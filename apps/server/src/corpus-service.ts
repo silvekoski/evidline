@@ -374,6 +374,8 @@ const retention: JobHandler = async (ctx, _payload, _job, resolve) => {
 };
 
 const reembed: JobHandler = async (ctx) => {
+  const current = ctx.textGateway.embedder();
+  ctx.corpus.embeddingMeta.set({ name: current.name, model: current.model, dims: current.dims });
   ctx.corpus.chunks.clearVectors();
   enqueueEmbeds(ctx, ctx.corpus.chunks.unembeddedIds());
 };

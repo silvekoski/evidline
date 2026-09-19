@@ -44,6 +44,10 @@ export function knowledgeRoutes(ctx: AppContext) {
 
   return new Hono()
     .get("/knowledge/stats", (c) => c.json(corpusStats(ctx)))
+    .post("/knowledge/reembed", (c) => {
+      ctx.jobs.enqueue("reembed", {}, { dedupe: "reembed" });
+      return c.json({ embedder: ctx.textGateway.embedder() }, 202);
+    })
     .get("/sources", (c) => {
       const kind = SourceKind.safeParse(c.req.query("kind")).data;
       const status = SourceStatus.safeParse(c.req.query("status")).data;
