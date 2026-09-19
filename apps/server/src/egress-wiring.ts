@@ -1,5 +1,6 @@
 import { parse } from "node:path";
 import { buildLeakIndex, createGateway, getProvider, type EgressStore, type Gateway, type LeakIndex } from "@tpm/egress";
+import { EgressPayload, InvestigationTool, Stage } from "@tpm/schemas";
 import type { Db } from "./db";
 import { newEgressId } from "./ids";
 import { getModelSettings } from "./settings";
@@ -8,13 +9,31 @@ const cacheSize = 4;
 const emptyIndex = buildLeakIndex([], []);
 const splitValue = /\[(?:[^\]=]*=)?([^\]]+)\]/g;
 
+type SchemaDef = { shape?: Record<string, unknown>; entries?: Record<string, unknown>; values?: unknown[]; options?: unknown[]; element?: unknown; innerType?: unknown; keyType?: unknown; valueType?: unknown };
+
+export const payloadVocabulary = ((): Set<string> => {
+  const words = new Set<string>([...InvestigationTool.options, ...Stage.options]);
+  const visit = (schema: unknown): void => {
+    const def = (schema as { _zod?: { def?: SchemaDef } } | null)?._zod?.def;
+    if (!def) return;
+    for (const [key, value] of Object.entries(def.shape ?? {})) {
+      words.add(key);
+      visit(value);
+    }
+    for (const value of [...Object.values(def.entries ?? {}), ...(def.values ?? [])]) if (typeof value === "string") words.add(value);
+    for (const inner of [...(def.options ?? []), def.element, def.innerType, def.keyType, def.valueType]) visit(inner);
+  };
+  visit(EgressPayload);
+  return new Set([...words].map((w) => w.toLowerCase()));
+})();
+
 export function forbiddenNames(db: Db, runId: string): string[] {
   const run = db.runs.get(runId);
   const sourceNames = db.sensors.list(runId).map((s) => s.sourceName);
   const fields = sourceNames.filter((name) => name.includes(".")).map((name) => name.slice(0, name.indexOf(".")));
   const categoryValues = sourceNames.flatMap((name) => [...name.matchAll(splitValue)].map((m) => m[1] as string));
   const runNames = run ? [...run.quarantined, run.name, parse(run.name).name] : [];
-  return [...sourceNames, ...fields, ...categoryValues, ...runNames];
+  return [...sourceNames, ...fields, ...categoryValues, ...runNames].filter((name) => !payloadVocabulary.has(name.toLowerCase()));
 }
 
 export function createLeakIndexCache(db: Db): (runId: string | null) => LeakIndex {

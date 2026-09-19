@@ -2,7 +2,7 @@ import { binarySegmentation, countViolations, crossCorrelation, histogram, mad, 
 import type { ChartSeries, Overrides, ToolCall, Window } from "@tpm/schemas";
 import { HTTPException } from "hono/http-exception";
 import type { AppContext } from "./context";
-import { appendLog } from "./log";
+import { addEvidence, storedSource } from "./persist";
 import { runPipelineJob, type PipelineOutput } from "./pipeline-worker";
 import { notFound } from "./request";
 
@@ -28,16 +28,9 @@ export async function executeTool(ctx: AppContext, runId: string, call: ToolCall
   const created: string[] = [];
   const sink: EvidenceSink = {
     add(input, derived) {
-      return db.transaction(() => {
-        let seq = db.evidence.count(runId) + 1;
-        let id = `ev-${runId}-${String(seq).padStart(5, "0")}`;
-        while (db.evidence.get(id)) id = `ev-${runId}-${String(++seq).padStart(5, "0")}`;
-        db.evidence.saveAll([{ ...input, id, runId }]);
-        if (derived) db.evidence.saveSeries(id, derived);
-        appendLog(db, { runId, type: "evidence", actor: "agent", inferenceId: null, evidenceIds: [id], egressId: null, before: null, after: { tool: call.tool, method: input.method }, reason: null });
-        created.push(id);
-        return id;
-      });
+      const id = addEvidence(db, runId, input, derived, { tool: call.tool, method: input.method });
+      created.push(id);
+      return id;
     },
   };
   const get = (alias: string) => grid.values[grid.aliases.indexOf(alias)]!;
@@ -103,7 +96,7 @@ export async function executeTool(ctx: AppContext, runId: string, call: ToolCall
       return { text, evidenceIds: selected.evidenceIds, role: selected };
     }
     case "rerun_without": {
-      const output = await runPipelineJob({ runId, overrides: { ...overrides, masked: [...new Set([...(overrides.masked ?? []), call.sensor])] }, source: { grid, t0: run.timeBase.t0, sourceNames: db.sensors.list(runId).map((s) => s.sourceName), stats: { rows: run.rows, columns: run.columns, rawBytes: run.rawBytes, quarantined: run.quarantined, domain: run.domain, bucket: run.bucket, episodes: run.episodes } } }, () => {});
+      const output = await runPipelineJob({ runId, overrides: { ...overrides, masked: [...new Set([...(overrides.masked ?? []), call.sensor])] }, source: storedSource(db, run, grid) }, () => {});
       const result = db.transaction(() => {
         const remap = new Map<string, string>();
         for (const evidence of output.evidence) remap.set(evidence.id, sink.add(evidence, output.derived.get(evidence.id)));

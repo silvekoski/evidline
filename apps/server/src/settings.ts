@@ -2,7 +2,7 @@ import { getProvider } from "@tpm/egress";
 import { ModelMode, type ModelSettings } from "@tpm/schemas";
 import type { Db } from "./db";
 
-export type ModelCallsHook = (runId: string) => Promise<void>;
+export type ModelCallsHook = (runId: string) => Promise<unknown>;
 
 const modeKey = "model-mode";
 let modelCallsHook: ModelCallsHook | null = null;

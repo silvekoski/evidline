@@ -1,8 +1,11 @@
+import type { Source } from "@tpm/adapters";
+import type { EvidenceInput, Grid } from "@tpm/core";
 import type { DiagnosisValue, Inference, Rule, Run } from "@tpm/schemas";
 import type { Db, SensorRecord } from "./db";
 import { inferenceId, newRuleId } from "./ids";
 import { appendLog } from "./log";
 import type { PipelineJobResult, PipelineOutput } from "./pipeline-worker";
+import { notFound } from "./request";
 
 type StageResult<V> = { value: V; claim: string; confidence: number; evidenceIds: string[] };
 type ByStage<I = Inference> = I extends Inference ? I : never;
@@ -15,6 +18,25 @@ export function createInference(db: Db, draft: InferenceDraft): Inference {
   const inference = { ...draft, id: inferenceId(draft.runId, seq), seq } as Inference;
   db.inferences.save(inference);
   return inference;
+}
+
+export function addEvidence(db: Db, runId: string, input: EvidenceInput, derived?: Record<string, Float64Array>, after: unknown = null): string {
+  return db.transaction(() => {
+    let seq = db.evidence.count(runId) + 1;
+    const idOf = (): string => `ev-${runId}-${String(seq).padStart(5, "0")}`;
+    while (db.evidence.get(idOf())) seq++;
+    const id = idOf();
+    db.evidence.saveAll([{ ...input, id, runId }]);
+    if (derived) db.evidence.saveSeries(id, derived);
+    appendLog(db, { runId, type: "evidence", actor: "agent", inferenceId: null, evidenceIds: [id], egressId: null, before: null, after, reason: null });
+    return id;
+  });
+}
+
+export function storedSource(db: Db, run: Run, grid: Grid | null = db.grids.load(run.id)): Source {
+  if (!grid) throw notFound("run grid");
+  const { rows, columns, rawBytes, quarantined, domain, bucket, episodes } = run;
+  return { grid, t0: run.timeBase.t0, sourceNames: db.sensors.list(run.id).map((s) => s.sourceName), stats: { rows, columns, rawBytes, quarantined, domain, bucket, episodes } };
 }
 
 export function inferencesOf(runId: string, result: PipelineOutput): Inference[] {

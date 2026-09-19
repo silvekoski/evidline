@@ -262,6 +262,7 @@ export function openDb(path: string = process.env.DB_PATH ?? dbPath) {
       save: inferences.upsert,
       saveAll: (items: Inference[]): void => transaction(() => items.forEach(inferences.upsert)),
       get: (id: string): Inference | null => inferences.one("WHERE id = ?", id),
+      successor: (id: string, runId: string): Inference | null => inferences.one("WHERE supersedes = ? AND run_id = ? ORDER BY seq DESC LIMIT 1", id, runId),
       list: (runId: string, stage?: Stage): Inference[] =>
         stage === undefined
           ? inferences.many("WHERE run_id = ? ORDER BY seq", runId)

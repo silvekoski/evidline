@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { Grid } from "@tpm/core";
 import type { EgressPayload } from "@tpm/schemas";
-import { forbiddenNames } from "../src/egress-wiring";
+import { forbiddenNames, payloadVocabulary } from "../src/egress-wiring";
 import { fixture, run, type Fixture } from "./fixture";
 
 const grid: Grid = {
@@ -47,6 +47,22 @@ describe("gateway wiring", () => {
       "uploads/plant-a.csv",
       "plant-a",
     ]);
+  });
+
+  it("drops a column header that equals a payload vocabulary word", async () => {
+    f.ctx.db.runs.save(run("89abcdef", { name: "plant-b.csv", quarantined: ["State", "index", "faultNumber"] }));
+    f.ctx.db.sensors.saveAll([
+      { runId: "89abcdef", alias: "S01", index: 0, sourceName: "Setpoint", fingerprint: {} as never, relations: [], redundancyGroup: null, peers: [], flowIndex: 0 },
+      { runId: "89abcdef", alias: "S02", index: 1, sourceName: "Step", fingerprint: {} as never, relations: [], redundancyGroup: null, peers: [], flowIndex: 1 },
+      { runId: "89abcdef", alias: "S03", index: 2, sourceName: "reactor_pressure", fingerprint: {} as never, relations: [], redundancyGroup: null, peers: [], flowIndex: 2 },
+    ]);
+    f.ctx.db.grids.save("89abcdef", grid);
+    expect(forbiddenNames(f.ctx.db, "89abcdef")).toEqual(["reactor_pressure", "faultNumber", "plant-b.csv", "plant-b"]);
+    for (const word of ["setpoint", "state", "step", "index", "sensor-drift", "verdict", "rerun_without", "diagnosis", "purpose"]) expect(payloadVocabulary.has(word), word).toBe(true);
+    const payload: EgressPayload = { purpose: "compile_rule", sentence: "S01 must stay below 20", dt: null, n: 20000, catalog: [{ alias: "S01", signalType: "step", role: "setpoint" }, { alias: "S02", signalType: "state", role: "state" }] };
+    const result = await f.ctx.gateway.call("compile_rule", payload, { runId: "89abcdef", inferenceId: null, operatorText: true });
+    expect(result).toMatchObject({ ok: true, source: "fallback" });
+    expect(f.ctx.db.egress.list("89abcdef")[0]?.guards.find((g) => g.name === "names")).toMatchObject({ pass: true, hits: 0 });
   });
 
   it("writes off records to sqlite and blocks a leak from the grids table", async () => {
