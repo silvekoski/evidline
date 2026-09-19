@@ -49,13 +49,15 @@ function project(m: PcaModel, grid: Grid, t: number, b: Scratch): { t2: number; 
   for (let i = 0; i < p; i++) {
     let reconstructed = 0;
     let weight = 0;
+    let leverage = 0;
     for (let c = 0; c < k; c++) {
       const l = m.loadings[c * p + i]!;
       reconstructed += b.s[c]! * l;
       weight += (b.s[c]! / m.eigenvalues[c]!) * l;
+      leverage += l * l;
     }
     const residual = b.z[i]! - reconstructed;
-    b.e[i] = residual * residual;
+    b.e[i] = (residual * residual) / Math.max(1 - leverage, 1e-9);
     b.tc[i] = weight * b.z[i]!;
     spe += residual * residual;
   }

@@ -7,10 +7,10 @@ import {
   distanceReference,
   distanceWindow,
   driftBlock,
+  fineBlock,
   isContinuous,
   isDrifting,
   rollingDistance,
-  type BlockStats,
 } from "./drift";
 import { injectFault, type FaultSpec } from "./inject";
 import { alignPeers, fitColumns, maskedValues, predictRange } from "./peer-model";
@@ -60,8 +60,8 @@ function tally(): Tally {
   };
 }
 
-function score(t: Tally, series: Float64Array, episodes: Window[], block: number, limit: number, fault: number | null): void {
-  const stats: BlockStats = blockStats(series, 0, series.length, block);
+function score(t: Tally, series: Float64Array, episodes: Window[], block: number, fine: number, limit: number, fault: number | null): void {
+  const stats = blockStats(series, 0, series.length, block, fine);
   combos.forEach(({ k, h }, c) => {
     const alarm = cusum(series, k, h, { start: 0, episodes }).alarms[0] ?? null;
     const fired = isDrifting(stats, alarm, limit);
@@ -102,6 +102,7 @@ export function calibrateDrift(
   const { n } = grid;
   const limit = defaultDriftThresholds.deviationLimit;
   const block = driftBlock(grid);
+  const fine = fineBlock(n);
   const { w, stride } = distanceWindow(n);
   const length = baseline.to - baseline.from;
   const segments = Math.min(20, Math.max(2, Math.floor(length / Math.max(500, 2 * w))));
@@ -142,19 +143,21 @@ export function calibrateDrift(
         if (fit.n >= 100) {
           const clean = predictRange(fit, y, columns, from, to).deviation;
           peerTally.pairs++;
-          score(peerTally, clean, episodes, block, limit, null);
+          score(peerTally, clean, episodes, block, fine, limit, null);
           faults.forEach((f, index) => {
             const injected = inject(f, fit.sigma);
             const series = Float64Array.from(clean, (d, t) => d + (injected[t]! - held[t]!) / fit.sigma);
-            score(peerTally, series, episodes, block, limit, index);
+            score(peerTally, series, episodes, block, fine, limit, index);
           });
         }
       }
 
       const ref = distanceReference(y, others, w, refStride, fp.step, thin);
       distanceTally.pairs++;
-      score(distanceTally, rollingDistance(held, ref), episodes, Math.max(block, w), limit, null);
-      faults.forEach((f, index) => score(distanceTally, rollingDistance(inject(f, ref.scale), ref), episodes, Math.max(block, w), limit, index));
+      score(distanceTally, rollingDistance(held, ref), episodes, Math.max(block, w), Math.max(block, w), limit, null);
+      faults.forEach((f, index) =>
+        score(distanceTally, rollingDistance(inject(f, ref.scale), ref), episodes, Math.max(block, w), Math.max(block, w), limit, index),
+      );
     }
   }
 

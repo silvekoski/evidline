@@ -1,14 +1,28 @@
-import type { BaselineValue, Fingerprint } from "@tpm/schemas";
-import { median } from "./stats/quantile";
+import type { BaselineValue, Fingerprint, Window } from "@tpm/schemas";
+import { mad, median } from "./stats/quantile";
 import { binarySegmentation } from "./stats/segmentation";
-import { roundSig } from "./stats/series";
+import { noiseLevel, roundSig } from "./stats/series";
 import { type EvidenceSink, type Grid, window } from "./types";
 
-export type BaselineResult = { value: BaselineValue; claim: string; confidence: number; evidenceIds: string[] };
+export type BaselineResult = {
+  value: BaselineValue;
+  claim: string;
+  confidence: number;
+  evidenceIds: string[];
+  sensorChangepoints: Map<string, number[]>;
+};
 
 type Change = { sensor: number; index: number; move: number; scale: number };
 
 type ChangeGroup = { index: number; sensors: number[]; big: Change | null };
+
+export function minBaselineLength(n: number): number {
+  return Math.max(1000, Math.floor(0.1 * n));
+}
+
+export function snapToBoundary(episodes: Window[], n: number, end: number): number {
+  return episodes.slice(1).map((e) => e.from).filter((s) => s <= end && end - s <= 0.05 * n).at(-1) ?? end;
+}
 
 export function selectBaseline(grid: Grid, fps: Fingerprint[], sink: EvidenceSink): BaselineResult {
   const { n, aliases, episodes } = grid;
@@ -18,15 +32,17 @@ export function selectBaseline(grid: Grid, fps: Fingerprint[], sink: EvidenceSin
     const x = grid.values[sensor]!;
     const cps = binarySegmentation(x, { episodes });
     if (cps.length === 0) return cps;
-    const scale = Math.max(fps[sensor]!.mad, fps[sensor]!.noise);
     const edges = [0, ...cps, n];
     const levels = edges.slice(0, -1).map((from, k) => median(x.subarray(from, edges[k + 1]!)));
     let maxMove = 0;
     cps.forEach((index, k) => {
+      const before = x.subarray(0, index);
+      const spans = episodes.filter((e) => e.from < index).map((e) => window(e.from, Math.min(e.to, index)));
       const move = Math.abs(levels[k + 1]! - levels[k]!);
       maxMove = Math.max(maxMove, move);
-      changes.push({ sensor, index, move, scale });
+      changes.push({ sensor, index, move, scale: Math.max(mad(before), noiseLevel(before, spans)) });
     });
+    const scale = Math.max(fps[sensor]!.mad, fps[sensor]!.noise);
     evidenceIds.push(
       sink.add({
         kind: "changepoint",
@@ -47,6 +63,7 @@ export function selectBaseline(grid: Grid, fps: Fingerprint[], sink: EvidenceSin
   });
 
   changes.sort((a, b) => a.index - b.index);
+  const shareFloor = Math.max(3, Math.ceil(0.25 * aliases.length));
   const counted: ChangeGroup[] = [];
   for (let i = 0; i < changes.length; ) {
     const first = changes[i]!;
@@ -58,23 +75,14 @@ export function selectBaseline(grid: Grid, fps: Fingerprint[], sink: EvidenceSin
       members.add(c.sensor);
       if (c.move > 3 * c.scale) big ??= c;
     }
-    if (members.size >= 3 || big) counted.push({ index: first.index, sensors: [...members], big });
+    if (members.size >= shareFloor || big) counted.push({ index: first.index, sensors: [...members], big });
     i = j;
   }
 
-  const minLength = Math.max(1000, Math.floor(0.1 * n));
-  const starts = episodes.slice(1).map((e) => e.from);
-  const snap = (end: number) => starts.filter((s) => s <= end && end - s <= 0.05 * n).at(-1) ?? end;
-  let chosen: ChangeGroup | null = null;
-  let end = snap(Math.floor(0.6 * n));
-  for (const g of counted) {
-    const snapped = snap(g.index);
-    if (snapped >= minLength) {
-      chosen = g;
-      end = snapped;
-      break;
-    }
-  }
+  const minLength = minBaselineLength(n);
+  const snap = (end: number) => snapToBoundary(episodes, n, end);
+  const chosen = counted.find((g) => snap(g.index) >= minLength) ?? null;
+  const end = snap(chosen ? chosen.index : Math.floor(0.6 * n));
 
   const clean = perSensor.filter((cps) => !cps.some((c) => c < end)).length;
   const shown = (chosen ? chosen.sensors : aliases.map((_, i) => i)).slice(0, 5);
@@ -101,7 +109,7 @@ export function selectBaseline(grid: Grid, fps: Fingerprint[], sink: EvidenceSin
   );
 
   const reason = chosen
-    ? chosen.sensors.length >= 3
+    ? chosen.sensors.length >= shareFloor
       ? `The first counted change point at sample ${chosen.index} is shared by ${chosen.sensors.length} sensors.`
       : `The first counted change point at sample ${chosen.index} moves ${aliases[chosen.big!.sensor]} by ${roundSig(chosen.big!.move)}, more than 3 change point scales.`
     : counted.length === 0
@@ -113,5 +121,6 @@ export function selectBaseline(grid: Grid, fps: Fingerprint[], sink: EvidenceSin
     claim: `Baseline is the first ${end} samples. ${reason}${snappedToBoundary ? ` The end snaps to the episode boundary at sample ${end}.` : ""}`,
     confidence: aliases.length > 0 ? clean / aliases.length : 1,
     evidenceIds,
+    sensorChangepoints: new Map(aliases.map((alias, i) => [alias, perSensor[i]!])),
   };
 }

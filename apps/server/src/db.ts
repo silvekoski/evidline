@@ -1,11 +1,10 @@
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import Database from "better-sqlite3";
-import type { Grid } from "@tpm/core";
+import type { Grid, Peer } from "@tpm/core";
 import type { EgressRecord, Evidence, Fingerprint, Inference, RedundancyGroup, Relation, Rule, Run, Stage, ThreadEntry } from "@tpm/schemas";
 import { dbPath } from "./paths";
 
-export type SensorPeer = { alias: string; lag: number; rho: number; n: number };
 export type SensorRecord = {
   runId: string;
   alias: string;
@@ -14,7 +13,7 @@ export type SensorRecord = {
   fingerprint: Fingerprint;
   relations: Relation[];
   redundancyGroup: RedundancyGroup | null;
-  peers: SensorPeer[];
+  peers: Peer[];
   flowIndex: number | null;
 };
 export type LogRow = { seq: number; runId: string; text: string; hash: string };

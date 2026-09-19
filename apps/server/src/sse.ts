@@ -8,8 +8,6 @@ export type RunHub = {
   subscribe(runId: string, listener: RunListener): () => void;
 };
 
-const finished = (run: Run | null): run is Run => run !== null && (run.status === "done" || run.status === "failed");
-
 export function createHub(getRun: (runId: string) => Run | null): RunHub {
   const channels = new Map<string, Set<RunListener>>();
   return {
@@ -21,7 +19,7 @@ export function createHub(getRun: (runId: string) => Run | null): RunHub {
     },
     subscribe(runId, listener) {
       const run = getRun(runId);
-      if (finished(run)) {
+      if (run !== null && (run.status === "done" || run.status === "failed")) {
         listener({ type: "run", run });
         listener({ type: "done", runId });
         return () => {};
@@ -44,7 +42,7 @@ export function sseResponse(c: Context, hub: RunHub, runId: string): Response {
       new Promise<void>((resolve) => {
         let queue = Promise.resolve();
         const unsubscribe = hub.subscribe(runId, (event) => {
-          queue = queue.then(() => stream.writeSSE({ event: event.type, data: JSON.stringify(event) }));
+          queue = queue.then(() => stream.writeSSE({ data: JSON.stringify(event) }));
           if (event.type === "done") void queue.then(resolve);
         });
         stream.onAbort(() => {

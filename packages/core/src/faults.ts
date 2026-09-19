@@ -13,10 +13,10 @@ import type {
 } from "@tpm/schemas";
 import { faultLabel, healthToFault } from "@tpm/schemas";
 import type { DriftResult } from "./drift";
-import { fitPca, pcaStatistics, type PcaModel, type PcaStatistics } from "./pca";
+import { fitPca, pcaStatistics, type PcaModel } from "./pca";
 import type { RelationGraph } from "./relations";
 import type { RoleResult } from "./roles";
-import { blockMedians, dominantPeriod, mannKendall, median, spearman, theilSen } from "./stats";
+import { acfTime, blockMedians, dominantPeriod, mannKendall, median, spearman, theilSen } from "./stats";
 import { buildTrace, listing, sig, type Cited } from "./trace";
 import { window, type EvidenceInput, type EvidenceSink, type Grid, type Masks } from "./types";
 
@@ -51,12 +51,12 @@ type Prepared = FaultContext & {
   drifting: Map<string, DriftResult>;
   drivers: string[];
   victims: Map<string, string[]>;
-  pairs: Set<string>;
+  neighbors: Map<string, Set<string>>;
   pca: PcaModel | null;
   shared: Shared;
 };
 
-type Group = { drivers: string[]; onset: number | null };
+type Group = { drivers: string[]; onset: number | null; until: number };
 
 type Loop = { actuator: string; controlled: string; downstream: string[]; shifted: string[] };
 
@@ -94,8 +94,19 @@ function ratio(a: number, b: number): number {
   return b === 0 ? 1 : a / b;
 }
 
-function pairKey(a: string, b: string): string {
-  return a < b ? `${a}|${b}` : `${b}|${a}`;
+function neighborsOf(ctx: FaultContext): Map<string, Set<string>> {
+  const out = new Map(ctx.grid.aliases.map((a) => [a, new Set<string>()]));
+  for (const r of ctx.graph.relations) {
+    out.get(r.a)?.add(r.b);
+    out.get(r.b)?.add(r.a);
+  }
+  return out;
+}
+
+function related(p: Prepared, a: string, b: string): boolean {
+  const near = p.neighbors.get(a);
+  const far = p.neighbors.get(b);
+  return near !== undefined && far !== undefined && (near.has(b) || [...near].some((c) => far.has(c)));
 }
 
 function directed(r: Relation): boolean {
@@ -111,7 +122,11 @@ function leads(p: Prepared, a: string): string[] {
 function prepare(ctx: FaultContext, sink: EvidenceSink, overrides: Overrides): Prepared {
   const healthOf = new Map(ctx.health.map((h) => [h.value.sensor, h]));
   const roleOf = new Map(ctx.roles.map((r) => [r.value.sensor, overrides.roles?.[r.value.sensor] ?? r.value.role]));
-  const acfOf = new Map(ctx.grid.aliases.map((a, i) => [a, ctx.fps[i]?.acfTime ?? 0]));
+  const { baseline } = ctx;
+  const baselineEpisodes = ctx.grid.episodes
+    .filter((e) => e.to > baseline.from && e.from < baseline.to)
+    .map((e) => window(Math.max(e.from, baseline.from) - baseline.from, Math.min(e.to, baseline.to) - baseline.from));
+  const acfOf = new Map(ctx.grid.aliases.map((a, i) => [a, acfTime(ctx.grid.values[i]!.subarray(baseline.from, baseline.to), baselineEpisodes)]));
   const excluded = [
     ...new Set([...(overrides.masked ?? []), ...ctx.health.filter((h) => h.value.health !== "healthy").map((h) => h.value.sensor)]),
   ].sort();
@@ -140,7 +155,7 @@ function prepare(ctx: FaultContext, sink: EvidenceSink, overrides: Overrides): P
     drifting,
     drivers,
     victims,
-    pairs: new Set(ctx.graph.relations.map((r) => pairKey(r.a, r.b))),
+    neighbors: neighborsOf(ctx),
     pca: fitPca(ctx.grid, ctx.baseline, pcaSensors),
     shared: sharedChangepoint(ctx, sink),
   };
@@ -265,35 +280,51 @@ function driverGroups(p: Prepared): Group[] {
     parent[i] = root;
     return root;
   };
+  const coincide = (a: string, b: string): boolean =>
+    Math.abs(onsetForGrouping(p, a) - onsetForGrouping(p, b)) <= Math.max(2 * Math.max(p.acfOf.get(a)!, p.acfOf.get(b)!), 0.01 * n);
   for (let i = 0; i < drivers.length; i++) {
     for (let j = i + 1; j < drivers.length; j++) {
-      const a = drivers[i]!;
-      const b = drivers[j]!;
-      if (!p.pairs.has(pairKey(a, b))) continue;
-      const slack = Math.max(2 * Math.max(p.acfOf.get(a)!, p.acfOf.get(b)!), 0.01 * n);
-      if (Math.abs(onsetForGrouping(p, a) - onsetForGrouping(p, b)) <= slack) parent[find(i)] = find(j);
+      if (related(p, drivers[i]!, drivers[j]!) && coincide(drivers[i]!, drivers[j]!)) parent[find(i)] = find(j);
     }
   }
   const members = new Map<number, string[]>();
   drivers.forEach((a, i) => members.set(find(i), [...(members.get(find(i)) ?? []), a]));
-  return [...members.values()]
+  const plantWide = Math.max(3, Math.ceil(0.1 * p.grid.aliases.length));
+  for (const [root, group] of members) {
+    if (group.length < plantWide) continue;
+    for (let i = 0; i < drivers.length; i++) {
+      if (find(i) !== root && group.some((a) => coincide(a, drivers[i]!))) parent[find(i)] = root;
+    }
+  }
+  const merged = new Map<number, string[]>();
+  drivers.forEach((a, i) => merged.set(find(i), [...(merged.get(find(i)) ?? []), a]));
+  const groups = [...merged.values()]
     .map((group) => {
       const onsets = group.map((a) => p.drifting.get(a)!.value.onset).filter((o): o is number => o !== null);
       return { drivers: group.sort(), onset: onsets.length > 0 ? Math.min(...onsets) : null };
     })
     .sort((x, y) => (x.onset ?? n) - (y.onset ?? n) || x.drivers[0]!.localeCompare(y.drivers[0]!));
+  return groups.map((g, i) => ({ ...g, until: groups[i + 1]?.onset ?? n }));
 }
 
-function rank(p: Prepared, members: string[], pca: PcaStatistics | null): RankedSensor[] {
-  const raw = members.map((a) => pca?.contributions.get(a) ?? 0);
+function rank(p: Prepared, drivers: string[], victims: string[]): RankedSensor[] {
+  const members = [...drivers, ...victims];
+  const raw = members.map((a) => p.drifting.get(a)?.value.maxDeviation ?? 0);
   const total = raw.reduce((s, v) => s + v, 0);
+  const tier = new Set(drivers);
   return members
     .map((sensor, i) => ({
       sensor,
       contribution: total > 0 ? raw[i]! / total : 1 / members.length,
       onset: p.drifting.get(sensor)?.value.onset ?? null,
     }))
-    .sort((x, y) => y.contribution - x.contribution || (x.onset ?? p.n) - (y.onset ?? p.n) || x.sensor.localeCompare(y.sensor));
+    .sort(
+      (x, y) =>
+        Number(tier.has(y.sensor)) - Number(tier.has(x.sensor)) ||
+        y.contribution - x.contribution ||
+        (x.onset ?? p.n) - (y.onset ?? p.n) ||
+        x.sensor.localeCompare(y.sensor),
+    );
 }
 
 function findLoop(p: Prepared, drivers: string[]): Loop | null {
@@ -310,17 +341,18 @@ function findLoop(p: Prepared, drivers: string[]): Loop | null {
   return null;
 }
 
-function processKind(p: Prepared, deviation: Float64Array, lead: string, from: number): Kind {
+function processKind(p: Prepared, deviation: Float64Array, lead: string, span: Window): Kind {
   const { n } = p;
+  const { from, to } = span;
   const block = Math.max(1, Math.floor(n / 200));
-  const { centers, medians } = blockMedians(Float64Array.from(deviation, (v) => Math.abs(v)), block, from, n);
+  const { centers, medians } = blockMedians(Float64Array.from(deviation, (v) => Math.abs(v)), block, from, to);
   const fit = theilSen(Float64Array.from(medians), Float64Array.from(centers));
   const mk = mannKendall(Float64Array.from(medians));
-  const span = Math.max(2, Math.ceil(2 * p.acfOf.get(lead)!));
-  const before = median(deviation.subarray(Math.max(0, from - span), from));
-  const after = median(deviation.subarray(from, Math.min(n, from + span)));
+  const reach = Math.max(2, Math.ceil(2 * p.acfOf.get(lead)!));
+  const before = median(deviation.subarray(Math.max(0, from - reach), from));
+  const after = median(deviation.subarray(from, Math.min(to, from + reach)));
   const jump = Math.abs(after - before);
-  const period = dominantPeriod(deviation.subarray(from, n), 0.5) ?? 0;
+  const period = dominantPeriod(deviation.subarray(from, to), 0.5) ?? 0;
   const faultClass: FaultClass =
     medians.length >= 4 && mk.p < 0.01 && fit.slope > 0
       ? "process-slow-degradation"
@@ -329,7 +361,7 @@ function processKind(p: Prepared, deviation: Float64Array, lead: string, from: n
         : period > 0
           ? "process-oscillation"
           : "process-degradation";
-  return { faultClass, blocks: medians.length, slopePer1000: 1000 * fit.slope, mkZ: mk.z, pValue: mk.p, jump, span, period };
+  return { faultClass, blocks: medians.length, slopePer1000: 1000 * fit.slope, mkZ: mk.z, pValue: mk.p, jump, span: reach, period };
 }
 
 function maxDeviationOf(p: Prepared, alias: string): number {
@@ -341,22 +373,23 @@ function diagnose(p: Prepared, group: Group): Incident {
   const onset = group.onset;
   const from = Math.max(0, Math.min(onset ?? p.baseline.to, n - MIN_WINDOW));
   const w = window(from, n);
+  const span = window(from, Math.min(n, Math.max(group.until, from + MIN_WINDOW)));
   const victims = [...new Set(group.drivers.flatMap((d) => p.victims.get(d) ?? []))].sort();
-  const pca = p.pca ? pcaStatistics(p.pca, grid, w) : null;
-  const ranked = rank(p, [...group.drivers, ...victims], pca);
+  const pca = p.pca ? pcaStatistics(p.pca, grid, span) : null;
+  const ranked = rank(p, group.drivers, victims);
   const lead = ranked.find((r) => group.drivers.includes(r.sensor))!.sensor;
   const drift = p.drifting.get(lead)!;
   const model = drift.model;
   const single = group.drivers.length === 1;
 
-  const level = model ? spearman(model.deviation.subarray(from, n), model.expected.subarray(from, n)) : { rho: 0, n: 0 };
+  const level = model ? spearman(model.deviation.subarray(span.from, span.to), model.expected.subarray(span.from, span.to)) : { rho: 0, n: 0 };
   const peers = (p.graph.peers.get(lead) ?? []).map((q) => q.alias);
   const peerDrivers = peers.filter((a) => p.drivers.includes(a)).length;
   const redundancy = p.graph.groups.find((g) => g.sensors.includes(lead)) ?? null;
   const groupOthers = redundancy ? redundancy.sensors.filter((a) => a !== lead) : [];
   const groupDrivers = groupOthers.filter((a) => p.drivers.includes(a)).length;
   const loop = findLoop(p, group.drivers);
-  const kind = model ? processKind(p, model.deviation, lead, from) : null;
+  const kind = model ? processKind(p, model.deviation, lead, span) : null;
 
   const onsets = new Map(ranked.filter((r) => r.onset !== null).map((r) => [r.sensor, r.onset!]));
   let edges = 0;
@@ -374,7 +407,7 @@ function diagnose(p: Prepared, group: Group): Incident {
   const pcaEv = add(p.sink, {
     kind: "structure",
     sensors: ranked.map((r) => r.sensor),
-    window: w,
+    window: span,
     method: "pca",
     stats: {
       n: pca?.n ?? w.n,
@@ -382,7 +415,7 @@ function diagnose(p: Prepared, group: Group): Incident {
       components: p.pca?.components ?? 0,
       excluded: p.excluded.length,
       ...(pca && p.pca ? { t2: pca.t2, t2Limit: p.pca.t2Limit, spe: pca.spe, speLimit: p.pca.speLimit } : {}),
-      ...Object.fromEntries(ranked.map((r) => [`contrib_${r.sensor}`, r.contribution])),
+      ...Object.fromEntries(ranked.map((r) => [`pca_${r.sensor}`, pca?.contributions.get(r.sensor) ?? 0])),
     },
     verdict:
       pca && p.pca
@@ -392,7 +425,7 @@ function diagnose(p: Prepared, group: Group): Incident {
             ? `T2 ${sig(pca.t2)} exceeds ${sig(p.pca.t2Limit)} with SPE inside its limit: the process moved inside its relations.`
             : `T2 ${sig(pca.t2)} and SPE ${sig(pca.spe)} stay inside their limits.`
         : "No PCA model: fewer than two healthy non-constant sensors.",
-    chart: { type: "bar", window: w, series: [], bars: ranked.map((r) => ({ label: r.sensor, value: r.contribution })) },
+    chart: { type: "bar", window: span, series: [], bars: ranked.map((r) => ({ label: r.sensor, value: pca?.contributions.get(r.sensor) ?? 0 })) },
   });
   const onsetEv = add(p.sink, {
     kind: "lag",
@@ -423,10 +456,10 @@ function diagnose(p: Prepared, group: Group): Incident {
     {
       kind: "residual",
       sensors: [lead, ...peers],
-      window: w,
+      window: span,
       method: "spearman",
       stats: {
-        n: w.n,
+        n: span.n,
         pairs: level.n,
         levelRho: Math.abs(level.rho),
         maxDeviation: drift.value.maxDeviation,
@@ -440,13 +473,14 @@ function diagnose(p: Prepared, group: Group): Incident {
         actuatorDeviation: loop ? maxDeviationOf(p, loop.actuator) : 0,
         downstream: loop ? loop.downstream.length : 0,
         downstreamShifted: loop ? loop.shifted.length : 0,
+        ...Object.fromEntries(ranked.map((r) => [`contrib_${r.sensor}`, r.contribution])),
       },
       verdict: model
         ? `${lead} deviates up to ${sig(drift.value.maxDeviation)} from its ${peers.length} peers; |rho| between deviation and level ${sig(Math.abs(level.rho))}.`
         : `${lead} drifts against its own baseline distribution; no peer model.`,
       chart: {
         type: "line",
-        window: w,
+        window: span,
         series: [
           series(lead, "solid", "value"),
           ...(model ? [{ key: "expected", label: "expected from peers", source: { derived: "expected" }, style: "dashed" as const }] : []),
@@ -466,13 +500,13 @@ function diagnose(p: Prepared, group: Group): Incident {
           {
             kind: "trend",
             sensors: [lead],
-            window: w,
+            window: span,
             method: "theil-sen",
-            stats: { n: w.n, blocks: kind.blocks, slopePer1000: kind.slopePer1000, mkZ: kind.mkZ, pValue: kind.pValue, jump: kind.jump, span: kind.span, period: kind.period },
+            stats: { n: span.n, blocks: kind.blocks, slopePer1000: kind.slopePer1000, mkZ: kind.mkZ, pValue: kind.pValue, jump: kind.jump, span: kind.span, period: kind.period },
             verdict: `|deviation| of ${lead} trends ${sig(kind.slopePer1000)} per 1000 samples over ${kind.blocks} blocks (p ${sig(kind.pValue)}); jump at onset ${sig(kind.jump)}; period ${kind.period}.`,
             chart: {
               type: "line",
-              window: w,
+              window: span,
               series: [{ key: "deviation", label: "deviation", source: { derived: "deviation" }, style: "solid" }],
               ...(onset === null ? {} : { marks: [{ at: onset, label: "onset", kind: "onset" as const }] }),
             },
