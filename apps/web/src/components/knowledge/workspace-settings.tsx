@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { keys, listWorkspaces, patchWorkspace } from "@/api";
+import { erasePerson, keys, listWorkspaces, patchWorkspace } from "@/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -25,6 +25,15 @@ export function WorkspaceSettings() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: keys.workspaces });
       toast.success("Workspace saved");
+    },
+  });
+  const [person, setPerson] = useState("");
+  const erase = useMutation({
+    mutationFn: () => erasePerson(person),
+    onSuccess: (r) => {
+      void queryClient.invalidateQueries();
+      setPerson("");
+      toast.success(`Erased ${person}`, { description: `${r.segments} segments, ${r.claims} claims, ${r.blobsRemoved} files, ${r.sourcesRemoved} sources removed, ${r.sourcesRebuilt} rebuilt.` });
     },
   });
   if (!current) return null;
@@ -52,6 +61,21 @@ export function WorkspaceSettings() {
           </div>
           <Button type="submit" size="sm" disabled={save.isPending}>
             Save
+          </Button>
+        </form>
+        <form
+          className="mt-4 grid gap-3 border-t pt-4 md:grid-cols-[1fr_auto] md:items-end"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (confirm(`Erase every word and claim of ${person} from this workspace? The original files of those sources are removed too.`)) erase.mutate();
+          }}
+        >
+          <div className="grid gap-1">
+            <Label htmlFor="ws-erase">Erase a person (GDPR request)</Label>
+            <Input id="ws-erase" value={person} onChange={(e) => setPerson(e.target.value)} placeholder="Name as it appears as a speaker" />
+          </div>
+          <Button type="submit" size="sm" variant="outline" disabled={erase.isPending || person.trim().length < 2}>
+            Erase
           </Button>
         </form>
       </CardContent>

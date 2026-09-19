@@ -155,13 +155,18 @@ const chunk: JobHandler = async (ctx, payload) => {
   if (!source) throw new Error(`source ${id} not found`);
   const segments = ctx.corpus.segments.list(id);
   const drafts = chunkSegments(source.kind, segments);
-  const chunkIds = ctx.corpus.transaction(() => {
+  const keepClaims = payload.extract === false;
+  const { chunkIds, claimChunkIds } = ctx.corpus.transaction(() => {
     for (const claim of ctx.corpus.claims.ofSource(id)) if (payload.previous) ctx.corpus.claims.setStatus(claim.id, "contradicted", "The source changed and the quote was not found again.");
     ctx.corpus.chunks.deleteOfSource(id);
-    return drafts.map((d) => ctx.corpus.chunks.insert({ sourceId: id, kind: "passage", text: d.text, locator: d.locator, tokens: d.tokens, segmentFrom: d.segmentFrom, segmentTo: d.segmentTo }));
+    const chunkIds = drafts.map((d) => ctx.corpus.chunks.insert({ sourceId: id, kind: "passage", text: d.text, locator: d.locator, tokens: d.tokens, segmentFrom: d.segmentFrom, segmentTo: d.segmentTo }));
+    const claimChunkIds = keepClaims
+      ? ctx.corpus.claims.ofSource(id).map((c) => ctx.corpus.chunks.insert({ sourceId: id, kind: "claim", text: c.statement, locator: c.locator, tokens: Math.ceil(c.statement.length / 4), segmentFrom: null, segmentTo: null, claimId: c.id }))
+      : [];
+    return { chunkIds, claimChunkIds };
   });
-  enqueueEmbeds(ctx, chunkIds);
-  for (const chunkId of chunkIds) ctx.jobs.enqueue("extract", { chunkId });
+  enqueueEmbeds(ctx, [...chunkIds, ...claimChunkIds]);
+  if (!keepClaims) for (const chunkId of chunkIds) ctx.jobs.enqueue("extract", { chunkId });
   if (source.status !== "sensor_data") ctx.corpus.sources.setStatus(id, "processed");
 };
 
@@ -286,6 +291,46 @@ const runSensorFile: JobHandler = async (ctx, payload) => {
   ctx.corpus.sources.update(id, { runId: run.id });
   await done;
 };
+
+export type ErasureResult = { segments: number; claims: number; sourcesRemoved: number; sourcesRebuilt: number; blobsRemoved: number; unassignedRemoved: number };
+
+export function erasePerson(ctx: AppContext, person: string): ErasureResult {
+  const name = person.trim();
+  const result = ctx.corpus.transaction((): ErasureResult => {
+    const affected = (ctx.corpus.raw.prepare("SELECT DISTINCT source_id AS id FROM segment WHERE speaker = ? COLLATE NOCASE").all(name) as { id: number }[]).map((r) => r.id);
+    const claims = ctx.corpus.raw.prepare("DELETE FROM claim WHERE speaker = ? COLLATE NOCASE").run(name).changes;
+    const segments = ctx.corpus.raw.prepare("DELETE FROM segment WHERE speaker = ? COLLATE NOCASE").run(name).changes;
+    let sourcesRemoved = 0;
+    let sourcesRebuilt = 0;
+    let blobsRemoved = 0;
+    for (const id of affected) {
+      const source = ctx.corpus.sources.get(id)!;
+      if (source.blobPath) {
+        rmSync(join(ctx.dir, source.blobPath), { force: true });
+        ctx.corpus.sources.update(id, { blobPath: null });
+        blobsRemoved++;
+      }
+      const remaining = ctx.corpus.segments.list(id);
+      if (remaining.length === 0) {
+        ctx.corpus.sources.delete(id);
+        sourcesRemoved++;
+        continue;
+      }
+      ctx.corpus.segments.replace(id, remaining);
+      ctx.jobs.enqueue("chunk", { sourceId: id, extract: false });
+      sourcesRebuilt++;
+    }
+    return { segments, claims, sourcesRemoved, sourcesRebuilt, blobsRemoved, unassignedRemoved: 0 };
+  });
+  for (const row of ctx.registry.unassigned.list()) {
+    const raw = ctx.registry.unassigned.raw(row.id)?.raw as { segments?: { speaker: string | null }[] } | undefined;
+    if (raw?.segments?.some((s) => s.speaker?.toLowerCase() === name.toLowerCase())) {
+      ctx.registry.unassigned.delete(row.id);
+      result.unassignedRemoved++;
+    }
+  }
+  return result;
+}
 
 export const RETENTION_INTERVAL_MS = 24 * 3600_000;
 

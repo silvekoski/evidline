@@ -178,6 +178,8 @@ export const syncConnector = (id: number) => request(Connector, `/connectors/${i
 export const deleteConnector = (id: number) => request(nothing, `/connectors/${id}`, { method: "DELETE" });
 export const connectorGaps = (id: number, days = 30) => request(MeetingGapList, `/connectors/${id}/gaps?days=${days}`);
 export const importAliases = (csv: string) => request({ parse: (x) => x as { added: number; unknown: number } }, "/aliases/import", post({ csv }));
+export const erasePerson = (person: string) =>
+  request({ parse: (x) => x as { segments: number; claims: number; sourcesRemoved: number; sourcesRebuilt: number; blobsRemoved: number; unassignedRemoved: number } }, "/erasure", post({ person }));
 export const listJobs = () => request(JobList, "/jobs");
 export const retryJobs = () => request({ parse: (x) => x as { retried: number } }, "/jobs/retry", post());
 export const listTextEgress = () => request(TextEgressList, "/egress-log");

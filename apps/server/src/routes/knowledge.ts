@@ -7,7 +7,7 @@ import { CorpusSearchBody, CreateConnectorBody, CreateUploadLinkBody, PatchClaim
 import { z } from "zod";
 import type { AppContext } from "../context";
 import { scheduleSync, transcriptGaps } from "../connector-service";
-import { confirmLink, corpusStats, dataSpec, ingestFile, linkOne, openQuestions, search } from "../corpus-service";
+import { confirmLink, corpusStats, dataSpec, erasePerson, ingestFile, linkOne, openQuestions, search } from "../corpus-service";
 import { badRequest, notFound, parseBody } from "../request";
 
 export const MAX_UPLOAD_BYTES = 200 * 1024 * 1024;
@@ -32,6 +32,7 @@ export async function uploadFiles(ctx: AppContext, body: Record<string, string |
 
 const AliasImportBody = z.object({ csv: z.string().min(1), tagColumn: z.string().default("tag"), phraseColumns: z.array(z.string()).default(["description", "name", "alias"]) });
 const ManualLinkBody = z.object({ columnId: z.number().int() });
+const ErasureBody = z.object({ person: z.string().trim().min(2).max(120) });
 
 export function knowledgeRoutes(ctx: AppContext) {
   const { corpus, registry } = ctx;
@@ -149,6 +150,10 @@ export function knowledgeRoutes(ctx: AppContext) {
         }
       });
       return c.json({ added, unknown });
+    })
+    .post("/erasure", async (c) => {
+      const { person } = await parseBody(c, ErasureBody);
+      return c.json(erasePerson(ctx, person));
     })
     .get("/egress-log", (c) => c.json(corpus.egressLog.list()))
     .get("/jobs", (c) => c.json(registry.jobs.list(ctx.slug)))

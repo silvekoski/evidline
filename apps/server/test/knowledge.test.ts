@@ -265,3 +265,27 @@ describe("retention", () => {
     expect(existsSync(join(f.ctx.dir, older!.blobPath!))).toBe(false);
   });
 });
+
+describe("erasure", () => {
+  it("removes the words and claims of one person, drops the original file, and rebuilds the rest", async () => {
+    const [source] = await upload({ "call.vtt": vtt });
+    await drain();
+    const before = f.ctx.corpus.claims.ofSource(source!.id);
+    expect(before.some((c) => c.speaker === "Matti Virtanen")).toBe(true);
+    const res = await f.app.request("/api/erasure", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ person: "matti virtanen" }) });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ segments: 1, sourcesRebuilt: 1, sourcesRemoved: 0, blobsRemoved: 1 });
+    await drain();
+    const after = f.ctx.corpus.sources.get(source!.id)!;
+    expect(after.blobPath).toBeNull();
+    expect(after.segments).toBe(1);
+    expect(f.ctx.corpus.segments.list(after.id)[0]!.speaker).toBe("Anna Data");
+    expect(f.ctx.corpus.claims.ofSource(after.id).every((c) => c.speaker !== "Matti Virtanen")).toBe(true);
+    expect(f.ctx.corpus.raw.prepare("SELECT COUNT(*) AS n FROM chunk WHERE source_id = ? AND text LIKE '%Matti%'").get(after.id)).toEqual({ n: 0 });
+    const hits = await search("Anna Data valve");
+    expect(hits.length).toBeGreaterThan(0);
+    const second = await f.app.request("/api/erasure", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ person: "Anna Data" }) });
+    expect(await second.json()).toMatchObject({ sourcesRemoved: 1 });
+    expect(f.ctx.corpus.sources.count()).toBe(0);
+  });
+});
