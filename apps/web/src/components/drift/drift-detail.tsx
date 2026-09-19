@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router";
 import type { DriftInference } from "@tpm/schemas";
+import { useClaimMarks } from "@/hooks/use-claim-marks";
 import { useLens } from "@/hooks/use-lens";
 import { screenPath } from "@/layout/screens";
 import { ActionBar } from "@/components/action-bar";
@@ -25,6 +26,7 @@ type Props = {
 export function DriftDetail({ inference, runId, aliases, label, dt }: Props) {
   const { value } = inference;
   const lens = useLens();
+  const claimMarks = useClaimMarks(runId);
   const residual = useResidual(inference);
   const limit = deviationLimit(residual.evidence?.chart);
   const spec = residual.evidence?.chart;
@@ -86,7 +88,7 @@ export function DriftDetail({ inference, runId, aliases, label, dt }: Props) {
         <p className="text-base font-medium">{inRangeLine(value)}.</p>
         <figure className="flex flex-col gap-2">
           {residual.series && spec ? (
-            <DriftCharts value={value} spec={spec} series={residual.series} limit={limit} label={label} />
+            <DriftCharts value={value} spec={spec} series={residual.series} limit={limit} label={label} claimMarks={claimMarks} />
           ) : residual.error ? (
             <p className="text-sm text-muted-foreground">Series not available: {residual.error.message}</p>
           ) : (

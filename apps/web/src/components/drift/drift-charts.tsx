@@ -9,7 +9,7 @@ type Props = { value: DriftValue; spec: ChartSpec; series: EvidenceSeries; limit
 
 const axisTick = { fontFamily: "var(--font-mono)", fontSize: 10 };
 const dotted = { stroke: "var(--chart-2)", strokeDasharray: "1 3" } as const;
-const markLabel = (text: string, position: "insideTopLeft" | "insideTopRight") =>
+const markLabel = (text: string, position: "insideTopLeft" | "insideTopRight" | "insideBottomLeft") =>
   ({ value: text, position, fill: "var(--muted-foreground)", fontSize: 10 }) as const;
 
 const symmetricBound = (values: (number | null)[], limit: number | null) =>
@@ -33,7 +33,7 @@ export function DeviationSparkline({ value, spec, series, limit }: Props) {
   );
 }
 
-export function DriftCharts({ value, spec, series, limit, label }: Props & { label: (sample: number) => string }) {
+export function DriftCharts({ value, spec, series, limit, label, claimMarks = [] }: Props & { label: (sample: number) => string; claimMarks?: { at: number; label: string; claimId: number }[] }) {
   const syncId = useId();
   const hatchId = useId();
   const key = deviationKey(value);
@@ -62,6 +62,9 @@ export function DriftCharts({ value, spec, series, limit, label }: Props & { lab
     <ReferenceLine x={onset} stroke="var(--chart-2)" strokeDasharray="4 4" label={markLabel("onset", "insideTopLeft")} ifOverflow="visible" />
   );
   const activeDot = { r: 3, fill: "var(--chart-1)", stroke: "none" };
+  const claimLines = claimMarks.map((m) => (
+    <ReferenceLine key={`claim-${m.claimId}`} x={m.at} stroke="var(--chart-3)" strokeDasharray="1 3" label={markLabel(m.label, "insideBottomLeft")} ifOverflow="visible" />
+  ));
 
   return (
     <div className="flex flex-col gap-1">
@@ -82,6 +85,7 @@ export function DriftCharts({ value, spec, series, limit, label }: Props & { lab
             <Line dataKey="expected" type="linear" dot={false} activeDot={activeDot} isAnimationActive={false} stroke="var(--chart-2)" strokeWidth={1.5} strokeDasharray="6 4" />
           )}
           <Line dataKey="value" type="linear" dot={false} activeDot={activeDot} isAnimationActive={false} stroke="var(--chart-1)" strokeWidth={2} />
+          {claimLines}
           {onsetLine}
         </ComposedChart>
       </ChartContainer>

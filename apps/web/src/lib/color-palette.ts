@@ -32,8 +32,12 @@ export function readColorPalette(): ColorPaletteId {
   }
 }
 
-export function applyColorPalette(id: ColorPaletteId): void {
+export function previewColorPalette(id: ColorPaletteId): void {
   document.documentElement.dataset.palette = id;
+}
+
+export function applyColorPalette(id: ColorPaletteId): void {
+  previewColorPalette(id);
   try {
     localStorage.setItem(storageKey, id);
   } catch {

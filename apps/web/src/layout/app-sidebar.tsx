@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { NavLink, useLocation, useNavigate } from "react-router";
-import { FilesIcon, PlayIcon } from "lucide-react";
+import { BookOpenIcon, CircleHelpIcon, FilesIcon, FileTextIcon, PlayIcon, PlugIcon } from "lucide-react";
 import { keys, listRuns } from "@/api";
 import { useActiveRunId } from "@/hooks/use-active-run-id";
 import { useLens } from "@/hooks/use-lens";
@@ -20,6 +20,14 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar";
 import { screens, type ScreenSlug } from "./screens";
+import { WorkspaceSwitcher } from "./workspace-switcher";
+
+const knowledgeScreens = [
+  { path: "/sources", label: "Sources", icon: BookOpenIcon },
+  { path: "/open-questions", label: "Open questions", icon: CircleHelpIcon },
+  { path: "/spec", label: "Data spec", icon: FileTextIcon },
+  { path: "/connectors", label: "Connectors", icon: PlugIcon },
+];
 
 export function currentScreen(pathname: string): ScreenSlug | null {
   const slug = pathname.split("/")[3];
@@ -43,6 +51,7 @@ export function AppSidebar() {
           </span>
           <span className="truncate group-data-[collapsible=icon]:hidden">Process Monitor</span>
         </div>
+        <WorkspaceSwitcher />
         <div className="flex flex-col gap-1 group-data-[collapsible=icon]:hidden">
           <Label htmlFor="run-selector" className="px-2 text-xs text-muted-foreground">
             Run
@@ -108,6 +117,23 @@ export function AppSidebar() {
                       <span>{label(lens)}</span>
                     </SidebarMenuButton>
                   )}
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+        <SidebarGroup>
+          <SidebarGroupLabel>Knowledge</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {knowledgeScreens.map(({ path, label, icon: Icon }) => (
+                <SidebarMenuItem key={path}>
+                  <SidebarMenuButton asChild isActive={pathname === path || pathname.startsWith(`${path}/`)} tooltip={label}>
+                    <NavLink to={path}>
+                      <Icon aria-hidden="true" />
+                      <span>{label}</span>
+                    </NavLink>
+                  </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
             </SidebarMenu>

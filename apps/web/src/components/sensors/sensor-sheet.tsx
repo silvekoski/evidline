@@ -12,11 +12,12 @@ import { useTimeBase } from "@/hooks/use-time-base";
 import { screenPath } from "@/layout/screens";
 import { FingerprintTab } from "./fingerprint-tab";
 import { HealthBadge } from "./health-badge";
+import { KnowledgeTab } from "./knowledge-tab";
 import { Hypothesis } from "./hypothesis";
 import { RelationsTab } from "./relations-tab";
 import { RolesTab } from "./roles-tab";
 
-export type SheetTab = "fingerprint" | "roles" | "relations" | "notes";
+export type SheetTab = "fingerprint" | "roles" | "relations" | "knowledge" | "notes";
 
 export function SensorSheet({
   run,
@@ -81,6 +82,7 @@ function SensorBody({ run, report, row, initialTab, lens }: { run: Run | undefin
           <TabsTrigger value="fingerprint">Fingerprint</TabsTrigger>
           <TabsTrigger value="roles">Roles</TabsTrigger>
           <TabsTrigger value="relations">Relations</TabsTrigger>
+          <TabsTrigger value="knowledge">Knowledge</TabsTrigger>
           <TabsTrigger value="notes">Notes</TabsTrigger>
         </TabsList>
         {detail.data ? (
@@ -93,6 +95,9 @@ function SensorBody({ run, report, row, initialTab, lens }: { run: Run | undefin
             </TabsContent>
             <TabsContent value="relations">
               <RelationsTab detail={detail.data} report={report} lens={lens} dt={dt} />
+            </TabsContent>
+            <TabsContent value="knowledge">
+              <KnowledgeTab sourceName={row.sourceName} />
             </TabsContent>
             <TabsContent value="notes">
               {detail.data.notes.length === 0 ? (

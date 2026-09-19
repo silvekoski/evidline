@@ -1,6 +1,28 @@
 import {
   ActionResponse,
   ActivateRuleResponse,
+  CatalogColumnList,
+  ClaimList,
+  Claim,
+  ColumnKnowledge,
+  ConnectorList,
+  Connector,
+  CorpusStats,
+  DataSpec,
+  JobList,
+  OpenQuestionList,
+  SearchHitList,
+  SourceDetail,
+  SourceList,
+  Source,
+  TextEgressList,
+  UnassignedList,
+  UploadLink,
+  WorkspaceList,
+  Workspace,
+  type ClaimStatus,
+  type CreateConnectorBody,
+  type CreateWorkspaceBody,
   CompileRuleResult,
   CreateRunResponse,
   DriftReport,
@@ -19,6 +41,7 @@ import {
   Run,
   RunEvent,
   RunList,
+  SearchResult,
   SensorDetail,
   SensorReport,
   TemplateInfo,
@@ -27,14 +50,19 @@ import {
   type OverrideValue,
 } from "@tpm/schemas";
 
-const base = "/api";
+export const workspaceSlug = (pathname: string = window.location.pathname): string | null => /^\/w\/([a-z0-9][a-z0-9-]*)(?:\/|$)/.exec(pathname)?.[1] ?? null;
+
+export const apiBase = (): string => {
+  const slug = workspaceSlug();
+  return slug ? `/api/w/${slug}` : "/api";
+};
 
 type Parser<T> = { parse(input: unknown): T };
 
 async function request<T>(schema: Parser<T>, path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${base}${path}`, init);
+  const res = await fetch(`${apiBase()}${path}`, init);
   if (!res.ok) throw new Error(await errorMessage(res));
-  return schema.parse(await res.json());
+  return schema.parse(res.status === 204 ? undefined : await res.json());
 }
 
 async function errorMessage(res: Response): Promise<string> {
@@ -71,6 +99,7 @@ export const keys = {
   quality: (runId: string) => ["runs", runId, "quality"] as const,
   drift: (runId: string) => ["runs", runId, "drift"] as const,
   incidents: (runId: string) => ["runs", runId, "incidents"] as const,
+  search: (runId: string, text: string) => ["runs", runId, "search", text] as const,
   evidence: (id: string) => ["evidence", id] as const,
   evidenceSeries: (id: string) => ["evidence", id, "series"] as const,
   inference: (id: string) => ["inferences", id] as const,
@@ -83,9 +112,69 @@ export const keys = {
   egressTemplates: ["egress", "templates"] as const,
   egressRecord: (id: string) => ["egress", "record", id] as const,
   modelSettings: ["settings", "model"] as const,
+  workspaces: ["workspaces"] as const,
+  corpusStats: ["knowledge", "stats"] as const,
+  sources: (filter: string) => ["sources", filter] as const,
+  source: (id: number) => ["sources", id] as const,
+  sourceClaims: (id: number) => ["sources", id, "claims"] as const,
+  corpusSearch: (query: string) => ["knowledge", "search", query] as const,
+  columns: ["columns"] as const,
+  columnKnowledge: (name: string) => ["columns", name, "knowledge"] as const,
+  claims: ["claims"] as const,
+  openQuestions: ["open-questions"] as const,
+  spec: ["spec"] as const,
+  connectors: ["connectors"] as const,
+  jobs: ["jobs"] as const,
+  textEgress: ["egress-log"] as const,
+  unassigned: ["unassigned"] as const,
 };
 
 const runQuery = (runId?: string) => (runId ? `?runId=${encodeURIComponent(runId)}` : "");
+
+const patch = (body: unknown): RequestInit => ({ method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+const files = (list: File[]): RequestInit => {
+  const body = new FormData();
+  for (const file of list) body.append("files", file);
+  return { method: "POST", body };
+};
+
+async function rootRequest<T>(schema: Parser<T>, path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(`/api${path}`, init);
+  if (!res.ok) throw new Error(await errorMessage(res));
+  return schema.parse(res.status === 204 ? undefined : await res.json());
+}
+
+export const listWorkspaces = () => rootRequest(WorkspaceList, "/workspaces");
+export const createWorkspace = (body: CreateWorkspaceBody) => rootRequest(Workspace, "/workspaces", post(body));
+export const listUnassigned = () => rootRequest(UnassignedList, "/unassigned");
+export const assignUnassigned = (id: number, workspace: string) => rootRequest(nothing, `/unassigned/${id}/assign`, post({ workspace }));
+export const uploadThroughLink = (token: string, list: File[]) => rootRequest(arrayOf(Source), `/upload/${token}`, files(list));
+
+export const getCorpusStats = () => request(CorpusStats, "/knowledge/stats");
+export const listSources = (query: string) => request(SourceList, `/sources${query ? `?${query}` : ""}`);
+export const getSource = (id: number) => request(SourceDetail, `/sources/${id}`);
+export const getSourceClaims = (id: number) => request(ClaimList, `/sources/${id}/claims`);
+export const sourceBlobUrl = (id: number) => `${apiBase()}/sources/${id}/blob`;
+export const uploadSources = (list: File[]) => request(arrayOf(Source), "/sources/upload", files(list));
+export const reprocessSource = (id: number) => request(Source, `/sources/${id}/reprocess`, post());
+export const deleteSource = (id: number) => request(nothing, `/sources/${id}`, { method: "DELETE" });
+export const createUploadLink = (hours: number) => request(UploadLink, "/upload-links", post({ hours }));
+export const searchCorpus = (query: string, limit = 20) => request(SearchHitList, "/search", post({ query, limit }));
+export const listColumns = () => request(CatalogColumnList, "/columns");
+export const getColumnKnowledge = (name: string) => request(ColumnKnowledge, `/columns/${encodeURIComponent(name)}/knowledge`);
+export const listClaims = () => request(ClaimList, "/claims");
+export const setClaimStatus = (id: number, status: ClaimStatus) => request(Claim, `/claims/${id}`, patch({ status }));
+export const setLinkConfirmed = (id: number, confirmed: boolean) => request(Claim, `/claim-links/${id}`, patch({ confirmed }));
+export const addClaimLink = (claimId: number, columnId: number) => request(Claim, `/claims/${claimId}/links`, post({ columnId }));
+export const listOpenQuestions = () => request(OpenQuestionList, "/open-questions");
+export const buildSpec = () => request(DataSpec, "/spec", post());
+export const listConnectors = () => request(ConnectorList, "/connectors");
+export const createConnector = (body: CreateConnectorBody) => request(Connector, "/connectors", post(body));
+export const syncConnector = (id: number) => request(Connector, `/connectors/${id}/sync`, post());
+export const deleteConnector = (id: number) => request(nothing, `/connectors/${id}`, { method: "DELETE" });
+export const listJobs = () => request(JobList, "/jobs");
+export const retryJobs = () => request({ parse: (x) => x as { retried: number } }, "/jobs/retry", post());
+export const listTextEgress = () => request(TextEgressList, "/egress-log");
 
 export const listFiles = () => request(FileList, "/files");
 export const uploadFile = (file: File) =>
@@ -98,6 +187,7 @@ export const getSensor = (runId: string, alias: string) => request(SensorDetail,
 export const getQuality = (runId: string) => request(QualityReport, `/runs/${runId}/quality`);
 export const getDrift = (runId: string) => request(DriftReport, `/runs/${runId}/drift`);
 export const getIncidents = (runId: string) => request(IncidentReport, `/runs/${runId}/incidents`);
+export const searchRun = (runId: string, text: string) => request(SearchResult, `/runs/${runId}/search`, post({ text }));
 export const runModelCalls = (runId: string) => request(nothing, `/runs/${runId}/model-calls`, post());
 export const getEvidence = (id: string) => request(Evidence, `/evidence/${id}`);
 export const getEvidenceSeries = (id: string) => request(EvidenceSeries, `/evidence/${id}/series`);
@@ -114,7 +204,7 @@ export const compileRule = (runId: string, sentence: string) =>
 export const activateRule = (id: string) => request(ActivateRuleResponse, `/rules/${id}/activate`, post());
 export const getLog = (runId?: string) => request(arrayOf(LogEntry), `/log${runQuery(runId)}`);
 export const verifyLog = () => request(LogVerification, "/log/verify");
-export const logExportUrl = (format: "json" | "csv") => `${base}/log/export?format=${format}`;
+export const logExportUrl = (format: "json" | "csv") => `${apiBase()}/log/export?format=${format}`;
 export const getEgress = (runId?: string) => request(arrayOf(EgressRecord), `/egress${runQuery(runId)}`);
 export const getEgressTotals = (runId?: string) => request(EgressTotals, `/egress/totals${runQuery(runId)}`);
 export const getEgressTemplates = () => request(TemplateInfo, "/egress/templates");
@@ -124,7 +214,7 @@ export const setModelMode = (mode: ModelMode) =>
   request(ModelSettings, "/settings/model", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ mode }) });
 
 export function subscribeRunEvents(runId: string, onEvent: (event: RunEvent) => void): () => void {
-  const source = new EventSource(`${base}/runs/${runId}/events`);
+  const source = new EventSource(`${apiBase()}/runs/${runId}/events`);
   const handle = (event: Event) => {
     if (!(event instanceof MessageEvent) || typeof event.data !== "string") return;
     let parsed: ReturnType<typeof RunEvent.safeParse>;

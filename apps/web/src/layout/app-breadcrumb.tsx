@@ -6,6 +6,8 @@ import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbP
 import { currentScreen } from "./app-sidebar";
 import { screens } from "./screens";
 
+const pageTitles: Record<string, string> = { runs: "Runs", sources: "Sources", "open-questions": "Open questions", spec: "Data spec", connectors: "Connectors" };
+
 export function AppBreadcrumb() {
   const { pathname } = useLocation();
   const runId = useActiveRunId();
@@ -36,7 +38,7 @@ export function AppBreadcrumb() {
           </>
         ) : (
           <BreadcrumbItem>
-            <BreadcrumbPage>{pathname === "/runs" ? "Runs" : "Run"}</BreadcrumbPage>
+            <BreadcrumbPage>{pageTitles[pathname.split("/")[1] ?? ""] ?? "Run"}</BreadcrumbPage>
           </BreadcrumbItem>
         )}
       </BreadcrumbList>
