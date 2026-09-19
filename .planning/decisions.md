@@ -97,3 +97,6 @@ typescript 5.9, vite 7, @vitejs/plugin-react 5, vitest 4, react 19, react-router
 - `useEvidenceOfKind(ids, kind)` in `hooks` is the shared picker for an inline line chart. It picks in id order and stops at the first pending query, so the choice does not flip. `useResidual` on the Drift screen delegates to it.
 - Radix `ScrollArea` sets `position: relative` inline, so `xl:sticky` on it never applied and `top-16` pushed the list down by 56 px on both screens. The sticky classes now sit on a wrapper div.
 - On a hash selection the screen scrolls the detail into view and moves focus to it. Below xl the detail sits above the list, so a card tap would otherwise change nothing on screen.
+- The Onset column of the ranked table is an onset ladder: a dot on a track whose scale runs from the earliest to the latest onset among the ranked sensors. Hidden rows past the top 5 still set the scale.
+- `WindowTrack` shows where an incident window sits in the run, on each card (with a name for a screen reader) and next to the Window fact. A short window keeps a 2 px minimum.
+- The PCA meter sits above the ranked table, both capped at 42 rem, so the three bar kinds share one right edge.

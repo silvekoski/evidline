@@ -30,6 +30,9 @@ export function RankedTable({
   const [expanded, setExpanded] = useState<boolean | null>(null);
   const all = expanded ?? ranked.findIndex((r) => r.sensor === highlight) >= top;
   const data = useMemo(() => ranked.map((r, i) => ({ ...r, rank: i + 1 })).slice(0, all ? undefined : top), [ranked, all]);
+  const onsets = ranked.flatMap((r) => (r.onset === null ? [] : [r.onset]));
+  const first = Math.min(...onsets);
+  const span = Math.max(...onsets) - first;
   const columns = useMemo(
     () => [
       column.accessor("rank", { header: "Rank", meta: right, enableSorting: false }),
@@ -65,11 +68,19 @@ export function RankedTable({
         enableSorting: false,
         cell: ({ getValue }) => {
           const onset = getValue();
-          return onset === null ? null : <span title={`sample ${onset}`}>{label(onset)}</span>;
+          if (onset === null) return null;
+          return (
+            <span className="flex items-center justify-end gap-2">
+              <span aria-hidden="true" className="relative h-2 w-16 rounded-xs bg-muted md:w-28">
+                <span className="absolute inset-y-0 size-2 rounded-full bg-foreground" style={{ left: `calc(${span === 0 ? 0 : (onset - first) / span} * (100% - 0.5rem))` }} />
+              </span>
+              <span title={`sample ${onset}`}>{label(onset)}</span>
+            </span>
+          );
         },
       }),
     ],
-    [runId, label, lens.sensor],
+    [runId, label, lens.sensor, first, span],
   );
   return (
     <div className="flex flex-col items-start gap-1">

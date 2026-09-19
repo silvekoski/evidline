@@ -20,6 +20,7 @@ import { DiagnosisProse } from "./diagnosis-prose";
 import { PcaMeter } from "./pca-meter";
 import { RankedTable } from "./ranked-table";
 import { TraceSteps } from "./trace-steps";
+import { WindowTrack } from "./window-track";
 
 type Props = {
   incident: DiagnosisInference;
@@ -68,6 +69,7 @@ export function IncidentDetail({ incident, runId, highlight, label }: Props) {
         <dl className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
           <Fact term="Onset">{value.onset === null ? "not located" : `${label(value.onset)}, sample ${value.onset.toLocaleString("en-US")}`}</Fact>
           <Fact term="Window">
+            <WindowTrack window={value.window} className="mr-1 align-middle" />
             {label(value.window.from)} to {label(value.window.to)}, {value.window.n.toLocaleString("en-US")} samples
           </Fact>
           <Fact term="Excluded">
@@ -107,7 +109,7 @@ export function IncidentDetail({ incident, runId, highlight, label }: Props) {
           )}
         </figure>
         {!gated && (
-          <div className="grid gap-5 md:grid-cols-2">
+          <div className="flex max-w-2xl flex-col gap-5">
             <Section title="PCA against the baseline model">
               {value.pca ? (
                 <PcaMeter pca={value.pca} />

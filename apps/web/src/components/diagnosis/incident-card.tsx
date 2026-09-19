@@ -7,6 +7,7 @@ import { FaultBadge } from "@/components/fault-badge";
 import { StatusBadge } from "@/components/status-badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatNumber } from "@/lib/format";
+import { WindowTrack } from "./window-track";
 
 const hatch = { backgroundImage: "repeating-linear-gradient(45deg, var(--chart-2) 0 1px, transparent 1px 6px)" };
 
@@ -56,14 +57,17 @@ export function IncidentCard({ incident, selected, label }: { incident: Diagnosi
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-2">
-          <p className="font-mono text-xs text-muted-foreground tabular-nums">
-            {value.onset === null ? (
-              "onset not located"
-            ) : (
-              <>
-                since <span className="text-foreground">{label(value.onset)}</span>
-              </>
-            )}
+          <p className="flex items-center justify-between gap-2 font-mono text-xs text-muted-foreground tabular-nums">
+            <span>
+              {value.onset === null ? (
+                "onset not located"
+              ) : (
+                <>
+                  since <span className="text-foreground">{label(value.onset)}</span>
+                </>
+              )}
+            </span>
+            <WindowTrack window={value.window} name={`window ${label(value.window.from)} to ${label(value.window.to)}`} />
           </p>
           <ContributionStrip value={value} />
           <div className="flex items-center justify-between gap-2">
