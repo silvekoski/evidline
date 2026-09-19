@@ -70,3 +70,9 @@ typescript 5.9, vite 7, @vitejs/plugin-react 5, vitest 4, react 19, react-router
 - The noisy check needs the block level inside the baseline p1..p99 (a scale change is not noise). The plant-wide noise exemption counts raw block noise. Saturation needs a fine resolution: (p99 - p1) / step >= 50.
 - The distance path uses a window of clamp(n / 40, 50, 5000) and a spread floor of 0.5 scale units. A 30% demand drop under a daily cycle of larger amplitude stays below the limit: the records demo shows the dead field and the gain fault, not the demand drop.
 - The leak index collapses repeated consecutive values so a sample-and-hold sensor is caught and a repeated histogram share is not.
+
+## Storage and the final state (2026-09-19, night)
+
+- Derived evidence series are stored at most 4,096 points with a stride, and expanded on read. A stream run now costs about 12 MB in `data/tpm.db`; before it cost about 30 MB. There is no delete route: remove `data/tpm.db*` to start clean.
+- Histogram shares stay at 3 significant digits. On the records demo one `name_role` payload of 132 collides with a run of three rounded raw samples and the leak guard blocks it. That is the guard at work, not a leak. The stream demo has 0 hits.
+- The Norrin endpoint (OpenAI-compatible, Mistral Large 3) works in mode `cloud`: 55 calls sent for the stream demo, 0 blocked, model prose validated for all 3 incidents, hypothesis names on all 52 sensors.
