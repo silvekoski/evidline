@@ -13,9 +13,21 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { formatBytes, formatMs, formatTime } from "@/lib/format";
+import { formatBytes, formatMs, formatNumber, formatTime } from "@/lib/format";
 
 const pendingStages = (): StageProgress[] => stageNames.map((name, stage) => ({ stage, name, status: "pending", ms: null, counts: {} }));
+
+function gridNotes(run: Run, source: Record<string, number>): string[] {
+  const notes: string[] = [];
+  if (run.bucket > 1) notes.push(`Bucket ${formatNumber(run.bucket)}: one sample is the mean of ${formatNumber(run.bucket)} rows.`);
+  const { episodes, spans, minEpisode } = source;
+  if (run.gridSize > 0 && episodes !== undefined && spans !== undefined && minEpisode !== undefined && spans < episodes) {
+    notes.push(
+      `The file holds ${formatNumber(episodes)} episodes and the median episode is shorter than the engine minimum of ${formatNumber(minEpisode)} samples, so the agent analyzes the grid as one series of ${formatNumber(run.gridSize)} samples.`,
+    );
+  }
+  return notes;
+}
 
 const statusIcon = {
   pending: CircleIcon,
@@ -82,6 +94,7 @@ export function RunScreen() {
   };
 
   const doneCount = stages.filter((s) => s.status === "done" || s.status === "skipped").length;
+  const sentences = run ? [...gridNotes(run, stages.find((s) => s.name === "Source adapter")?.counts ?? {}), ...(run.error ? [run.error] : [])] : [];
 
   return (
     <>
@@ -169,8 +182,8 @@ export function RunScreen() {
               {runId ? (
                 <>
                   Run <span className="font-mono">{runId}</span>
-                  {run ? `, ${run.name}, ${run.domain}, ${run.rows.toLocaleString("en-US")} rows, ${run.sensorCount} sensors` : ""}
-                  {run?.error ? `. ${run.error}` : ""}
+                  {run ? `, ${run.name}, ${run.domain}, ${formatNumber(run.rows)} rows, ${run.sensorCount} sensors` : ""}
+                  {sentences.length ? `. ${sentences.join(" ")}` : ""}
                 </>
               ) : (
                 "Stages run in a fixed order. The health gate runs before drift and diagnosis."

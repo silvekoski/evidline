@@ -1,6 +1,6 @@
 import { isMainThread, parentPort, Worker, workerData } from "node:worker_threads";
 import { loadSource, type Source } from "@tpm/adapters";
-import { createMemorySink, runPipeline, type DriftResult, type PipelineResult, type StageCounts } from "@tpm/core";
+import { createMemorySink, minEpisodeLength, runPipeline, type DriftResult, type PipelineResult, type StageCounts } from "@tpm/core";
 import type { Evidence, Overrides, StageName } from "@tpm/schemas";
 
 export type PipelineJob = { runId: string; overrides: Overrides; source: { path: string } | Source };
@@ -28,18 +28,21 @@ export function runPipelineJob(job: PipelineJob, onStage: (event: StageEvent) =>
 async function execute(job: PipelineJob, post: (message: WorkerMessage) => void): Promise<void> {
   try {
     const started = Date.now();
-    post({ type: "stage", event: { name: "Source adapter", status: "running", ms: null, counts: {} } });
-    const source = "path" in job.source ? await loadSource(job.source.path) : job.source;
+    let lastProgress = started;
+    const progress = (counts: StageCounts): void => post({ type: "stage", event: { name: "Source adapter", status: "running", ms: null, counts } });
+    progress({});
+    const onProgress = (rows: number): void => {
+      const now = Date.now();
+      if (now - lastProgress < 1000) return;
+      lastProgress = now;
+      progress({ rows });
+    };
+    const source = "path" in job.source ? await loadSource(job.source.path, { onProgress }) : job.source;
     const { stats } = source;
-    post({
-      type: "stage",
-      event: {
-        name: "Source adapter",
-        status: "done",
-        ms: Date.now() - started,
-        counts: { rows: stats.rows, columns: stats.columns, sensors: source.grid.aliases.length, episodes: stats.episodes, quarantined: stats.quarantined.length },
-      },
-    });
+    const spans = source.grid.episodes.length;
+    const counts: StageCounts = { rows: stats.rows, columns: stats.columns, sensors: source.grid.aliases.length, episodes: stats.episodes, spans, quarantined: stats.quarantined.length };
+    if (spans < stats.episodes) counts.minEpisode = minEpisodeLength(source.grid.n);
+    post({ type: "stage", event: { name: "Source adapter", status: "done", ms: Date.now() - started, counts } });
     const sink = createMemorySink(job.runId);
     const result = runPipeline(source.grid, sink, {
       overrides: job.overrides,

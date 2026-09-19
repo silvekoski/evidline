@@ -73,6 +73,23 @@ describe("stream with a counter column and episode metadata", () => {
   });
 });
 
+describe("stream with many short episodes", () => {
+  const rng = mulberry32(3);
+  const rows: (string | number)[][] = [];
+  for (let episode = 0; episode < 100; episode++) {
+    for (let sample = 1; sample <= 12; sample++) {
+      rows.push([episode + 1, sample, (rng() * 5).toFixed(3), (sample * 0.1 + rng()).toFixed(3)]);
+    }
+  }
+  const path = writeCsv(dir, "short-episodes.csv", ["run", "sample", "a", "b"], rows);
+
+  it("merges the episodes into one window and keeps the count in stats", async () => {
+    const source = await loadSource(path);
+    expect(source.stats.episodes).toBe(100);
+    expect(source.grid.episodes).toEqual([{ from: 0, to: 1200, n: 1200 }]);
+  });
+});
+
 describe("large stream", () => {
   it("downsamples with a power-of-2 bucket", async () => {
     const rows = Array.from({ length: 300_000 }, (_, i) => [isoAt(t0, i * 1000), i * 2, (i % 7).toFixed(1), i % 2 === 0 ? "" : i % 3]);

@@ -1,3 +1,4 @@
+import { usableEpisodes } from "@tpm/core";
 import { streamRows } from "./csv";
 import { GridBuilder, aliases } from "./grid-builder";
 import { parseNumber, plainDecimal } from "./parse-number";
@@ -68,7 +69,7 @@ export async function loadStream(ctx: LoadContext): Promise<Source> {
       n: built.n,
       dt: medianStep > 0 ? medianStep * built.bucket : null,
       time: built.time,
-      episodes: built.episodes,
+      episodes: usableEpisodes(built.episodes, built.n),
     },
     t0,
     sourceNames: kept.map((k) => header[candidates[k] ?? -1] ?? ""),

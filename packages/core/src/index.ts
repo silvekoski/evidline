@@ -13,6 +13,7 @@ export * from "./peer-model";
 export * from "./drift";
 export * from "./calibrate-drift";
 export * from "./health";
+export * from "./usable-episodes";
 export * from "./calibrate-health";
 export * from "./rules";
 export * from "./pipeline";

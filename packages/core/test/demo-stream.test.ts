@@ -33,6 +33,7 @@ describe.skipIf(!existsSync(csv) || !existsSync(truthPath))("demo stream", () =>
     normalEnd = Math.min(...truth.episodes.filter((e) => e.fault !== 0).map((e) => e.from));
     const source = await loadSource(csv);
     expect(source.grid.n).toBe(truth.rows);
+    expect(source.grid.episodes).toHaveLength(truth.episodes.length);
     sink = createMemorySink("0123abcd");
     const started = performance.now();
     result = runPipeline(source.grid, sink);

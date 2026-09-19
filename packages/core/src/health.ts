@@ -74,9 +74,12 @@ function tile(from: number, to: number, size: number): Window[] {
   return Array.from({ length: count }, (_, b) => window(from + b * size, b === count - 1 ? to : from + (b + 1) * size));
 }
 
-export function healthBlocks(grid: Grid): Window[] {
+export function healthBlocks(grid: Grid, baseline: Window): Window[] {
   const w = healthBlockSize(grid.n);
-  return grid.episodes.flatMap((e) => tile(e.from, e.to, w));
+  const cut = baseline.to;
+  return grid.episodes
+    .flatMap((e) => (e.from < cut && cut < e.to ? [window(e.from, cut), window(cut, e.to)] : [e]))
+    .flatMap((e) => tile(e.from, e.to, w));
 }
 
 export function mergeWindows(ws: Window[]): Window[] {
@@ -236,7 +239,7 @@ export function plantWideFloor(sensors: number): number {
 export function healthGate(grid: Grid, baseline: Window, fps: Fingerprint[], thresholds: Thresholds, sink: EvidenceSink): HealthResult[] {
   const { n, aliases, episodes } = grid;
   const w = healthBlockSize(n);
-  const blocks = healthBlocks(grid);
+  const blocks = healthBlocks(grid, baseline);
   const regularity = blocks.map((b) => timeRegularity(grid, b));
   const whole = window(0, n);
   const refs = aliases.map((_, i) => healthReference(grid.values[i]!, baseline, episodes, fps[i]!.hold, [thresholds.spikeSigma], w));

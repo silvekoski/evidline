@@ -2,7 +2,7 @@ import type { HealthClass, Window } from "@tpm/schemas";
 import { describe, expect, it } from "vitest";
 import { calibrateHealth } from "../src/calibrate-health";
 import { fingerprint } from "../src/fingerprint";
-import { defaultThresholds, healthBlockSize, healthGate, type HealthResult } from "../src/health";
+import { defaultThresholds, healthBlockSize, healthBlocks, healthGate, type HealthResult } from "../src/health";
 import { injectFault } from "../src/inject";
 import { gaussian, mulberry32 } from "../src/random";
 import { proposeRules } from "../src/rules";
@@ -89,6 +89,29 @@ function expectFault(grid: Grid, index: number, cls: HealthClass): HealthResult 
   for (const other of results.filter((_, i) => i !== index)) expect(other.value.health).toBe("healthy");
   return r;
 }
+
+describe("healthBlocks", () => {
+  const gridOf = (size: number, eps: Window[]): Grid => ({ aliases: [], values: [], n: size, dt: null, time: null, episodes: eps });
+
+  it("starts a block at the baseline end", () => {
+    const blocks = healthBlocks(gridOf(4096, [window(0, 4096)]), window(0, 100));
+    expect(blocks.slice(0, 3)).toEqual([window(0, 100), window(100, 164), window(164, 228)]);
+    expect(blocks.at(-1)!.to).toBe(4096);
+  });
+
+  it("never crosses the baseline end on a two-episode grid", () => {
+    const blocks = healthBlocks(gridOf(n, episodes), window(0, 3000));
+    expect(blocks.some((b) => b.from < 3000 && 3000 < b.to)).toBe(false);
+    expect(blocks.some((b) => b.from === 3000)).toBe(true);
+    expect(blocks.some((b) => b.from < 6000 && 6000 < b.to)).toBe(false);
+  });
+
+  it("equals the plain tiling when the baseline ends on an episode boundary", () => {
+    const grid = gridOf(n, episodes);
+    expect(healthBlocks(grid, baseline)).toEqual(healthBlocks({ ...grid, episodes: [window(0, n)] }, baseline));
+    expect(healthBlocks(grid, baseline).length).toBe(2 * Math.floor(6000 / w));
+  });
+});
 
 describe("healthGate", () => {
   it("passes every check on a clean grid", () => {

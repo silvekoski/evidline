@@ -5,9 +5,20 @@ import { bucketMeans, noiseLevel } from "./series";
 
 export type SegmentationOptions = { maxPoints?: number; minSegment?: number; penalty?: number; episodes?: Window[] };
 
+export function grain(n: number, opts: SegmentationOptions = {}): { bucket: number; minSeg: number } {
+  const bucket = Math.max(1, Math.ceil(n / (opts.maxPoints ?? 4096)));
+  const minSeg = Math.max(2, Math.ceil((opts.minSegment ?? Math.max(2 * bucket, Math.floor(n / 100))) / bucket));
+  return { bucket, minSeg };
+}
+
+export function minSplittableSpan(n: number): number {
+  const { bucket, minSeg } = grain(n);
+  return 2 * minSeg * bucket;
+}
+
 export function binarySegmentation(x: Float64Array, opts: SegmentationOptions = {}): number[] {
   const n = x.length;
-  const bucket = Math.max(1, Math.ceil(n / (opts.maxPoints ?? 4096)));
+  const { bucket, minSeg } = grain(n, opts);
   const ds = bucketMeans(x, bucket);
   const m = ds.length;
   const center = median(ds);
@@ -25,7 +36,6 @@ export function binarySegmentation(x: Float64Array, opts: SegmentationOptions = 
     scale = count > 0 ? Math.sqrt(sq / count) : 0;
   }
   if (scale === 0) return [];
-  const minSeg = Math.max(2, Math.ceil((opts.minSegment ?? Math.max(2 * bucket, Math.floor(n / 100))) / bucket));
   const penalty = opts.penalty ?? 2 * Math.log(m);
   const cnt = new Float64Array(m + 1);
   const sum = new Float64Array(m + 1);

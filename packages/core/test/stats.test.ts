@@ -18,6 +18,7 @@ import {
   mad,
   mannKendall,
   median,
+  minSplittableSpan,
   pearson,
   quantile,
   quantileSorted,
@@ -171,6 +172,10 @@ describe("binarySegmentation", () => {
     const x = noise(4000, 11);
     for (let t = 2000; t < 4000; t++) x[t] = x[t]! + 3;
     expect(binarySegmentation(x, { episodes: [window(0, 2000), window(2000, 4000)] })).toEqual([]);
+  });
+
+  it("minSplittableSpan gives the shortest span that can split", () => {
+    expect([1200, 20160, 76800, 239532].map(minSplittableSpan)).toEqual([24, 410, 1558, 4838]);
   });
 });
 

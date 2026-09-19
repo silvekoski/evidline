@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { FileList } from "@tpm/schemas";
@@ -22,6 +22,29 @@ describe("files routes", () => {
     expect(files.map((e) => e.path)).toEqual(["demo-stream.csv", "nested/records.CSV"]);
     expect(files[0]).toMatchObject({ name: "demo-stream.csv", bytes: 11 });
     expect(files[1]?.modifiedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  });
+
+  it("lists a symlink to a csv file with the target size", async () => {
+    writeFileSync(join(f.dir, "outside.csv"), "a,b\n1,2\n3,4\n");
+    symlinkSync(join("..", "outside.csv"), join(f.ctx.dataDir, "linked.csv"));
+    const files = FileList.parse(await (await f.app.request("/api/files")).json());
+    expect(files.find((e) => e.path === "linked.csv")).toMatchObject({ name: "linked.csv", bytes: 12 });
+  });
+
+  it("skips a dangling symlink and lists the other files", async () => {
+    symlinkSync(join("..", "missing.csv"), join(f.ctx.dataDir, "dangling.csv"));
+    const res = await f.app.request("/api/files");
+    expect(res.status).toBe(200);
+    const files = FileList.parse(await res.json());
+    expect(files.map((e) => e.path)).toEqual(["demo-stream.csv", "nested/records.CSV"]);
+  });
+
+  it("answers 413 and writes no file when the content length exceeds the free space", async () => {
+    const res = await f.app.request("/api/files", { method: "POST", headers: { "x-file-name": "huge.csv", "content-length": "999999999999999999" }, body: "x" });
+    expect(res.status).toBe(413);
+    const { error } = (await res.json()) as { error: string };
+    expect(error).toMatch(/^The file is 1000000000\.0 GB and data\/ has \d+\.\d GB free\. Link the file under data\/ instead: ln -s \.\.\/huge\.csv data\/huge\.csv$/);
+    expect(existsSync(join(f.ctx.dataDir, "uploads", "huge.csv"))).toBe(false);
   });
 
   it("streams an upload to data/uploads and returns its entry", async () => {
