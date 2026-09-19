@@ -11,10 +11,11 @@ export function registerModelCallsHook(hook: ModelCallsHook): void {
   modelCallsHook = hook;
 }
 
-export const getModelMode = (db: Db): ModelMode => ModelMode.safeParse(db.settings.get(modeKey)).data ?? "off";
+export const getModelMode = (db: Db, gateway: Gateway): ModelMode =>
+  ModelMode.safeParse(db.settings.get(modeKey)).data ?? (gateway.provider("cloud") ? "cloud" : "off");
 
 export function getModelSettings(db: Db, gateway: Gateway): ModelSettings {
-  const mode = getModelMode(db);
+  const mode = getModelMode(db, gateway);
   return { mode, provider: gateway.provider(mode) };
 }
 

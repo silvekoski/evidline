@@ -63,11 +63,12 @@ export function createSqliteStore(db: Db): EgressStore {
 }
 
 export function wireGateway(db: Db): Gateway {
-  return createGateway({
+  const gateway: Gateway = createGateway({
     store: createSqliteStore(db),
-    getMode: () => getModelMode(db),
+    getMode: () => getModelMode(db, gateway),
     leakIndex: createLeakIndexCache(db),
     nowIso: () => new Date().toISOString(),
     newId: newEgressId,
   });
+  return gateway;
 }
