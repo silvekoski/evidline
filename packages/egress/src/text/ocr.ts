@@ -18,6 +18,8 @@ const response = z.object({ choices: z.array(z.object({ message: z.object({ cont
 
 export const chatUrl = (url: string): string => `${embeddingsUrl(url).replace(/\/embeddings\/?$/, "")}/chat/completions`;
 
+export const cleanOcrText = (text: string): string => text.replace(/^\s*```[a-z]*\s*\n?/i, "").replace(/\n?\s*```\s*$/, "").trim();
+
 export function createOpenAiOcr(cfg: OcrConfig): OcrReader {
   return {
     name: "openai-vision",
@@ -35,7 +37,7 @@ export function createOpenAiOcr(cfg: OcrConfig): OcrReader {
       const parsed = JSON.parse(res.text) as unknown;
       const error = (parsed as { error?: { message?: string } }).error;
       if (error) throw new Error(`ocr: ${error.message ?? "unknown error"}`);
-      return (response.parse(parsed).choices[0]!.message.content ?? "").trim();
+      return cleanOcrText(response.parse(parsed).choices[0]!.message.content ?? "");
     },
   };
 }

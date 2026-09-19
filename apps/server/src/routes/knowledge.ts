@@ -2,7 +2,7 @@ import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
-import { parseCsv } from "@tpm/corpus";
+import { openPdf, parseCsv } from "@tpm/corpus";
 import { CorpusSearchBody, CreateConnectorBody, CreateUploadLinkBody, PatchClaimBody, PatchClaimLinkBody, SourceKind, SourceStatus, type ColumnKnowledge, type Source } from "@tpm/schemas";
 import { z } from "zod";
 import type { AppContext } from "../context";
@@ -71,6 +71,19 @@ export function knowledgeRoutes(ctx: AppContext) {
       if (!source?.blobPath) throw notFound("blob");
       const body = readFileSync(join(ctx.dir, source.blobPath));
       return c.body(body, 200, { "content-type": source.mediaType, "content-disposition": `inline; filename*=UTF-8''${encodeURIComponent(source.title)}` });
+    })
+    .get("/sources/:id/pages/:page", async (c) => {
+      const source = corpus.sources.get(numericId(c.req.param("id")));
+      const page = numericId(c.req.param("page"));
+      if (!source?.blobPath || source.mediaType !== "application/pdf") throw notFound("page");
+      if (source.pages !== null && page > source.pages) throw notFound(`page ${page}`);
+      const doc = await openPdf(readFileSync(join(ctx.dir, source.blobPath)));
+      try {
+        if (page > doc.pages) throw notFound(`page ${page}`);
+        return c.body(new Uint8Array(await doc.render(page)), 200, { "content-type": "image/png", "cache-control": "private, max-age=86400" });
+      } finally {
+        await doc.close();
+      }
     })
     .post("/sources/:id/reprocess", (c) => {
       const source = corpus.sources.get(numericId(c.req.param("id")));

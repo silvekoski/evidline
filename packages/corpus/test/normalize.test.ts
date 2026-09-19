@@ -82,8 +82,12 @@ describe("documents", () => {
     expect(n.status).toBe("processed");
     expect(n.segments.map((s) => (s.locator.kind === "file" ? s.locator.page : null))).toEqual([1, 2]);
     expect(n.segments[1]!.text).toContain("Dryer 3");
-    const blank = await normalizeFile(file("scan.pdf", pdf(["", ""])));
+    expect(n.pages).toBe(2);
+    expect(n.ocrPages).toEqual([]);
+    const blank = await normalizeFile(file("scan.pdf", pdf(["", "The typed page in the middle has a text layer.", ""])));
     expect(blank.status).toBe("needs_ocr");
+    expect(blank.pages).toBe(3);
+    expect(blank.ocrPages).toEqual([1, 3]);
   });
 
   it("rejects msg and unknown types with a reason", async () => {

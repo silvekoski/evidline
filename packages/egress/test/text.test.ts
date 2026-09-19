@@ -4,7 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { TextEgressRow } from "@tpm/schemas";
 import { createHashEmbedder, createTextGateway, hashEmbed, numericShare, textGuard } from "../src/index";
 import { createOpenAiEmbedder, embeddingsUrl } from "../src/text/openai-embedder";
-import { chatUrl, createOpenAiOcr } from "../src/text/ocr";
+import { chatUrl, cleanOcrText, createOpenAiOcr } from "../src/text/ocr";
 import { createElevenLabsTranscriber } from "../src/text/transcriber";
 
 const dot = (a: Float32Array, b: Float32Array) => a.reduce((s, v, i) => s + v * b[i]!, 0);
@@ -171,6 +171,13 @@ describe("ocr reader", () => {
     expect(seen?.body.messages[0]!.content[1]!.image_url!.url).toBe(`data:image/png;base64,${image.toString("base64")}`);
     expect(store.rows[0]).toMatchObject({ purpose: "ocr", status: "sent", bytes: image.byteLength, detail: "page 3, 37 characters" });
     expect(JSON.stringify(store.rows[0])).not.toContain("Dryer");
+  });
+
+  it("strips a markdown fence around the page text and leaves an empty page empty", () => {
+    expect(cleanOcrText("```text\nDryer 3 steam valve\n```")).toBe("Dryer 3 steam valve");
+    expect(cleanOcrText("```\n```")).toBe("");
+    expect(cleanOcrText("  plain text  ")).toBe("plain text");
+    expect(cleanOcrText("a ``` inside stays")).toBe("a ``` inside stays");
   });
 
   it("blocks in mode off", async () => {

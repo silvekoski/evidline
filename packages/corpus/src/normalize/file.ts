@@ -24,6 +24,7 @@ const base = (input: FileInput, patch: Partial<Normalized>): Normalized => ({
   segments: [],
   headers: [],
   attachments: [],
+  pages: null,
   ocrPages: [],
   ...patch,
 });
@@ -33,7 +34,7 @@ async function pdf(input: FileInput): Promise<Normalized> {
   const pages = Array.isArray(text) ? text : [text];
   const segments = pages.flatMap((pageText, i) => paragraphSegments(pageText, { page: i + 1, block: i + 1 }));
   const ocrPages = pages.flatMap((pageText, i) => (pageText.replace(/\s+/g, "").length < PAGE_TEXT_MIN_CHARS ? [i + 1] : []));
-  return base(input, { segments, ocrPages, status: ocrPages.length > 0 ? "needs_ocr" : "processed" });
+  return base(input, { segments, pages: pages.length, ocrPages, status: ocrPages.length > 0 ? "needs_ocr" : "processed" });
 }
 
 async function docx(input: FileInput): Promise<Normalized> {

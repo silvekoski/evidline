@@ -299,7 +299,8 @@ describe("ocr", () => {
     await drain();
     const after = f.ctx.corpus.sources.get(source!.id)!;
     expect(after.status).toBe("processed");
-    expect(pages).toEqual([1, 3]);
+    expect(after).toMatchObject({ pages: 3, ocrPages: [1, 3] });
+    expect(pages.sort()).toEqual([1, 3]);
     const segments = f.ctx.corpus.segments.list(after.id);
     expect(segments.map((s) => [s.locator.kind === "file" ? s.locator.page : null, s.text])).toEqual([[1, "Scanned page 1: xmeas_7 is the reactor pressure."], [2, "Typed page two has text."], [3, "Scanned page 3: xmeas_7 is the reactor pressure."]]);
   });
@@ -307,6 +308,16 @@ describe("ocr", () => {
   it("keeps the status needs_ocr with the reason when OCR is off", async () => {
     const [source] = await upload({ "scan.pdf": pdf([""]) });
     await drain();
-    expect(f.ctx.corpus.sources.get(source!.id)).toMatchObject({ status: "needs_ocr", error: expect.stringContaining("model off") });
+    expect(f.ctx.corpus.sources.get(source!.id)).toMatchObject({ status: "needs_ocr", pages: 1, ocrPages: [1], error: expect.stringContaining("model off") });
+  });
+
+  it("renders one page of a pdf source as a png and rejects a page past the end", async () => {
+    const [source] = await upload({ "report.pdf": pdf(["Page one has text.", "Page two has text."]) });
+    await drain();
+    const res = await f.app.request(`/api/sources/${source!.id}/pages/2`);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("image/png");
+    expect(Buffer.from(await res.arrayBuffer()).subarray(1, 4).toString()).toBe("PNG");
+    expect((await f.app.request(`/api/sources/${source!.id}/pages/3`)).status).toBe(404);
   });
 });

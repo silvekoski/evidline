@@ -159,6 +159,7 @@ export const listSources = (query: string) => request(SourceList, `/sources${que
 export const getSource = (id: number) => request(SourceDetail, `/sources/${id}`);
 export const getSourceClaims = (id: number) => request(ClaimList, `/sources/${id}/claims`);
 export const sourceBlobUrl = (id: number) => `${apiBase()}/sources/${id}/blob`;
+export const sourcePageUrl = (id: number, page: number) => `${apiBase()}/sources/${id}/pages/${page}`;
 export const uploadSources = (list: File[]) => request(arrayOf(Source), "/sources/upload", files(list));
 export const reprocessSource = (id: number) => request(Source, `/sources/${id}/reprocess`, post());
 export const deleteSource = (id: number) => request(nothing, `/sources/${id}`, { method: "DELETE" });

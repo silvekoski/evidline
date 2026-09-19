@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { extname, join, relative } from "node:path";
-import { chunkSegments, extractClaimsLocally, fuseRanks, isAudioName, linkClaim, normalizeFile, paragraphSegments, renderPdfPage, verifyQuote, wordsToTurns, type Normalized, type SegmentDraft } from "@tpm/corpus";
+import { chunkSegments, extractClaimsLocally, fuseRanks, isAudioName, linkClaim, normalizeFile, openPdf, paragraphSegments, verifyQuote, wordsToTurns, type Normalized, type SegmentDraft } from "@tpm/corpus";
 import type { CatalogColumn, Claim, CorpusStats, DataSpec, ExtractedClaim, OpenQuestion, SearchHit, Source, SourceKind } from "@tpm/schemas";
 import type { AppContext } from "./context";
 import { columnCandidates, enqueueEmbeds } from "./catalog";
@@ -68,7 +68,7 @@ export function ingestFile(ctx: AppContext, input: FileIngest): { source: Source
     contentHash: hash,
     blobPath: relative(ctx.dir, blob),
     externalUrl: input.externalUrl ?? null,
-    mediaType: input.mediaType || mediaTypeOf(input.name),
+    mediaType: input.mediaType && input.mediaType !== "application/octet-stream" ? input.mediaType : mediaTypeOf(input.name),
     bytes: input.content.byteLength,
     status: "received",
     error: null,
@@ -125,6 +125,7 @@ const normalize: JobHandler = async (ctx, payload) => {
     const ocr = result.ocrPages.length ? await readPages(ctx, content, result) : null;
     ctx.corpus.transaction(() => {
       ctx.corpus.segments.replace(id, result.segments);
+      ctx.corpus.sources.setPages(id, result.pages, result.ocrPages);
       ctx.corpus.raw.prepare("UPDATE source SET kind = ?, title = ?, occurred_at = ? WHERE id = ?").run(result.kind, result.title, result.occurredAt ?? source.occurredAt, id);
     });
     for (const attachment of result.attachments) ingestFile(ctx, { ...attachment, connectorId: source.connectorId, parentSourceId: id });
@@ -143,17 +144,34 @@ const normalize: JobHandler = async (ctx, payload) => {
   }
 };
 
+export const OCR_CONCURRENCY = 3;
+
 async function readPages(ctx: AppContext, pdf: Buffer, result: Normalized): Promise<{ ok: boolean; reason: string }> {
-  const read: SegmentDraft[] = [];
-  for (const page of result.ocrPages) {
-    const image = await renderPdfPage(pdf, page);
-    const text = await ctx.textGateway.ocr({ image, mediaType: "image/png", page });
-    if (!text.ok) return { ok: false, reason: text.reason };
-    read.push(...paragraphSegments(text.value, { page, block: page }));
+  const doc = await openPdf(pdf);
+  try {
+    const texts = await mapLimit(result.ocrPages, OCR_CONCURRENCY, async (page) => ctx.textGateway.ocr({ image: await doc.render(page), mediaType: "image/png", page }));
+    const failed = texts.find((t) => !t.ok);
+    if (failed && !failed.ok) return { ok: false, reason: failed.reason };
+    const read = result.ocrPages.flatMap((page, i) => {
+      const text = texts[i]!;
+      return text.ok ? paragraphSegments(text.value, { page, block: page }) : [];
+    });
+    result.segments = [...result.segments, ...read].sort((a, b) => pageOf(a) - pageOf(b) || charOf(a) - charOf(b));
+    result.status = "processed";
+    return { ok: true, reason: "" };
+  } finally {
+    await doc.close();
   }
-  result.segments = [...result.segments, ...read].sort((a, b) => pageOf(a) - pageOf(b) || charOf(a) - charOf(b));
-  result.status = "processed";
-  return { ok: true, reason: "" };
+}
+
+async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const out: R[] = new Array(items.length);
+  let next = 0;
+  const lane = async () => {
+    for (let i = next++; i < items.length; i = next++) out[i] = await fn(items[i]!);
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, lane));
+  return out;
 }
 
 const pageOf = (s: SegmentDraft): number => (s.locator.kind === "file" ? (s.locator.page ?? 0) : 0);
@@ -163,7 +181,7 @@ async function transcribeAudio(ctx: AppContext, source: Source, content: Buffer)
   const result = await ctx.textGateway.transcribe({ audio: content, mediaType: source.mediaType, language: process.env.TPM_TRANSCRIBE_LANGUAGE || null });
   if (!result.ok) throw new Error(`transcription failed: ${result.reason}`);
   const segments = wordsToTurns(result.value.words);
-  return { title: source.title, kind: "voice_note", occurredAt: source.occurredAt, status: "processed", segments: segments.length ? segments : result.value.text.trim() ? [{ text: result.value.text.trim(), speaker: null, block: 0, locator: { kind: "teams_call", startMs: 0, endMs: 0, speaker: null } }] : [], headers: [], attachments: [], ocrPages: [] };
+  return { title: source.title, kind: "voice_note", occurredAt: source.occurredAt, status: "processed", segments: segments.length ? segments : result.value.text.trim() ? [{ text: result.value.text.trim(), speaker: null, block: 0, locator: { kind: "teams_call", startMs: 0, endMs: 0, speaker: null } }] : [], headers: [], attachments: [], pages: null, ocrPages: [] };
 }
 
 const chunk: JobHandler = async (ctx, payload) => {

@@ -136,9 +136,10 @@ const migrations = [
   CREATE TABLE embedding_meta (id INTEGER PRIMARY KEY CHECK (id = 1), name TEXT NOT NULL, model TEXT NOT NULL, dims INTEGER NOT NULL);
   `,
   `ALTER TABLE source ADD COLUMN external_url TEXT;`,
+  `ALTER TABLE source ADD COLUMN pages INTEGER; ALTER TABLE source ADD COLUMN ocr_pages TEXT NOT NULL DEFAULT '[]';`,
 ];
 
-export type SourceDraft = Omit<Source, "id" | "workspace" | "segments" | "chunks" | "claims" | "createdAt"> & { parentSourceId: number | null };
+export type SourceDraft = Omit<Source, "id" | "workspace" | "pages" | "ocrPages" | "segments" | "chunks" | "embeddedChunks" | "claims" | "createdAt"> & { parentSourceId: number | null };
 export type SegmentDraftRow = { text: string; speaker: string | null; locator: Locator; block: number };
 export type ChunkDraftRow = { sourceId: number | null; kind: ChunkKind; text: string; locator: Locator; tokens: number; segmentFrom: number | null; segmentTo: number | null; columnId?: number | null; claimId?: number | null };
 export type ClaimDraft = { chunkId: number; sourceId: number; statement: string; quote: string; speaker: string | null; occurredAt: string | null; provenance: Provenance; status: ClaimStatus; locator: Locator; namedColumn: string | null };
@@ -174,7 +175,7 @@ export function openCorpus(db: Database.Database, workspace: WorkspaceSlug) {
   const run = (sql: string, ...params: unknown[]) => prepare(sql).run(...params);
   const transaction = <T>(fn: () => T): T => db.transaction(fn)();
 
-  const sourceSql = `SELECT s.*, (SELECT COUNT(*) FROM segment WHERE source_id = s.id) AS segments, (SELECT COUNT(*) FROM chunk WHERE source_id = s.id) AS chunks, (SELECT COUNT(*) FROM claim WHERE source_id = s.id) AS claims FROM source s`;
+  const sourceSql = `SELECT s.*, (SELECT COUNT(*) FROM segment WHERE source_id = s.id) AS segments, (SELECT COUNT(*) FROM chunk WHERE source_id = s.id) AS chunks, (SELECT COUNT(*) FROM chunk WHERE source_id = s.id AND embedded = 1) AS embedded_chunks, (SELECT COUNT(*) FROM claim WHERE source_id = s.id) AS claims FROM source s`;
   const sourceOf = (r: Row): Source => ({
     id: r.id as number,
     workspace,
@@ -191,8 +192,11 @@ export function openCorpus(db: Database.Database, workspace: WorkspaceSlug) {
     status: r.status as SourceStatus,
     error: r.error as string | null,
     runId: r.run_id as string | null,
+    pages: r.pages as number | null,
+    ocrPages: JSON.parse(r.ocr_pages as string) as number[],
     segments: r.segments as number,
     chunks: r.chunks as number,
+    embeddedChunks: r.embedded_chunks as number,
     claims: r.claims as number,
     createdAt: r.created_at as string,
   });
@@ -289,6 +293,7 @@ export function openCorpus(db: Database.Database, workspace: WorkspaceSlug) {
         return all(`${sourceSql} ${where.length ? `WHERE ${where.join(" AND ")}` : ""} ORDER BY s.occurred_at DESC, s.id DESC`, ...params).map(sourceOf);
       },
       setStatus: (id: number, status: SourceStatus, error: string | null = null): void => void run("UPDATE source SET status = ?, error = ? WHERE id = ?", status, error, id),
+      setPages: (id: number, pages: number | null, ocrPages: number[]): void => void run("UPDATE source SET pages = ?, ocr_pages = ? WHERE id = ?", pages, JSON.stringify(ocrPages), id),
       update: (id: number, patch: Partial<Pick<Source, "title" | "occurredAt" | "runId" | "contentHash" | "blobPath" | "bytes" | "externalUrl">>): void => {
         const fields: Record<string, string> = { title: "title", occurredAt: "occurred_at", runId: "run_id", contentHash: "content_hash", blobPath: "blob_path", bytes: "bytes", externalUrl: "external_url" };
         const entries = Object.entries(patch).filter(([, v]) => v !== undefined);

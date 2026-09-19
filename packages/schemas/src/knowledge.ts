@@ -59,8 +59,11 @@ export const Source = z.object({
   status: SourceStatus,
   error: z.string().nullable(),
   runId: z.string().nullable(),
+  pages: z.number().int().nullable(),
+  ocrPages: z.array(z.number().int()),
   segments: z.number().int(),
   chunks: z.number().int(),
+  embeddedChunks: z.number().int(),
   claims: z.number().int(),
   createdAt: z.string(),
 });

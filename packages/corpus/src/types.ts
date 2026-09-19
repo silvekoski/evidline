@@ -10,6 +10,7 @@ export type Normalized = {
   segments: SegmentDraft[];
   headers: string[];
   attachments: Attachment[];
+  pages: number | null;
   ocrPages: number[];
 };
 
