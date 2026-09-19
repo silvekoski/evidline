@@ -35,5 +35,6 @@ export default tseslint.config(
     rules: { "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_", varsIgnorePattern: "^_" }] },
   },
   { files: ["packages/adapters/**", "packages/schemas/**", "apps/server/**", "scripts/**"], rules: noOutbound },
-  { files: ["packages/core/**"], rules: pureCore },
+  { files: ["packages/core/src/**"], rules: pureCore },
+  { files: ["packages/core/test/**"], rules: noOutbound },
 );
