@@ -115,7 +115,7 @@ export function SourceScreen() {
 
   return (
     <div className={cn("grid gap-4", paged ? "lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] xl:grid-cols-[minmax(0,5fr)_minmax(0,4fr)_minmax(0,3fr)]" : "lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]")}>
-      <div className={cn(paged && "lg:col-span-2 xl:col-span-3")}>
+      <div className={cn("lg:col-span-2", paged && "xl:col-span-3")}>
         <PageHeader title={source.title} description={`${formatTime(source.occurredAt)}, ${sourceStatusWord[source.status]}, ${formatBytes(source.bytes)}${source.pages ? `, ${source.pages} pages` : ""}`}>
           <SourceKindBadge value={source.kind} />
           {source.blobPath && !paged && (
@@ -167,10 +167,10 @@ export function SourceScreen() {
               const fromOcr = l.kind === "file" && l.page !== null && source.ocrPages.includes(l.page);
               const where = l.kind === "teams_call" ? formatClock(l.startMs) : l.kind === "file" && l.page !== null ? `p. ${l.page}` : l.kind === "file" && l.row !== null ? `row ${l.row}` : String(s.seq + 1);
               return (
-                <li key={s.id} id={`seg-${s.seq}`} ref={active ? target : undefined} className={cn("grid grid-cols-[4.5rem_1fr] gap-3 rounded-md border p-2 text-sm", active && "border-foreground")} aria-current={active ? "true" : undefined}>
+                <li key={s.id} id={`seg-${s.seq}`} ref={active ? target : undefined} className={cn("grid grid-cols-[5.5rem_1fr] gap-3 rounded-md border p-2 text-sm", active && "border-foreground")} aria-current={active ? "true" : undefined}>
                   <div className="flex flex-col items-start gap-1 font-mono text-xs text-muted-foreground">
                     <span>{where}</span>
-                    {s.speaker && <span className="truncate font-sans" title={s.speaker}>{s.speaker}</span>}
+                    {s.speaker && <span className="max-w-full truncate font-sans" title={s.speaker}>{s.speaker}</span>}
                     {fromOcr && <OcrBadge className="font-sans" />}
                   </div>
                   <p className="whitespace-pre-wrap">
