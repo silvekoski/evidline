@@ -305,7 +305,7 @@ export function detectDrift(
           pValue: stats.p,
           maxDeviation: stats.maxDeviation,
         },
-        verdict: `Block medians of ${alias} after sample ${baseline.to} trend at ${roundSig(stats.slope * 1000)} per 1000 samples, Mann-Kendall p ${roundSig(stats.p)}.`,
+        verdict: `Block medians of ${alias} after sample ${baseline.to} trend at ${roundSig(stats.slope * 1000)} per thousand samples, Mann-Kendall p ${roundSig(stats.p)}.`,
         chart: {
           type: "bar",
           window: full,
@@ -434,7 +434,7 @@ export function detectDrift(
     const parts = [subject, `Max deviation ${roundSig(d.stats.maxDeviation)} ${unit}, limit ${roundSig(limit)}.`];
     if (d.drifting) {
       if (onset !== null) parts.push(`Onset at sample ${onset}, detection delay ${detectionDelay} samples.`);
-      parts.push(`Rate ${roundSig(value.ratePer1000)} ${unit} per 1000 samples, Mann-Kendall p ${roundSig(d.stats.p)}.`);
+      parts.push(`Rate ${roundSig(value.ratePer1000)} ${unit} per thousand samples, Mann-Kendall p ${roundSig(d.stats.p)}.`);
       parts.push(d.inRange ? "The value stays inside the baseline p1 to p99 range." : "The value has left the baseline p1 to p99 range.");
       if (override) parts.push(`The operator set the responsible sensor to ${override}.`);
       else if (d.victimOf) parts.push(`${d.alias} follows ${d.victimOf}: its deviation falls below the limit without ${d.victimOf}.`);

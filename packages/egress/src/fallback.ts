@@ -98,12 +98,9 @@ function parseRule(sentence: string, dt: number | null): RuleJson | null {
 function explain(p: PayloadOf<"explain_diagnosis">): ExplainDiagnosisResponse | null {
   const verdict = p.trace.find((s) => s.test === "verdict") ?? p.trace[p.trace.length - 1];
   if (!verdict) return null;
-  return {
-    sentences: [
-      { text: `${faultLabel(p.faultClass)}.`, evidenceIds: verdict.evidenceIds },
-      ...p.trace.map((s) => ({ text: s.result, evidenceIds: s.evidenceIds })),
-    ],
-  };
+  const label = faultLabel(p.faultClass);
+  const steps = p.trace.map((s) => ({ text: s.result, evidenceIds: s.evidenceIds }));
+  return { sentences: steps.some((s) => s.text.includes(label)) ? steps : [{ text: `${label}.`, evidenceIds: verdict.evidenceIds }, ...steps] };
 }
 
 function questionCenter(question: string, dt: number | null): number | null {

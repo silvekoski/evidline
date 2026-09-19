@@ -560,7 +560,7 @@ function diagnose(p: Prepared, group: Group): Incident {
             window: span,
             method: "theil-sen",
             stats: { n: span.n, blocks: kind.blocks, slopePer1000: kind.slopePer1000, mkZ: kind.mkZ, pValue: kind.pValue, jump: kind.jump, span: kind.span, period: kind.period },
-            verdict: `|deviation| of ${lead} trends ${sig(kind.slopePer1000)} per 1000 samples over ${kind.blocks} blocks (p ${sig(kind.pValue)}); jump at onset ${sig(kind.jump)}; period ${kind.period}.`,
+            verdict: `|deviation| of ${lead} trends ${sig(kind.slopePer1000)} per thousand samples over ${kind.blocks} blocks (p ${sig(kind.pValue)}); jump at onset ${sig(kind.jump)}; period ${kind.period}.`,
             chart: {
               type: "line",
               window: span,
@@ -673,7 +673,7 @@ function diagnose(p: Prepared, group: Group): Incident {
       result:
         `${group.drivers.length} related sensors move together; ${agree} of ${edges} lead-lag edges follow the learned lags` +
         (pca && p.pca ? `; SPE ${sig(pca.spe)} against ${sig(p.pca.speLimit)}, T2 ${sig(pca.t2)} against ${sig(p.pca.t2Limit)}` : "") +
-        (kind ? `; |deviation| trend ${sig(kind.slopePer1000)} per 1000 samples (p ${sig(kind.pValue)}), jump ${sig(kind.jump)}, period ${kind.period}.` : "."),
+        (kind ? `; |deviation| trend ${sig(kind.slopePer1000)} per thousand samples (p ${sig(kind.pValue)}), jump ${sig(kind.jump)}, period ${kind.period}.` : "."),
     },
     "control-loop": {
       name: "Control loop",
