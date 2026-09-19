@@ -1,3 +1,4 @@
+import { healthBlockSize } from "./health";
 import type {
   ChartSeries,
   DiagnosisValue,
@@ -16,7 +17,7 @@ import type { DriftResult } from "./drift";
 import { fitPca, pcaStatistics, type PcaModel } from "./pca";
 import type { RelationGraph } from "./relations";
 import type { RoleResult } from "./roles";
-import { acfTime, blockMedians, dominantPeriod, mannKendall, median, spearman, theilSen } from "./stats";
+import { acfTime, blockMedians, dominantPeriod, mannKendall, median, noiseLevel, spearman, theilSen } from "./stats";
 import { buildTrace, listing, sig, type Cited } from "./trace";
 import { window, type EvidenceInput, type EvidenceSink, type Grid, type Masks } from "./types";
 
@@ -51,6 +52,7 @@ type Prepared = FaultContext & {
   drifting: Map<string, DriftResult>;
   drivers: string[];
   victims: Map<string, string[]>;
+  sources: Map<string, string[]>;
   neighbors: Map<string, Set<string>>;
   pca: PcaModel | null;
   shared: Shared;
@@ -143,6 +145,14 @@ function prepare(ctx: FaultContext, sink: EvidenceSink, overrides: Overrides): P
     if (driver !== null) victims.set(driver, [...(victims.get(driver) ?? []), a]);
   }
   const pcaSensors = ctx.grid.aliases.filter((a, i) => ctx.fps[i]?.signalType !== "constant" && !excluded.includes(a));
+  const sources = new Map<string, string[]>();
+  for (const set of ctx.grid.siblings ?? []) {
+    for (const a of set) {
+      if (!drivers.includes(a)) continue;
+      const others = set.filter((b) => b !== a && !excluded.includes(b));
+      if (others.length > 0 && others.every((b) => !drifting.has(b) || victimOf(b) === a)) sources.set(a, others);
+    }
+  }
   return {
     ...ctx,
     sink,
@@ -155,6 +165,7 @@ function prepare(ctx: FaultContext, sink: EvidenceSink, overrides: Overrides): P
     drifting,
     drivers,
     victims,
+    sources,
     neighbors: neighborsOf(ctx),
     pca: fitPca(ctx.grid, ctx.baseline, pcaSensors),
     shared: sharedChangepoint(ctx, sink),
@@ -210,60 +221,71 @@ function healthClassOf(p: Prepared, alias: string): string {
 
 function healthIncidents(p: Prepared): Incident[] {
   const { n, grid } = p;
-  return p.health
-    .filter((h) => h.value.health !== "healthy")
-    .sort((a, b) => a.value.sensor.localeCompare(b.value.sensor))
-    .map((h) => {
-      const { sensor, masked } = h.value;
-      const cls = h.value.health as Exclude<HealthValue["health"], "healthy">;
-      const onset = masked[0]?.from ?? null;
-      const w = window(Math.max(0, Math.min(onset ?? 0, n - MIN_WINDOW)), n);
-      const check = h.value.checks.find((c) => c.check === cls);
-      const statistic = check?.statistic ?? 0;
-      const threshold = check?.threshold ?? 0;
-      const mask = p.masks[grid.aliases.indexOf(sensor)];
-      let maskedSamples = 0;
+  const failed = p.health.filter((h) => h.value.health !== "healthy").sort((a, b) => a.value.sensor.localeCompare(b.value.sensor));
+  const blockSize = healthBlockSize(n);
+  const groups: (typeof failed)[] = [];
+  for (const h of failed) {
+    const onset = h.value.masked[0]?.from ?? 0;
+    const group = groups.find((g) => g[0]!.value.health === h.value.health && Math.abs((g[0]!.value.masked[0]?.from ?? 0) - onset) <= blockSize);
+    if (group) group.push(h);
+    else groups.push([h]);
+  }
+  return groups.map((group) => {
+    const lead = group[0]!;
+    const sensors = group.map((h) => h.value.sensor);
+    const cls = lead.value.health as Exclude<HealthValue["health"], "healthy">;
+    const onset = Math.min(...group.map((h) => h.value.masked[0]?.from ?? 0));
+    const w = window(Math.max(0, Math.min(onset, n - MIN_WINDOW)), n);
+    const check = lead.value.checks.find((c) => c.check === cls);
+    const statistic = check?.statistic ?? 0;
+    const threshold = check?.threshold ?? 0;
+    let maskedSamples = 0;
+    for (const alias of sensors) {
+      const mask = p.masks[grid.aliases.indexOf(alias)];
       if (mask) for (let t = w.from; t < w.to; t++) maskedSamples += mask[t]!;
-      const maskedShare = ratio(maskedSamples, w.n);
-      const ev = add(p.sink, {
-        kind: "health",
-        sensors: [sensor],
-        window: w,
-        method: cls,
-        stats: { n: w.n, statistic, threshold, ratio: ratio(statistic, threshold), maskedShare, maskedWindows: masked.length },
-        verdict: `${sensor} failed the ${cls} check: statistic ${sig(statistic)} against threshold ${sig(threshold)}.`,
-        chart: { type: "line", window: w, series: [series(sensor, "solid", "value")], masks: masked },
-      });
-      const upstream = h.evidenceIds.map((id) => ({ id, stats: {} }));
-      const faultClass = p.overrides.faultClass?.[sensor] ?? healthToFault(cls);
-      const skipped = { n: w.n, cited: [ev], keys: [], result: `Not run: ${sensor} is excluded by the health gate.` };
-      const trace = buildTrace({
-        health: {
-          name: "Health gate",
-          n: w.n,
-          cited: [ev, ...upstream],
-          keys: ["statistic", "threshold", "ratio", "maskedShare"],
-          result: `The health gate excluded ${sensor} (${cls}): statistic ${sig(statistic)} against threshold ${sig(threshold)}; masked share of the window ${sig(maskedShare)}.`,
-        },
-        drift: { name: "Drift", ...skipped },
-        isolation: { name: "Isolation", ...skipped },
-        propagation: { name: "Propagation", ...skipped },
-        "control-loop": { name: "Control loop", ...skipped },
-        verdict: {
-          name: "Verdict",
-          n: w.n,
-          cited: [ev, ...upstream],
-          keys: ["statistic", "threshold"],
-          result: `${faultLabel(faultClass)} on ${sensor} from sample ${w.from}. No process diagnosis uses this sensor.`,
-        },
-      });
-      return {
-        value: { faultClass, window: w, onset, ranked: [], excluded: [sensor], trace, prose: null, pca: null },
-        claim: `${faultLabel(faultClass)} on ${sensor} from sample ${w.from}. No process diagnosis uses this sensor.`,
-        confidence: 1,
-        evidenceIds: [...new Set(trace.flatMap((s) => s.evidenceIds))],
-      };
+    }
+    const maskedShare = ratio(maskedSamples, w.n * sensors.length);
+    const masked = lead.value.masked;
+    const ev = add(p.sink, {
+      kind: "health",
+      sensors,
+      window: w,
+      method: cls,
+      stats: { n: w.n, sensors: sensors.length, statistic, threshold, ratio: ratio(statistic, threshold), maskedShare, maskedWindows: masked.length },
+      verdict: `${sensors.length} sensor${sensors.length === 1 ? "" : "s"} failed the ${cls} check from sample ${w.from}. ${lead.value.sensor}: statistic ${sig(statistic)} against threshold ${sig(threshold)}.`,
+      chart: { type: "line", window: w, series: sensors.slice(0, 5).map((alias, i) => series(alias, i === 0 ? "solid" : "thin", alias)), masks: masked },
     });
+    const upstream = group.flatMap((h) => h.evidenceIds.map((id) => ({ id, stats: {} })));
+    const faultClass = sensors.map((alias) => p.overrides.faultClass?.[alias]).find((fc) => fc !== undefined) ?? healthToFault(cls);
+    const who = sensors.length === 1 ? sensors[0]! : `${sensors[0]} and ${sensors.length - 1} more`;
+    const skipped = { n: w.n, cited: [ev], keys: [], result: `Not run: ${who} ${sensors.length === 1 ? "is" : "are"} excluded by the health gate.` };
+    const trace = buildTrace({
+      health: {
+        name: "Health gate",
+        n: w.n,
+        cited: [ev, ...upstream],
+        keys: ["sensors", "statistic", "threshold", "ratio", "maskedShare"],
+        result: `The health gate excluded ${sensors.length} sensor${sensors.length === 1 ? "" : "s"} (${cls}): ${sensors.slice(0, 6).join(", ")}${sensors.length > 6 ? ", ..." : ""}. ${lead.value.sensor}: statistic ${sig(statistic)} against threshold ${sig(threshold)}; masked share of the window ${sig(maskedShare)}.`,
+      },
+      drift: { name: "Drift", ...skipped },
+      isolation: { name: "Isolation", ...skipped },
+      propagation: { name: "Propagation", ...skipped },
+      "control-loop": { name: "Control loop", ...skipped },
+      verdict: {
+        name: "Verdict",
+        n: w.n,
+        cited: [ev, ...upstream],
+        keys: ["sensors", "statistic", "threshold"],
+        result: `${faultLabel(faultClass)} on ${who} from sample ${w.from}. No process diagnosis uses ${sensors.length === 1 ? "this sensor" : "these sensors"}.`,
+      },
+    });
+    return {
+      value: { faultClass, window: w, onset, ranked: [], excluded: sensors, trace, prose: null, pca: null },
+      claim: `${faultLabel(faultClass)} on ${who} from sample ${w.from}. No process diagnosis uses ${sensors.length === 1 ? "this sensor" : "these sensors"}.`,
+      confidence: 1,
+      evidenceIds: [...new Set(trace.flatMap((s) => s.evidenceIds))],
+    };
+  });
 }
 
 function onsetForGrouping(p: Prepared, alias: string): number {
@@ -299,12 +321,41 @@ function driverGroups(p: Prepared): Group[] {
   const merged = new Map<number, string[]>();
   drivers.forEach((a, i) => merged.set(find(i), [...(merged.get(find(i)) ?? []), a]));
   const groups = [...merged.values()]
+    .flatMap((group) => {
+      const source = group.filter((a) => p.sources.has(a));
+      return source.length > 0 && source.length < group.length ? [source, group.filter((a) => !p.sources.has(a))] : [group];
+    })
     .map((group) => {
       const onsets = group.map((a) => p.drifting.get(a)!.value.onset).filter((o): o is number => o !== null);
       return { drivers: group.sort(), onset: onsets.length > 0 ? Math.min(...onsets) : null };
     })
     .sort((x, y) => (x.onset ?? n) - (y.onset ?? n) || x.drivers[0]!.localeCompare(y.drivers[0]!));
   return groups.map((g, i) => ({ ...g, until: groups[i + 1]?.onset ?? n }));
+}
+
+type ScaleChange = { levelRatio: number; spreadRatio: number; gain: boolean };
+
+function scaleChange(x: Float64Array, baseline: Window, span: Window): ScaleChange {
+  const finite = (w: Window) => x.subarray(w.from, w.to).filter((v) => Number.isFinite(v));
+  const base = finite(baseline);
+  const post = finite(span);
+  if (base.length < 10 || post.length < 10) return { levelRatio: 1, spreadRatio: 1, gain: false };
+  const baseMedian = median(base);
+  const postMedian = median(post);
+  const baseSpread = noiseLevel(base);
+  const postSpread = noiseLevel(post);
+  const levelRatio = baseMedian !== 0 && Math.sign(baseMedian) === Math.sign(postMedian) ? postMedian / baseMedian : 1;
+  const spreadRatio = baseSpread > 0 ? postSpread / baseSpread : 1;
+  const level = Math.abs(Math.log(levelRatio));
+  const spread = Math.log(spreadRatio);
+  const gain = level > 0.05 && Math.sign(spread) === Math.sign(Math.log(levelRatio)) && Math.abs(spread) > 0.5 * level;
+  return { levelRatio, spreadRatio, gain };
+}
+
+function gainReason(gain: boolean, rho: number, scale: ScaleChange): string {
+  return gain
+    ? `the deviation scales with the level (|rho| ${sig(Math.abs(rho))}; level x${sig(scale.levelRatio)}, spread x${sig(scale.spreadRatio)})`
+    : `the deviation does not depend on the level (|rho| ${sig(Math.abs(rho))}; level x${sig(scale.levelRatio)}, spread x${sig(scale.spreadRatio)})`;
 }
 
 function rank(p: Prepared, drivers: string[], victims: string[]): RankedSensor[] {
@@ -383,6 +434,8 @@ function diagnose(p: Prepared, group: Group): Incident {
   const single = group.drivers.length === 1;
 
   const level = model ? spearman(model.deviation.subarray(span.from, span.to), model.expected.subarray(span.from, span.to)) : { rho: 0, n: 0 };
+  const scale = scaleChange(grid.values[grid.aliases.indexOf(lead)]!, p.baseline, span);
+  const gain = model !== null && (Math.abs(level.rho) > 0.5 || scale.gain);
   const peers = (p.graph.peers.get(lead) ?? []).map((q) => q.alias);
   const peerDrivers = peers.filter((a) => p.drivers.includes(a)).length;
   const redundancy = p.graph.groups.find((g) => g.sensors.includes(lead)) ?? null;
@@ -462,12 +515,16 @@ function diagnose(p: Prepared, group: Group): Incident {
         n: span.n,
         pairs: level.n,
         levelRho: Math.abs(level.rho),
+        levelRatio: scale.levelRatio,
+        spreadRatio: scale.spreadRatio,
         maxDeviation: drift.value.maxDeviation,
         deviationLimit: thresholds.deviationLimit,
         peers: peers.length,
         peerDrivers,
         groupSize: redundancy ? redundancy.sensors.length : 0,
         groupDrivers,
+        siblings: p.sources.get(lead)?.length ?? 0,
+        siblingDrivers: 0,
         loop: loop ? 1 : 0,
         controlledDeviation: loop ? maxDeviationOf(p, loop.controlled) : 0,
         actuatorDeviation: loop ? maxDeviationOf(p, loop.actuator) : 0,
@@ -526,6 +583,15 @@ function diagnose(p: Prepared, group: Group): Incident {
       keys: ["share", "index", "sharing"],
       redundancy: false,
     };
+  } else if (group.drivers.every((a) => p.sources.has(a))) {
+    const siblings = p.sources.get(lead)!;
+    row = {
+      faultClass: model ? (gain ? "sensor-drift-gain" : "sensor-drift-bias") : "sensor-drift",
+      reason: `${lead} leaves its ${siblings.length} siblings (the same measure over other sources) while they hold; ${gainReason(gain, level.rho, scale)}.`,
+      cited: [isoEv, pcaEv],
+      keys: ["levelRho", "levelRatio", "spreadRatio", "maxDeviation", "siblings", "siblingDrivers"],
+      redundancy: false,
+    };
   } else if (single && redundancy && groupDrivers === 0) {
     row = {
       faultClass: "sensor-drift",
@@ -535,14 +601,13 @@ function diagnose(p: Prepared, group: Group): Incident {
       redundancy: true,
     };
   } else if (single && !loop) {
-    const gain = model !== null && Math.abs(level.rho) > 0.5;
     row = {
       faultClass: model ? (gain ? "sensor-drift-gain" : "sensor-drift-bias") : "sensor-drift",
       reason: model
-        ? `${lead} leaves its ${peers.length} peers while they stay consistent; the deviation ${gain ? "scales with" : "does not depend on"} the level (|rho| ${sig(Math.abs(level.rho))}).`
+        ? `${lead} leaves its ${peers.length} peers while they stay consistent; ${gainReason(gain, level.rho, scale)}.`
         : `${lead} leaves its baseline distribution and has no peers.`,
       cited: [isoEv, pcaEv],
-      keys: ["levelRho", "maxDeviation", "peers", "peerDrivers", "spe", "speLimit"],
+      keys: ["levelRho", "levelRatio", "spreadRatio", "maxDeviation", "peers", "peerDrivers", "spe", "speLimit"],
       redundancy: false,
     };
   } else if (loop) {

@@ -1,6 +1,6 @@
 import type { ChartSpec, Fingerprint, HealthClass, HealthValue, Thresholds, Window } from "@tpm/schemas";
 import { hampel } from "./stats/hampel";
-import { finiteSorted } from "./stats/quantile";
+import { finiteSorted, quantileSorted } from "./stats/quantile";
 import { compressHold, longestRun, p99RunLength } from "./stats/runs";
 import { noiseLevel, roundSig, stepSize } from "./stats/series";
 import { window, type EvidenceSink, type Grid } from "./types";
@@ -28,17 +28,19 @@ const resolutionFactor = 4;
 const timebaseTolerance = 0.5;
 const dropoutRateFloor = 0.01;
 const hampelWindow = 7;
+const fineResolution = 50;
 
 export type HealthCheck = HealthValue["checks"][number];
 
 export type HealthResult = { value: HealthValue; claim: string; confidence: number; evidenceIds: string[]; mask: Uint8Array };
 
-export type HealthBlockStats = { missing: number; run: number; noise: number; spikes: number[]; edge: number; step: number };
+export type HealthBlockStats = { missing: number; run: number; noise: number; spikes: number[]; edge: number; step: number; level: number };
 
 export type HealthReference = {
   hold: number;
   sigmas: number[];
   constant: boolean;
+  fine: boolean;
   distinct: number;
   missing: number;
   run: number;
@@ -128,6 +130,7 @@ export function healthBlockStats(x: Float64Array, ref: Pick<HealthReference, "ho
     spikes: ref.sigmas.map((k) => share(hampel(y, hampelWindow, k), count)),
     edge: edgeMass(y, ref.p1, ref.p99, count),
     step: stepSize(y),
+    level: count > 0 ? quantileSorted(finiteSorted(y), 0.5) : NaN,
   };
 }
 
@@ -166,6 +169,7 @@ export function healthReference(
     hold,
     sigmas,
     constant: distinct <= 1,
+    fine: (p99 - p1) / stepSize(y) >= fineResolution,
     distinct,
     missing: raw.length > 0 ? 1 - finiteCount(raw) / raw.length : 0,
     run: p99RunLength(y, spans),
@@ -190,8 +194,8 @@ export function evaluateHealth(b: HealthBlockStats, ref: HealthReference, th: Th
     dead: [b.run, th.deadRunFactor * (ref.constant ? 1 : ref.run)],
     stuck: [b.noise, th.stuckNoiseRatio * ref.noise],
     spikes: [b.spikes[sigma]!, Math.max(spikeShareFloor, spikeShareFactor * ref.spikes[sigma]!)],
-    saturated: [ref.distinct >= saturationDistinct ? b.edge : 0, Math.max(th.saturationShare, saturationFactor * ref.edge)],
-    noisy: [b.noise, th.noisyRatio * ref.noise],
+    saturated: [ref.distinct >= saturationDistinct && ref.fine ? b.edge : 0, Math.max(th.saturationShare, saturationFactor * ref.edge)],
+    noisy: [b.level >= ref.p1 && b.level <= ref.p99 ? b.noise : 0, th.noisyRatio * ref.noise],
     timebase: [timebase, timebaseTolerance],
     resolution: [ref.stepRange ? stepFactor(b.step, ref.stepRange) : 1, resolutionFactor],
   };
@@ -236,12 +240,11 @@ export function healthGate(grid: Grid, baseline: Window, fps: Fingerprint[], thr
   const regularity = blocks.map((b) => timeRegularity(grid, b));
   const whole = window(0, n);
   const refs = aliases.map((_, i) => healthReference(grid.values[i]!, baseline, episodes, fps[i]!.hold, [thresholds.spikeSigma], w));
-  const evaluated = refs.map((ref, i) =>
-    ref.constant ? null : blocks.map((b, k) => evaluateHealth(healthBlockStats(grid.values[i]!.subarray(b.from, b.to), ref), ref, thresholds, regularity[k]!)),
-  );
+  const stats = refs.map((ref, i) => (ref.constant ? null : blocks.map((b) => healthBlockStats(grid.values[i]!.subarray(b.from, b.to), ref))));
+  const evaluated = stats.map((rows, i) => (rows ? rows.map((b, k) => evaluateHealth(b, refs[i]!, thresholds, regularity[k]!)) : null));
   const noisy = checks.findIndex((c) => c.check === "noisy");
   const floor = plantWideFloor(evaluated.filter((e) => e !== null).length);
-  const noisyCount = blocks.map((_, k) => evaluated.filter((e) => e !== null && !e[k]![noisy]!.pass).length);
+  const noisyCount = blocks.map((_, k) => stats.filter((rows, i) => rows !== null && rows[k]!.noise > thresholds.noisyRatio * refs[i]!.noise).length);
   const plantWide = noisyCount.map((count) => count >= floor);
   for (const e of evaluated) {
     if (!e) continue;
@@ -275,6 +278,28 @@ export function healthGate(grid: Grid, baseline: Window, fps: Fingerprint[], thr
         chart: chart(masks),
       });
     };
+
+    if (ref.constant && longestRun(x) < n) {
+      const value: HealthValue = { sensor: alias, health: "healthy", masked: [], checks: checks.map(({ check }) => ({ check, statistic: 0, threshold: 0, pass: true })) };
+      const passed: HealthCheck = { check: "dead", statistic: longestRun(x), threshold: n, pass: true };
+      return {
+        value,
+        claim: `${alias} is constant in the baseline and changes later, so no check has a reference. The change is left to the drift and fault stages.`,
+        confidence: checkMargin(passed),
+        evidenceIds: [
+          sink.add({
+            kind: "health",
+            sensors: [alias],
+            window: whole,
+            method: "constant-baseline",
+            stats: { n, distinct: ref.distinct, longestRun: passed.statistic },
+            verdict: `${alias} holds one value over the whole baseline and ${sig(passed.statistic)} samples at most in a row over the grid.`,
+            chart: chart([]),
+          }),
+        ],
+        mask: new Uint8Array(n),
+      };
+    }
 
     if (ref.constant) {
       const dead: HealthCheck = { check: "dead", statistic: longestRun(x, episodes), threshold: thresholds.deadRunFactor, pass: false };

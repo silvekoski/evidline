@@ -214,7 +214,7 @@ describe("separateFaults", () => {
     expect(incident!.value.window).toEqual(window(1200, N));
     expect(incident!.confidence).toBe(1);
     expect(incident!.claim).toContain("Sensor fault: dead");
-    expect(incident!.value.trace[0]!.result).toContain("S02 (dead)");
+    expect(incident!.value.trace[0]!.result).toContain("(dead): S02");
     expect(incident!.value.trace[0]!.stats.statistic).toBe(800);
     expect(incident!.value.trace[0]!.evidenceIds).toContain(ctx.health[1]!.evidenceIds[0]);
     checkTrace(incident!, sink);

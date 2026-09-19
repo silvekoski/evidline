@@ -80,7 +80,14 @@ describe("leak index", () => {
     expect(scanForLeaks("[5,5,5]", small).valueHits).toBe(0);
     expect(scanForLeaks('{"a":[0,1,0],"b":{"x":0,"y":0,"z":5}}', small).valueHits).toBe(1);
     expect(scanForLeaks('{"note":"0 then 1 then 0"}', small).valueHits).toBe(1);
-    expect(scanForLeaks('{"note":"0, 1, 0 and 0, 0, 5"}', small).valueHits).toBe(3);
+    expect(scanForLeaks('{"note":"0, 1, 0 and 0, 0, 5"}', small).valueHits).toBe(2);
+  });
+
+  it("collapses repeated values so a sample-and-hold sensor is caught and a repeated share is not", () => {
+    const hold = buildLeakIndex([{ alias: "S01", values: Float64Array.from([0.104, 0.104, 0.0995, 0.0995, 0.08, 0.08, 0.3, 0.3]) }], []);
+    expect(scanForLeaks('{"shares":[0.104,0.104,0.0995]}', hold).valueHits).toBe(0);
+    expect(scanForLeaks('{"shares":[0.104,0.0995,0.08]}', hold).valueHits).toBe(1);
+    expect(scanForLeaks("[0.104,0.104,0.0995,0.0995,0.08,0.08]", hold).valueHits).toBe(1);
   });
 
   it("finds a forbidden name in its JSON-escaped form", () => {

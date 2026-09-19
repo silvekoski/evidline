@@ -7,6 +7,7 @@ export type Grid = {
   dt: number | null;
   time: Float64Array | null;
   episodes: Window[];
+  siblings?: string[][];
 };
 
 export type Masks = Uint8Array[];

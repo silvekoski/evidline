@@ -89,6 +89,49 @@ function medianRowsPerBucket(times: number[], bucketMs: number): number {
   return median(ordered.length > 2 ? ordered.slice(1, -1) : ordered);
 }
 
+function derivedNumberFields(fields: Field[], sample: string[][]): Map<string, string> {
+  const numbers = fields.filter((f) => f.kind === "number");
+  const columns = numbers.map((f) => sample.map((row) => parseNumber((row[f.index] ?? "").trim())));
+  const rowsOk = (test: (r: number) => boolean) => {
+    let seen = 0;
+    for (let r = 0; r < sample.length; r++) {
+      const values = columns.map((c) => c[r] as number);
+      if (values.some((v) => !Number.isFinite(v))) continue;
+      seen++;
+      if (!test(r)) return false;
+    }
+    return seen >= 50;
+  };
+  const close = (a: number, b: number) => Math.abs(a - b) <= 1e-6 * Math.max(1, Math.abs(a), Math.abs(b));
+  const found = new Map<string, string>();
+  for (let z = 0; z < numbers.length; z++) {
+    const cz = columns[z]!;
+    for (let x = 0; x < numbers.length && !found.has(numbers[z]!.name); x++) {
+      if (x === z || found.has(numbers[x]!.name)) continue;
+      const cx = columns[x]!;
+      const first = sample.findIndex((_, r) => Number.isFinite(cx[r]) && Number.isFinite(cz[r]) && cx[r] !== 0);
+      const k = first >= 0 ? (cz[first] as number) / (cx[first] as number) : NaN;
+      if (Number.isFinite(k) && k !== 1 && rowsOk((r) => close(cz[r] as number, k * (cx[r] as number)))) {
+        found.set(numbers[z]!.name, `${numbers[z]!.name} = ${Number(k.toPrecision(6))} x ${numbers[x]!.name}`);
+        continue;
+      }
+      for (let y = x + 1; y < numbers.length; y++) {
+        if (y === z || found.has(numbers[y]!.name)) continue;
+        const cy = columns[y]!;
+        if (rowsOk((r) => close(cz[r] as number, (cx[r] as number) + (cy[r] as number)))) {
+          found.set(numbers[z]!.name, `${numbers[z]!.name} = ${numbers[x]!.name} + ${numbers[y]!.name}`);
+          break;
+        }
+        if (rowsOk((r) => close(cz[r] as number, (cx[r] as number) - (cy[r] as number)))) {
+          found.set(numbers[z]!.name, `${numbers[z]!.name} = ${numbers[x]!.name} - ${numbers[y]!.name}`);
+          break;
+        }
+      }
+    }
+  }
+  return found;
+}
+
 function defineMetrics(fields: Field[]): Metric[] {
   const metrics: Metric[] = [{ name: "rows.count", value: (b) => b.rows }];
   for (const f of fields) {
@@ -143,6 +186,8 @@ export async function loadRecords(ctx: LoadContext): Promise<Source> {
     const levels = new Map(p.levels.map((value, level) => [value, level]));
     fields.push({ index, at: fields.length, slot, name: p.name, kind, pattern: p.pattern, levels, splittable: kind === "category" && p.distinct <= maxLevels });
   });
+  const derived = derivedNumberFields(fields, sample);
+  for (const f of fields) if (derived.has(f.name)) f.kind = "text";
   const newBucket = (): Bucket => new Bucket(fields.length, slots.number, slots.category, slots.id);
 
   const buckets = new Map<number, Bucket>();
@@ -205,19 +250,42 @@ export async function loadRecords(ctx: LoadContext): Promise<Source> {
   const built = builder.finish(true);
 
   const scores = built.values.map(relativeVariance);
-  const ranked = metrics.map((_, i) => i).slice(1).sort((a, b) => (scores[b] ?? -1) - (scores[a] ?? -1) || a - b);
+  const constant = metrics.map((_, i) => i).slice(1).filter((i) => !(scores[i]! > 0));
+  const ranked = metrics
+    .map((_, i) => i)
+    .slice(1)
+    .filter((i) => scores[i]! > 0)
+    .sort((a, b) => (scores[b] ?? -1) - (scores[a] ?? -1) || a - b);
   const kept = [0, ...ranked.slice(0, maxSensors - 1)].sort((a, b) => a - b);
+  const keptAliases = aliases(kept.length);
+  const families = new Map<string, string[]>();
+  kept.forEach((i, k) => {
+    const m = /^(.*)\[([^=\]]+)=[^\]]*\]$/.exec(metrics[i]?.name ?? "");
+    if (!m) return;
+    const key = `${m[1]}[${m[2]}]`;
+    families.set(key, [...(families.get(key) ?? []), keptAliases[k]!]);
+  });
+  const siblings = [...families.values()].filter((set) => set.length >= 2);
   return {
     grid: {
-      aliases: aliases(kept.length),
+      aliases: keptAliases,
       values: kept.map((i) => built.values[i] as Float64Array),
       n: built.n,
       dt: bucketMs * built.bucket,
       time: built.time,
       episodes: built.episodes,
+      siblings,
     },
     t0: built.time?.[0] ?? null,
     sourceNames: kept.map((i) => metrics[i]?.name ?? ""),
-    stats: { rows, columns: header.length, rawBytes: ctx.rawBytes, quarantined: [], domain: "records", bucket: built.bucket, episodes: 1 },
+    stats: {
+      rows,
+      columns: header.length,
+      rawBytes: ctx.rawBytes,
+      quarantined: [...derived.values(), ...constant.map((i) => `${metrics[i]?.name ?? ""} (constant)`)],
+      domain: "records",
+      bucket: built.bucket,
+      episodes: 1,
+    },
   };
 }

@@ -17,7 +17,7 @@ type Change = { sensor: number; index: number; move: number; scale: number };
 type ChangeGroup = { index: number; sensors: number[]; big: Change | null };
 
 export function minBaselineLength(n: number): number {
-  return Math.max(1000, Math.floor(0.1 * n));
+  return Math.max(200, Math.min(1000, Math.floor(0.1 * n)));
 }
 
 export function snapToBoundary(episodes: Window[], n: number, end: number): number {

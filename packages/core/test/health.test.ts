@@ -183,10 +183,15 @@ describe("healthGate", () => {
     expectFault(flat, 0, "dead");
   });
 
-  it("marks a constant sensor dead everywhere", () => {
+  it("marks a constant sensor dead everywhere and leaves a sensor that changes after the baseline healthy", () => {
     const later = Float64Array.from({ length: n }, (_, t) => (t < 9000 ? 3 : 3 + Math.sin(t)));
     const { results, sink } = gate(makeGrid([new Float64Array(n).fill(3), later, ...cleanValues().slice(2)]));
-    for (const r of results.slice(0, 2)) {
+    const changed = results[1]!;
+    expect(changed.value.health).toBe("healthy");
+    expect(changed.value.masked).toEqual([]);
+    expect(changed.value.checks.every((c) => c.pass)).toBe(true);
+    expect(sink.evidence.find((e) => e.id === changed.evidenceIds[0])!.method).toBe("constant-baseline");
+    for (const r of results.slice(0, 1)) {
       expect(r.value.health).toBe("dead");
       expect(r.value.masked).toEqual([window(0, n)]);
       expect(r.mask.every((v) => v === 1)).toBe(true);

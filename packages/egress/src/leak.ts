@@ -30,11 +30,13 @@ export function buildLeakIndex(raw: { alias: string; values: Float64Array }[], f
   const hashes = new Float64Array(total);
   let count = 0;
   for (const { values } of raw) {
-    const rounded = values.map((v) => roundSig(v));
-    for (let i = 2; i < rounded.length; i++) {
-      if (Number.isNaN(rounded[i - 2]) || Number.isNaN(rounded[i - 1]) || Number.isNaN(rounded[i])) continue;
-      hashes[count++] = hashRun(rounded, i);
+    const rounded = new Float64Array(values.length);
+    let m = 0;
+    for (const v of values) {
+      const r = roundSig(v);
+      if (Number.isFinite(r) && (m === 0 || r !== rounded[m - 1])) rounded[m++] = r;
     }
+    for (let i = 2; i < m; i++) hashes[count++] = hashRun(rounded, i);
   }
   const sorted = hashes.subarray(0, count).sort();
   let size = 0;
@@ -70,11 +72,15 @@ export function scanValues(payloadText: string, index: LeakIndex): { hits: numbe
     return previous !== undefined && !payloadText.slice(previous.index + previous[0].length, m.index).includes('"');
   });
   const found: string[] = [];
-  for (let i = 2; i < values.length; i++) {
-    const triple: [number, number, number] = [values[i - 2] as number, values[i - 1] as number, values[i] as number];
-    const flat = triple[0] === triple[1] && triple[1] === triple[2];
-    if (joined[i - 1] && joined[i] && !flat && index.has(triple)) found.push(triple.join(", "));
-  }
+  let run: number[] = [];
+  values.forEach((v, i) => {
+    if (!joined[i]) run = [];
+    if (run[run.length - 1] === v) return;
+    run.push(v);
+    if (run.length < 3) return;
+    const triple = run.slice(-3) as [number, number, number];
+    if (index.has(triple)) found.push(triple.join(", "));
+  });
   const detail =
     found.length === 0
       ? `${values.length} number tokens, no run of 3 raw samples`

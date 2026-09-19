@@ -58,3 +58,15 @@ typescript 5.9, vite 7, @vitejs/plugin-react 5, vitest 4, react 19, react-router
 - The engine labels fault 13 as degradation, not slow degradation: the deviation after the onset is not monotone because the control loops react. The demo says what the engine says.
 - Ranked contributions come from normalized maximum deviations with drivers before victims. PCA T2 and SPE stay as supporting evidence in the trace. The agent measured that raw PCA contributions ranked by unit size on this data.
 - Roles on TE: 25 of 52 sensors are unknown or tied. Tightly coupled pressures form a redundancy group by the PRD rule. Sensors with a clear role for the demo: S46 (upstream, confidence 1.0), S12, S15, S17, S48, S49, S52 (redundant pairs of a level and its valve), S43 (downstream 0.67).
+
+## Engine rules added after the records run (2026-09-19, evening)
+
+- The records adapter quarantines constant metrics and number fields that are exact functions of other fields (`gross = net + tax`). It passes sibling sets to the grid: the same metric split over the values of one category field.
+- Fault separation: drivers that leave their siblings while the other sources hold form a source incident (`Sensor fault: drift (gain)` for the cents terminal). Bias against gain uses the level ratio and the noise ratio between the baseline and the incident window, or the Spearman level test.
+- Health failures with the same class and the same onset block form one incident (24 postcode-derived metrics become 2 incidents).
+- The drift detector tries three models in order: the full peer model, the peer model without redundancy group members, then the distribution path. A sensor whose group moves together is still found.
+- A driver becomes a victim of another driver when adding that driver as a regressor halves its deviation and brings it under the limit (measured in the original sigma).
+- The minimum baseline is clamp(10% of n, 200, 1000) samples. A sensor that is constant in the baseline but changes later is healthy with a note, not dead.
+- The noisy check needs the block level inside the baseline p1..p99 (a scale change is not noise). The plant-wide noise exemption counts raw block noise. Saturation needs a fine resolution: (p99 - p1) / step >= 50.
+- The distance path uses a window of clamp(n / 40, 50, 5000) and a spread floor of 0.5 scale units. A 30% demand drop under a daily cycle of larger amplitude stays below the limit: the records demo shows the dead field and the gain fault, not the demand drop.
+- The leak index collapses repeated consecutive values so a sample-and-hold sensor is caught and a repeated histogram share is not.

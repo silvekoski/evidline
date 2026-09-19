@@ -68,7 +68,10 @@ describe("records with one category field", () => {
     expect(source.stats.rows).toBe(days * rowsPerDay);
     expect(source.stats.bucket).toBe(1);
     expect(source.stats.episodes).toBe(1);
-    expect(source.stats.quarantined).toEqual([]);
+    expect(source.stats.quarantined).toContain("gross = net + tax");
+    expect(source.stats.quarantined).toContain("orderId.nullRate (constant)");
+    expect(source.sourceNames).not.toContain("gross.median");
+    expect(source.sourceNames).not.toContain("orderId.nullRate");
     expect(source.grid.dt).toBe(hourMs);
     expect(source.grid.n).toBeGreaterThanOrEqual(days * 24);
     expect(source.grid.n).toBeLessThanOrEqual(days * 24 + 2);
@@ -94,12 +97,12 @@ describe("records with one category field", () => {
     expect(roundShare).toBeLessThan(0.05);
     expect(mean(series(source, "qty.share[3]"))).toBeCloseTo(0.2, 1);
     expect(mean(series(source, "terminal.share[T1]"))).toBeCloseTo(1 / 8, 1);
-    expect(mean(series(source, "terminal.otherShare"))).toBe(0);
+    expect(source.stats.quarantined).toContain("terminal.otherShare (constant)");
     expect(mean(series(source, "rows.count[terminal=T3]"))).toBeCloseTo(rowsPerDay / 24 / 8, -1);
-    expect(mean(series(source, "gross.median[terminal=T3]"))).toBeGreaterThan(80);
+    expect(mean(series(source, "net.median[terminal=T3]"))).toBeGreaterThan(60);
     expect(mean(series(source, "note.nullRate"))).toBeCloseTo(0.1, 1);
     expect(mean(series(source, "note.share[gift wrap]"))).toBeGreaterThan(0.15);
-    expect(mean(series(source, "orderId.formatViolationRate"))).toBe(0);
+    expect(source.stats.quarantined).toContain("orderId.formatViolationRate (constant)");
   });
 });
 
@@ -112,11 +115,12 @@ describe("records with many category levels", () => {
     ]);
     const path = writeCsv(dir, "records-wide.csv", header, rows);
     const source = await loadSource(path);
-    expect(source.sourceNames).toHaveLength(200);
-    expect(source.grid.aliases).toHaveLength(200);
-    expect(source.grid.aliases[199]).toBe("S200");
-    expect(source.grid.values).toHaveLength(200);
+    expect(source.sourceNames.length).toBeLessThanOrEqual(200);
+    expect(source.grid.aliases).toHaveLength(source.sourceNames.length);
+    expect(source.grid.aliases.at(-1)).toBe(`S${source.sourceNames.length}`);
+    expect(source.grid.values).toHaveLength(source.sourceNames.length);
     expect(source.sourceNames).toContain("rows.count");
-    expect(new Set(source.sourceNames).size).toBe(200);
+    expect(new Set(source.sourceNames).size).toBe(source.sourceNames.length);
+    expect(source.grid.siblings!.some((set) => set.length === 8)).toBe(true);
   });
 });

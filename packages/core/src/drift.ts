@@ -22,6 +22,8 @@ export const defaultDriftThresholds: DriftThresholds = { cusumH: 20, cusumK: 0.5
 
 export type DriftModel = PeerModel & PeerPrediction;
 
+type Path = { model: DriftModel | null; ref: DistanceReference | null; series: Float64Array | null; blockSize: number; fine: number; h: number };
+
 export type DriftResult = {
   value: DriftValue;
   claim: string;
@@ -44,7 +46,7 @@ export function driftBlock(grid: Grid): number {
 }
 
 export function distanceWindow(n: number): { w: number; stride: number } {
-  const w = Math.min(Math.max(Math.round(n / 40), 200), 5000);
+  const w = Math.min(Math.max(Math.round(n / 40), 50), 5000);
   return { w, stride: Math.max(1, Math.floor(w / 4)) };
 }
 
@@ -115,7 +117,7 @@ export function distanceReference(y: Float64Array, parts: Window[], w: number, s
   for (const { from, to } of parts) for (const d of rollingDistance(y.subarray(from, to), raw)) if (Number.isFinite(d)) distances.push(d);
   const series = Float64Array.from(distances);
   const center = distances.length > 0 ? median(series) : 0;
-  return { ...raw, center, spread: Math.max(distances.length > 0 ? mad(series, center) : 0, 1) };
+  return { ...raw, center, spread: Math.max(distances.length > 0 ? mad(series, center) : 0, 0.5) };
 }
 
 function maskWindows(mask: Uint8Array | undefined): Window[] {
@@ -165,8 +167,11 @@ export function detectDrift(
   const fine = fineBlock(n);
   const { w, stride } = distanceWindow(n);
   const skip = new Set(roles.filter((r) => r.value.role === "counter" || r.value.role === "state").map((r) => r.value.sensor));
-  const peersOf = (alias: string): Peer[] =>
-    (graph.peers.get(alias) ?? []).filter((p) => p.alias !== alias && grid.aliases.includes(p.alias));
+  const groupOf = new Map<string, Set<string>>();
+  for (const g of graph.groups) for (const a of g.sensors) groupOf.set(a, new Set(g.sensors));
+  const allPeersOf = (alias: string): Peer[] => (graph.peers.get(alias) ?? []).filter((p) => p.alias !== alias && grid.aliases.includes(p.alias));
+  const chosenPeers = new Map<string, Peer[]>();
+  const peersOf = (alias: string): Peer[] => chosenPeers.get(alias) ?? allPeersOf(alias);
   const deviations = new Map<string, Float64Array>();
   const deviationWithout = (index: number, without: string): Float64Array => {
     const peers = peersOf(grid.aliases[index]!).filter((p) => p.alias !== without);
@@ -194,17 +199,27 @@ export function detectDrift(
     if (baseSorted.length < 100) continue;
     const p1 = quantileSorted(baseSorted, 0.01);
     const p99 = quantileSorted(baseSorted, 0.99);
-    const peers = peersOf(alias);
-    const fitted = peers.length > 0 ? fitPeerModel(grid, i, peers, baseline, masks) : null;
-    const model: DriftModel | null = fitted && fitted.peers.length > 0 ? { ...fitted, ...fitted.predict(grid, masks) } : null;
-    const path = model
-      ? { model, ref: null, series: model.deviation, blockSize: block, fine, h: thresholds.cusumH }
-      : { model: null, ref: distanceReference(y, [baseline], w, stride, fp.step), series: null, blockSize: Math.max(block, w), fine: Math.max(block, w), h: thresholds.distributionLimit };
-    const series = path.series ?? rollingDistance(y, path.ref);
-    const stats = blockStats(series, baseline.to, n, path.blockSize, path.fine);
-    const c = cusum(series, thresholds.cusumK, path.h, { start: baseline.to, episodes });
-    const alarm = c.alarms[0] ?? null;
-    const drifting = isDrifting(stats, alarm, limit);
+    const evaluate = (path: Path) => {
+      const series = path.series ?? rollingDistance(y, path.ref as DistanceReference);
+      const stats = blockStats(series, baseline.to, n, path.blockSize, path.fine);
+      const c = cusum(series, thresholds.cusumK, path.h, { start: baseline.to, episodes });
+      const alarm = c.alarms[0] ?? null;
+      return { path, series, stats, c, alarm, drifting: isDrifting(stats, alarm, limit) };
+    };
+    const distancePath = (): Path => ({ model: null, ref: distanceReference(y, [baseline], w, stride, fp.step), series: null, blockSize: Math.max(block, w), fine: Math.max(block, w), h: thresholds.distributionLimit });
+    const peerRun = (candidates: Peer[]) => {
+      const fitted = candidates.length > 0 ? fitPeerModel(grid, i, candidates, baseline, masks) : null;
+      const m: DriftModel | null = fitted && fitted.peers.length > 0 ? { ...fitted, ...fitted.predict(grid, masks) } : null;
+      return m ? evaluate({ model: m, ref: null, series: m.deviation, blockSize: block, fine, h: thresholds.cusumH }) : null;
+    };
+    const every = allPeersOf(alias);
+    const outside = every.filter((q) => !groupOf.get(alias)?.has(q.alias));
+    const runs = [peerRun(every), outside.length < every.length ? peerRun(outside) : null, evaluate(distancePath())];
+    const chosen = runs.find((r) => r?.drifting) ?? runs.find((r) => r !== null)!;
+    const peers = chosen.path.model ? (chosen === runs[1] ? outside : every) : [];
+    chosenPeers.set(alias, peers);
+    const model = chosen.path.model;
+    const { path, series, stats, c, alarm, drifting } = chosen;
     const checkedTo = drifting && alarm ? alarm.index + 1 : n;
     const lastValues = finiteSorted(y.subarray(Math.max(0, checkedTo - block), checkedTo));
     const lastMedian = quantileSorted(lastValues, 0.5);
@@ -247,7 +262,7 @@ export function detectDrift(
         ),
       );
     } else {
-      const { ref } = path;
+      const ref = path.ref as DistanceReference;
       evidenceIds.push(
         sink.add(
           {
@@ -256,7 +271,7 @@ export function detectDrift(
             window: full,
             method: "wasserstein-1",
             stats: { n: baseSorted.length, windowSize: w, stride, scale: ref.scale, center: ref.center, spread: ref.spread, ...commonStats },
-            verdict: `${alias} has no peers. Its rolling distribution ${stayed ? "stays within" : "moves beyond"} ${roundSig(limit)} standardized units of the baseline: max ${roundSig(stats.maxDeviation)}.`,
+            verdict: `${alias} ${every.length > 0 ? "tracks its peers, but its" : "has no peers. Its"} rolling distribution ${stayed ? "stays within" : "moves beyond"} ${roundSig(limit)} standardized units of the baseline: max ${roundSig(stats.maxDeviation)}.`,
             chart: {
               ...chart,
               type: "line",
@@ -365,6 +380,24 @@ export function detectDrift(
     for (const d of drafts) {
       if (d === driver || !d.drifting || d.victimOf || !d.peers.some((p) => p.alias === driver.alias)) continue;
       if (flatWithout(d.index, driver.alias, isolationWindow(d))) {
+        d.victimOf = driver.alias;
+        d.responsible = driver.alias;
+      }
+    }
+  }
+  const flatWith = (d: Draft, extra: string, iso: Window): boolean => {
+    if (!d.model) return false;
+    const peers = [...peersOf(d.alias), { alias: extra, lag: 0, rho: 0, n: 0 }];
+    const refit = fitPeerModel(grid, d.index, peers, baseline, masks);
+    const deviation = refit.predict(grid, masks).deviation.map((v) => (v * refit.sigma) / d.model!.sigma);
+    const before = blockStats(d.model.deviation, iso.from, iso.to, block, fine).maxDeviation;
+    return blockStats(deviation, iso.from, iso.to, block, fine).maxDeviation < Math.min(limit, 0.5 * before);
+  };
+  for (const driver of drivers) {
+    if (driver.victimOf) continue;
+    for (const d of drafts) {
+      if (d === driver || !d.drifting || d.victimOf || !d.model || d.peers.some((p) => p.alias === driver.alias)) continue;
+      if (flatWith(d, driver.alias, isolationWindow(d))) {
         d.victimOf = driver.alias;
         d.responsible = driver.alias;
       }
