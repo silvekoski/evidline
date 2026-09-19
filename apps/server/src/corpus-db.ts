@@ -137,6 +137,7 @@ const migrations = [
   `,
   `ALTER TABLE source ADD COLUMN external_url TEXT;`,
   `ALTER TABLE source ADD COLUMN pages INTEGER; ALTER TABLE source ADD COLUMN ocr_pages TEXT NOT NULL DEFAULT '[]';`,
+  `ALTER TABLE catalog_column ADD COLUMN checks INTEGER NOT NULL DEFAULT 0; ALTER TABLE catalog_column ADD COLUMN agreeing INTEGER NOT NULL DEFAULT 0;`,
 ];
 
 export type SourceDraft = Omit<Source, "id" | "workspace" | "pages" | "ocrPages" | "segments" | "chunks" | "embeddedChunks" | "claims" | "createdAt"> & { parentSourceId: number | null };
@@ -220,6 +221,8 @@ export function openCorpus(db: Database.Database, workspace: WorkspaceSlug) {
     signalType: r.signal_type as CatalogColumn["signalType"],
     hypothesis: r.hypothesis as string | null,
     confidence: r.confidence as number,
+    checks: (r.checks as number | undefined) ?? 0,
+    agreeing: (r.agreeing as number | undefined) ?? 0,
     description: r.description as string,
     claims: (r.claims as number | undefined) ?? 0,
     confirmedClaims: (r.confirmed_claims as number | undefined) ?? 0,
@@ -424,9 +427,9 @@ export function openCorpus(db: Database.Database, workspace: WorkspaceSlug) {
     columns: {
       upsert(draft: ColumnDraft): CatalogColumn {
         run(
-          `INSERT INTO catalog_column (name, alias, run_id, role, signal_type, hypothesis, confidence, description, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-           ON CONFLICT(name) DO UPDATE SET alias = excluded.alias, run_id = excluded.run_id, role = excluded.role, signal_type = excluded.signal_type, hypothesis = excluded.hypothesis, confidence = excluded.confidence, description = excluded.description, updated_at = excluded.updated_at`,
-          draft.name, draft.alias, draft.runId, draft.role, draft.signalType, draft.hypothesis, draft.confidence, draft.description, nowIso(),
+          `INSERT INTO catalog_column (name, alias, run_id, role, signal_type, hypothesis, confidence, checks, agreeing, description, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(name) DO UPDATE SET alias = excluded.alias, run_id = excluded.run_id, role = excluded.role, signal_type = excluded.signal_type, hypothesis = excluded.hypothesis, confidence = excluded.confidence, checks = excluded.checks, agreeing = excluded.agreeing, description = excluded.description, updated_at = excluded.updated_at`,
+          draft.name, draft.alias, draft.runId, draft.role, draft.signalType, draft.hypothesis, draft.confidence, draft.checks, draft.agreeing, draft.description, nowIso(),
         );
         return columnOf(one(`${columnSql} WHERE c.name = ?`, draft.name)!);
       },

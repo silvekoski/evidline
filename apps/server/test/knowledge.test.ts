@@ -32,8 +32,8 @@ const form = (files: Record<string, string | Buffer>) => {
 let f: Fixture;
 beforeEach(() => {
   f = fixture();
-  f.ctx.corpus.columns.upsert({ name: "xmeas_7", alias: "S07", runId: "run00001", role: "controlled", signalType: "slow", hypothesis: null, confidence: 0.3, description: "xmeas_7 (S07) has the role controlled and a slow signal" });
-  f.ctx.corpus.columns.upsert({ name: "PM2_DR3_STM_VLV_POS", alias: "S12", runId: "run00001", role: "actuator", signalType: "fast", hypothesis: "valve position", confidence: 0.9, description: "PM2_DR3_STM_VLV_POS (S12) is valve position and a fast signal" });
+  f.ctx.corpus.columns.upsert({ name: "xmeas_7", alias: "S07", runId: "run00001", role: "controlled", signalType: "slow", hypothesis: null, confidence: 0.3, checks: 0, agreeing: 0, description: "xmeas_7 (S07) has the role controlled and a slow signal" });
+  f.ctx.corpus.columns.upsert({ name: "PM2_DR3_STM_VLV_POS", alias: "S12", runId: "run00001", role: "actuator", signalType: "fast", hypothesis: "valve position", confidence: 0.9, checks: 0, agreeing: 0, description: "PM2_DR3_STM_VLV_POS (S12) is valve position and a fast signal" });
 });
 afterEach(() => f.close());
 

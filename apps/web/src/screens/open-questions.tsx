@@ -76,7 +76,9 @@ export function OpenQuestionsScreen() {
                         </div>
                         <div>
                           <span className="block">{q.column.hypothesis ?? <span className="text-muted-foreground">No hypothesis</span>}</span>
-                          <span className="block text-xs text-muted-foreground">Unit and logging interval unknown</span>
+                          <span className="block text-xs text-muted-foreground">
+                            {q.column.checks > 0 ? `${q.column.agreeing} of ${q.column.checks} reviewer models agree with the name. ` : ""}Unit and logging interval unknown
+                          </span>
                         </div>
                         <ConfidenceBar value={q.column.confidence} />
                         <span className="font-mono text-xs tabular-nums text-muted-foreground">{q.hypothesisClaims} unconfirmed</span>

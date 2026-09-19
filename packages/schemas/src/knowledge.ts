@@ -144,6 +144,8 @@ export const CatalogColumn = z.object({
   signalType: SignalType,
   hypothesis: z.string().nullable(),
   confidence: z.number(),
+  checks: z.number().int(),
+  agreeing: z.number().int(),
   description: z.string(),
   claims: z.number().int(),
   confirmedClaims: z.number().int(),

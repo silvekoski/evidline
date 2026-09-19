@@ -3,6 +3,7 @@ import { CheckNameResponse, type EgressRecord, type NameCheck, type NameCheckJob
 import type { AppContext } from "./context";
 import { appendLog } from "./log";
 import { chainOf } from "./operator";
+import { refreshCatalog } from "./catalog";
 import { sensorSummary } from "./payloads";
 
 const jobs = new Map<string, NameCheckJob>();
@@ -55,12 +56,14 @@ export function nameChecks(ctx: AppContext, head: RoleInference): NameCheck[] {
 
 export const nameCheckReport = (ctx: AppContext, head: RoleInference): NameCheckReport => ({ pending: jobs.get(head.runId) ?? null, checks: nameChecks(ctx, head) });
 
-export async function runNameChecks(ctx: AppContext, runId: string, heads: RoleInference[]): Promise<boolean> {
+export async function runNameChecks(ctx: AppContext, runId: string, heads: RoleInference[], opts: { again?: boolean } = {}): Promise<boolean> {
   if (jobs.has(runId)) return false;
   const models = ctx.gateway.reviewers().map((r) => r.model);
   const run = ctx.db.runs.get(runId);
   if (!run || models.length === 0) return false;
-  const work = heads.flatMap((head) => models.map((model) => ({ head, model })));
+  const done = new Set(heads.flatMap((head) => ctx.db.egress.byInference(head.id, "check_name").filter((r) => r.status === "sent" && r.response !== null).map((r) => `${head.id}:${r.provider?.model ?? ""}`)));
+  const work = heads.flatMap((head) => models.map((model) => ({ head, model }))).filter(({ head, model }) => opts.again || !done.has(`${head.id}:${model}`));
+  if (work.length === 0) return true;
   jobs.set(runId, { runId, done: 0, total: work.length, model: models[0] ?? "" });
   try {
     let cursor = 0;
@@ -89,5 +92,6 @@ export async function runNameChecks(ctx: AppContext, runId: string, heads: RoleI
   } finally {
     jobs.delete(runId);
   }
+  refreshCatalog(ctx, runId);
   return true;
 }

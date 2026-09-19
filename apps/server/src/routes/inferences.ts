@@ -46,7 +46,7 @@ export function inferencesRoutes(ctx: AppContext) {
     .post("/:id/name-check", async (c) => {
       const head = roleOf(c.req.param("id"));
       if (ctx.gateway.reviewers().length === 0) throw new HTTPException(422, { message: "no reviewer: set TPM_REVIEW_KEY and mode cloud" });
-      if (!(await runNameChecks(ctx, head.runId, [head]))) throw new HTTPException(409, { message: "name checks for this run are in flight" });
+      if (!(await runNameChecks(ctx, head.runId, [head], { again: true }))) throw new HTTPException(409, { message: "name checks for this run are in flight" });
       return c.json(nameCheckReport(ctx, head));
     })
     .get("/:id/reviews", (c) => c.json(reviewReport(ctx, diagnosisOf(c.req.param("id")))))

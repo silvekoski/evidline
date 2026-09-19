@@ -435,7 +435,8 @@ export function openQuestions(ctx: AppContext): OpenQuestion[] {
     .map((column) => {
       const claims = ctx.corpus.claims.ofColumn(column.id);
       const contact = claims.map((c) => c.speaker).find((s): s is string => s !== null) ?? null;
-      const hint = column.hypothesis ? ` Our current guess is "${column.hypothesis}".` : "";
+      const disagreement = column.checks > 0 && column.agreeing < column.checks ? ` ${column.checks - column.agreeing} of ${column.checks} other models gave a different name.` : "";
+      const hint = column.hypothesis ? ` Our current guess is "${column.hypothesis}".${disagreement}` : "";
       return { column, question: `What does the column ${column.name} measure, in which unit, and how often is it logged?${hint}`, contact, hypothesisClaims: claims.length };
     })
     .sort((a, b) => a.column.confidence - b.column.confidence);

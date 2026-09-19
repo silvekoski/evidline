@@ -6,17 +6,27 @@ import { getNameChecks, keys, requestNameCheck } from "@/api";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { formatTime } from "@/lib/format";
+import { useOpenSensor } from "./use-open-sensor";
 
 export const shortModel = (model: string): string => model.split("/").pop()?.replace(/-Instruct.*$/i, "") ?? model;
 
-export function NameCheckMarks({ checks }: { checks: SensorRow["nameChecks"] }) {
+export function NameCheckMarks({ checks, roleInferenceId }: { checks: SensorRow["nameChecks"]; roleInferenceId: string }) {
+  const open = useOpenSensor();
   if (checks.length === 0) return null;
   const agree = checks.filter((c) => c.agrees === true).length;
-  const label = `${agree} of ${checks.length} models agree: ${checks.map((c) => `${shortModel(c.model)} ${c.agrees === true ? "agrees" : c.agrees === false ? "differs" : "no answer"}${c.name ? ` (${c.name})` : ""}`).join(", ")}`;
+  const label = `${agree} of ${checks.length} models agree: ${checks.map((c) => `${shortModel(c.model)} ${c.agrees === true ? "agrees" : c.agrees === false ? "differs" : "no answer"}${c.name ? ` (${c.name})` : ""}`).join(", ")}. Open to see the full cross-check.`;
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <span className="inline-flex items-center gap-0.5 font-mono text-xs text-muted-foreground" aria-label={label} tabIndex={0}>
+        <button
+          type="button"
+          className="inline-flex items-center gap-0.5 rounded-sm font-mono text-xs text-muted-foreground hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+          aria-label={label}
+          onClick={(event) => {
+            event.stopPropagation();
+            open(roleInferenceId);
+          }}
+        >
           {checks.map((c) => (
             <span key={c.model} aria-hidden="true" className={cn("inline-flex size-4 items-center justify-center rounded-sm border", c.agrees === true && "border-foreground text-foreground", c.agrees === false && "border-dashed")}>
               {c.agrees === true ? <CheckIcon className="size-3" /> : c.agrees === false ? <XIcon className="size-3" /> : <MinusIcon className="size-3" />}
@@ -25,7 +35,7 @@ export function NameCheckMarks({ checks }: { checks: SensorRow["nameChecks"] }) 
           <span className="ml-1">
             {agree}/{checks.length}
           </span>
-        </span>
+        </button>
       </TooltipTrigger>
       <TooltipContent className="max-w-xs">{label}</TooltipContent>
     </Tooltip>

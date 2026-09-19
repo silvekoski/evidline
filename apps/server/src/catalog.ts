@@ -30,6 +30,9 @@ export function refreshCatalog(ctx: AppContext, runId: string): void {
     for (const s of report.sensors) {
       const role = roles.get(s.alias);
       const hypothesisConfidence = role?.stage === "role" ? role.value.hypothesisConfidence : null;
+      const checks = s.nameChecks.filter((c) => c.agrees !== null).length;
+      const agreeing = s.nameChecks.filter((c) => c.agrees === true).length;
+      const checkedConfidence = checks === 0 || hypothesisConfidence === null ? hypothesisConfidence : hypothesisConfidence * (0.5 + 0.5 * (agreeing / checks));
       const description = [`${s.sourceName} (${s.alias})`, s.hypothesisName ? `is ${s.hypothesisName}` : `has the role ${s.role}`, `and a ${s.signalType} signal`].join(" ");
       const before = ctx.corpus.columns.byName(s.sourceName);
       const column = ctx.corpus.columns.upsert({
@@ -39,7 +42,9 @@ export function refreshCatalog(ctx: AppContext, runId: string): void {
         role: s.role,
         signalType: s.signalType,
         hypothesis: s.hypothesisName,
-        confidence: Math.min(hypothesisConfidence ?? 1, s.roleConfidence),
+        confidence: Math.min(checkedConfidence ?? 1, s.roleConfidence),
+        checks,
+        agreeing,
         description,
       });
       if (before?.description === description && ctx.corpus.columns.descriptionChunkId(column.id) !== null) continue;

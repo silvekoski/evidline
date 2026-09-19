@@ -55,6 +55,13 @@ Date: 2026-09-19. Source: the PRD "Customer Knowledge Capture". This file record
 5. M4 to M6: Teams, Slack, email connectors with recorded-response tests.
 6. Retention and delete.
 
+### Cross-check of names
+
+- `check_name` sends the sensor summary to each reviewer model. The reviewer never sees the primary name. Agreement is a shared content word test with half of the shorter name as the limit.
+- The catalog confidence of a hypothesis is `hypothesisConfidence * (0.5 + 0.5 * agreeing / checks)` when checks exist, then the minimum with the engine role confidence.
+- Live on the TE run, 2026-09-20: 46 of 52 primary names got 0 of 4. Reviewers agreed with each other in 162 of 306 pairs, mostly on "temperature". A name from statistics alone is a guess. The corpus settles it.
+- A batch skips a sensor and model pair that already has a reply, so a server restart in the middle loses nothing.
+
 ## Progress (2026-09-20)
 
 - In commits on main: M1 to M7 except the replay test, the Teams, email, and Slack connectors, source routing with an Unassigned list, Graph webhooks, ElevenLabs voice notes, retention per workspace, erasure by person, tag list import, transcript gaps, origin links, Slack files, claim markers with links. `pnpm check` passes with 305 tests.

@@ -42,7 +42,7 @@ const columns = [
     cell: ({ row }) => (
       <span className="inline-flex flex-wrap items-center gap-2">
         <Hypothesis name={row.original.hypothesisName} />
-        <NameCheckMarks checks={row.original.nameChecks} />
+        <NameCheckMarks checks={row.original.nameChecks} roleInferenceId={row.original.roleInferenceId} />
       </span>
     ),
   }),
