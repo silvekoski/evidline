@@ -57,6 +57,5 @@ Date: 2026-09-19. Source: the PRD "Customer Knowledge Capture". This file record
 
 ## Progress (2026-09-20)
 
-- Done: M1 to M3, the data spec route and page, the Teams, email, and Slack connectors with recorded-response tests, source routing with an Unassigned list, the Graph webhook and lifecycle routes, subscription renewal, claim markers on the drift chart, delete of a source and of a workspace. `pnpm check` passes with 298 tests.
-- Not done: the replay test on a finished project (needs the project material), a retention period per customer, OCR for a PDF without a text layer, `.msg` files, IMAP.
-- Live checks: an uploaded VTT went through the pipeline with the Norrin endpoint in mode `cloud`. The model extracted two claims with verbatim quotes, and the linker tied both to `xmeas_7`. The connectors ran against recorded responses only. No Entra app, Slack app, or mailbox exists yet.
+- In commits on main: M1 to M7 except the replay test, the Teams, email, and Slack connectors, source routing with an Unassigned list, Graph webhooks, ElevenLabs voice notes, retention per workspace, erasure by person, tag list import, transcript gaps, origin links, Slack files, claim markers with links. `pnpm check` passes with 305 tests.
+- Not done: the replay test and the golden set (need project material), OCR for a PDF without a text layer, `.msg`, IMAP, live runs of the connectors (need an Entra app, a Slack app, and a mailbox).
