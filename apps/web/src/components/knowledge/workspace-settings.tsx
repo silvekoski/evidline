@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { erasePerson, keys, listWorkspaces, patchWorkspace } from "@/api";
+import { ConfirmAction } from "@/components/confirm-action";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -65,18 +66,17 @@ export function WorkspaceSettings() {
         </form>
         <form
           className="mt-4 grid gap-3 border-t pt-4 md:grid-cols-[1fr_auto] md:items-end"
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (confirm(`Erase every word and claim of ${person} from this workspace? The original files of those sources are removed too.`)) erase.mutate();
-          }}
+          onSubmit={(e) => e.preventDefault()}
         >
           <div className="grid gap-1">
             <Label htmlFor="ws-erase">Erase a person (GDPR request)</Label>
             <Input id="ws-erase" value={person} onChange={(e) => setPerson(e.target.value)} placeholder="Name as it appears as a speaker" />
           </div>
-          <Button type="submit" size="sm" variant="outline" disabled={erase.isPending || person.trim().length < 2}>
-            Erase
-          </Button>
+          <ConfirmAction title={`Erase ${person.trim()} from this workspace?`} description="Every segment and claim of this speaker goes away, and the original files of those sources too. The chunks of the other speakers build again." action="Erase person" onConfirm={() => erase.mutate()} disabled={erase.isPending || person.trim().length < 2}>
+            <Button type="button" size="sm" variant="outline" disabled={erase.isPending || person.trim().length < 2}>
+              Erase
+            </Button>
+          </ConfirmAction>
         </form>
       </CardContent>
     </Card>

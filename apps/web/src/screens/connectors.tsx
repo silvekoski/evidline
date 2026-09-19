@@ -6,6 +6,7 @@ import { assignUnassigned, createConnector, deleteConnector, keys, listConnector
 import { SourceKindBadge } from "@/components/knowledge/badges";
 import { WorkspaceSettings } from "@/components/knowledge/workspace-settings";
 import { connectorGaps } from "@/api";
+import { ConfirmAction } from "@/components/confirm-action";
 import { EmptyState } from "@/components/empty-state";
 import { JobSummary } from "@/components/knowledge/job-summary";
 import { PageHeader } from "@/components/page-header";
@@ -153,9 +154,11 @@ function ConnectorCard({ connector, onChange }: { connector: Connector; onChange
             <RefreshCwIcon aria-hidden="true" /> Sync now
           </Button>
         )}
-        <Button size="xs" variant="ghost" aria-label={`Remove ${connector.name}`} onClick={() => confirm(`Remove ${connector.name}?`) && remove.mutate()}>
-          <Trash2Icon aria-hidden="true" />
-        </Button>
+        <ConfirmAction title={`Remove ${connector.name}?`} description="New sources stop for this connector. Sources that arrived stay in their workspaces." action="Remove connector" onConfirm={() => remove.mutate()} disabled={remove.isPending}>
+          <Button size="xs" variant="ghost" aria-label={`Remove ${connector.name}`}>
+            <Trash2Icon aria-hidden="true" />
+          </Button>
+        </ConfirmAction>
       </CardFooter>
     </Card>
   );

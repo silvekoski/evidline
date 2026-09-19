@@ -5,6 +5,7 @@ import { ChevronLeftIcon, ChevronRightIcon, ExternalLinkIcon, RefreshCwIcon, Tra
 import { cn } from "cn";
 import type { Segment, Source } from "@tpm/schemas";
 import { deleteSource, getSource, getSourceClaims, keys, reprocessSource, sourceBlobUrl, sourcePageUrl } from "@/api";
+import { ConfirmAction } from "@/components/confirm-action";
 import { EmptyState } from "@/components/empty-state";
 import { OcrBadge, SourceKindBadge, sourceStatusWord } from "@/components/knowledge/badges";
 import { ClaimCard } from "@/components/knowledge/claim-card";
@@ -139,9 +140,11 @@ export function SourceScreen() {
           <Button variant="outline" size="sm" onClick={() => reprocess.mutate()} disabled={reprocess.isPending}>
             <RefreshCwIcon aria-hidden="true" /> Process again
           </Button>
-          <Button variant="ghost" size="sm" aria-label="Delete this source" onClick={() => confirm(`Delete ${source.title} with its chunks, vectors, and claims?`) && remove.mutate()}>
-            <Trash2Icon aria-hidden="true" />
-          </Button>
+          <ConfirmAction title={`Delete ${source.title}?`} description="The source goes away with its segments, chunks, vectors, and claims. A claim that the data spec uses goes away too." action="Delete source" onConfirm={() => remove.mutate()} disabled={remove.isPending}>
+            <Button variant="ghost" size="sm" aria-label="Delete this source">
+              <Trash2Icon aria-hidden="true" />
+            </Button>
+          </ConfirmAction>
         </PageHeader>
         <SourceSteps source={source} className="mb-3" />
         {source.error && <p className="mb-3 rounded-md border p-2 text-sm">{source.error}</p>}
