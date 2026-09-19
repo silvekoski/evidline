@@ -8,6 +8,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppLayout } from "@/layout/app-layout";
 import { WorkspaceProvider } from "@/layout/workspace-context";
 import { WorkspacePicker } from "@/layout/workspace-picker";
+import { ClaimsScreen } from "@/screens/claims";
 import { ConnectorsScreen } from "@/screens/connectors";
 import { DataFlowScreen } from "@/screens/data-flow";
 import { DiagnosisScreen } from "@/screens/diagnosis";
@@ -44,6 +45,7 @@ const routes = [
       { path: "runs/:id/data-flow", element: <DataFlowScreen /> },
       { path: "sources", element: <SourcesScreen /> },
       { path: "sources/:sourceId", element: <SourceScreen /> },
+      { path: "claims", element: <ClaimsScreen /> },
       { path: "open-questions", element: <OpenQuestionsScreen /> },
       { path: "spec", element: <SpecScreen /> },
       { path: "connectors", element: <ConnectorsScreen /> },

@@ -42,12 +42,12 @@ const columns: ColumnDef<Source>[] = [
   { accessorKey: "bytes", header: "Size", meta: { numeric: true }, cell: ({ getValue }) => formatBytes(getValue<number>()) },
 ];
 
-function StatCard({ label, value, hint }: { label: string; value: string | number; hint?: string }) {
+function StatCard({ label, value, hint, to }: { label: string; value: string | number; hint?: string; to?: string }) {
   return (
     <Card size="sm">
       <CardHeader>
         <CardDescription>{label}</CardDescription>
-        <CardTitle className="font-mono text-xl tabular-nums">{value}</CardTitle>
+        <CardTitle className="font-mono text-xl tabular-nums">{to ? <Link to={to} className="underline-offset-4 hover:underline">{value}</Link> : value}</CardTitle>
       </CardHeader>
       {hint && <CardContent className="text-xs text-muted-foreground">{hint}</CardContent>}
     </Card>
@@ -134,9 +134,9 @@ export function SourcesScreen() {
       <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
         <StatCard label="Sources" value={stats.data?.sources ?? "…"} />
         <StatCard label="Chunks" value={stats.data?.chunks ?? "…"} />
-        <StatCard label="Claims" value={stats.data?.claims ?? "…"} hint={stats.data ? `${stats.data.claimsRejected} rejected by the quote check` : undefined} />
+        <StatCard label="Claims" value={stats.data?.claims ?? "…"} hint={stats.data ? `${stats.data.claimsRejected} rejected by the quote check` : undefined} to="/claims" />
         <StatCard label="Columns" value={stats.data?.columns ?? "…"} />
-        <StatCard label="Jobs" value={stats.data ? `${stats.data.jobsQueued} queued` : "…"} hint={stats.data ? `${stats.data.jobsFailed} failed` : undefined} />
+        <StatCard label="Jobs" value={stats.data ? `${stats.data.jobsQueued} queued` : "…"} hint={stats.data ? `${stats.data.jobsFailed} failed` : undefined} to="/connectors" />
         <StatCard label="Embedder" value={stats.data?.embedder ?? "none"} hint={stats.data?.dimensions ? `${stats.data.dimensions} dimensions` : undefined} />
       </div>
       <div
