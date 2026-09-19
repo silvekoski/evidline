@@ -23,6 +23,8 @@ import {
   type ClaimStatus,
   type CreateConnectorBody,
   type CreateWorkspaceBody,
+  type PatchWorkspaceBody,
+  MeetingGapList,
   CompileRuleResult,
   CreateRunResponse,
   DriftReport,
@@ -127,6 +129,7 @@ export const keys = {
   jobs: ["jobs"] as const,
   textEgress: ["egress-log"] as const,
   unassigned: ["unassigned"] as const,
+  connectorGaps: (id: number) => ["connectors", id, "gaps"] as const,
 };
 
 const runQuery = (runId?: string) => (runId ? `?runId=${encodeURIComponent(runId)}` : "");
@@ -146,6 +149,7 @@ async function rootRequest<T>(schema: Parser<T>, path: string, init?: RequestIni
 
 export const listWorkspaces = () => rootRequest(WorkspaceList, "/workspaces");
 export const createWorkspace = (body: CreateWorkspaceBody) => rootRequest(Workspace, "/workspaces", post(body));
+export const patchWorkspace = (slug: string, body: PatchWorkspaceBody) => rootRequest(Workspace, `/workspaces/${slug}`, patch(body));
 export const listUnassigned = () => rootRequest(UnassignedList, "/unassigned");
 export const assignUnassigned = (id: number, workspace: string) => rootRequest(nothing, `/unassigned/${id}/assign`, post({ workspace }));
 export const uploadThroughLink = (token: string, list: File[]) => rootRequest(arrayOf(Source), `/upload/${token}`, files(list));
@@ -172,6 +176,8 @@ export const listConnectors = () => request(ConnectorList, "/connectors");
 export const createConnector = (body: CreateConnectorBody) => request(Connector, "/connectors", post(body));
 export const syncConnector = (id: number) => request(Connector, `/connectors/${id}/sync`, post());
 export const deleteConnector = (id: number) => request(nothing, `/connectors/${id}`, { method: "DELETE" });
+export const connectorGaps = (id: number, days = 30) => request(MeetingGapList, `/connectors/${id}/gaps?days=${days}`);
+export const importAliases = (csv: string) => request({ parse: (x) => x as { added: number; unknown: number } }, "/aliases/import", post({ csv }));
 export const listJobs = () => request(JobList, "/jobs");
 export const retryJobs = () => request({ parse: (x) => x as { retried: number } }, "/jobs/retry", post());
 export const listTextEgress = () => request(TextEgressList, "/egress-log");

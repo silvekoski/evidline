@@ -4,6 +4,8 @@ import { PlugIcon, RefreshCwIcon, Trash2Icon } from "lucide-react";
 import { ConnectorKind, type Connector, type Job } from "@tpm/schemas";
 import { assignUnassigned, createConnector, deleteConnector, keys, listConnectors, listJobs, listTextEgress, listUnassigned, listWorkspaces, retryJobs, syncConnector } from "@/api";
 import { SourceKindBadge } from "@/components/knowledge/badges";
+import { WorkspaceSettings } from "@/components/knowledge/workspace-settings";
+import { connectorGaps } from "@/api";
 import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
@@ -102,6 +104,30 @@ function NewConnector({ onCreated }: { onCreated: () => void }) {
   );
 }
 
+function TranscriptGaps({ connectorId }: { connectorId: number }) {
+  const [open, setOpen] = useState(false);
+  const gaps = useQuery({ queryKey: keys.connectorGaps(connectorId), queryFn: () => connectorGaps(connectorId), enabled: open, retry: false });
+  if (!open)
+    return (
+      <Button size="xs" variant="ghost" onClick={() => setOpen(true)}>
+        Calls without a transcript
+      </Button>
+    );
+  return (
+    <div className="w-full text-xs" aria-live="polite">
+      {gaps.isPending ? "Reading the calendar…" : gaps.isError ? gaps.error.message : gaps.data.length === 0 ? "Every customer call of the last 30 days has a transcript." : (
+        <ul className="flex flex-col gap-1">
+          {gaps.data.map((g, i) => (
+            <li key={i}>
+              {formatTime(g.start)}: {g.subject} ({g.domains.join(", ")})
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 function ConnectorCard({ connector, onChange }: { connector: Connector; onChange: () => void }) {
   const sync = useMutation({ mutationFn: () => syncConnector(connector.id), onSuccess: onChange });
   const remove = useMutation({ mutationFn: () => deleteConnector(connector.id), onSuccess: onChange });
@@ -119,7 +145,8 @@ function ConnectorCard({ connector, onChange }: { connector: Connector; onChange
         {connector.lastError && <span className="text-foreground">Last error: {connector.lastError}</span>}
         {connector.cursor && <span className="truncate font-mono">Cursor: {connector.cursor}</span>}
       </CardContent>
-      <CardFooter className="gap-2">
+      <CardFooter className="flex-wrap gap-2">
+        {connector.kind === "teams" && <TranscriptGaps connectorId={connector.id} />}
         {connector.kind !== "upload" && (
           <Button size="xs" variant="outline" onClick={() => sync.mutate()} disabled={sync.isPending}>
             <RefreshCwIcon aria-hidden="true" /> Sync now
@@ -202,6 +229,9 @@ export function ConnectorsScreen() {
       <PageHeader title="Connectors" description="Teams transcripts, Slack channels, the shared mailbox, and upload links. Each source arrives with no manual step.">
         <NewConnector onCreated={refresh} />
       </PageHeader>
+      <div className="mb-4">
+        <WorkspaceSettings />
+      </div>
       {connectors.isError ? (
         <EmptyState title="Connectors not available" description={connectors.error.message} />
       ) : (connectors.data ?? []).length === 0 ? (

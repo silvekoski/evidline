@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { Claim, ColumnKnowledge, DataSpec, OpenQuestion, SearchHit, Source, Workspace } from "@tpm/schemas";
 import { openRegistryAt } from "../src/context";
 import { deliver } from "../src/connector-service";
-import { extractForChunk } from "../src/corpus-service";
+import { applyRetention, extractForChunk } from "../src/corpus-service";
 import { createRootApp } from "../src/root-app";
 import { createWorkspaceManager, migrateLegacyDb } from "../src/workspaces";
 import { fixture, type Fixture } from "./fixture";
@@ -250,5 +250,18 @@ describe("connector routing", () => {
     expect(await echo.text()).toBe("abc def");
     manager.close();
     registry.close();
+  });
+});
+
+describe("retention", () => {
+  it("removes sources older than the retention period and keeps the rest", async () => {
+    await upload({ "old.md": notes, "new.md": `${notes}\nSecond file.` });
+    await drain();
+    const [older] = f.ctx.corpus.sources.list();
+    f.ctx.corpus.sources.update(older!.id, { occurredAt: "2026-01-01T00:00:00.000Z" });
+    expect(applyRetention(f.ctx, 30, Date.parse("2026-09-20T00:00:00Z"))).toBe(1);
+    expect(f.ctx.corpus.sources.list().map((s) => s.id)).toEqual([f.ctx.corpus.sources.list()[0]!.id]);
+    expect(f.ctx.corpus.sources.count()).toBe(1);
+    expect(existsSync(join(f.ctx.dir, older!.blobPath!))).toBe(false);
   });
 });

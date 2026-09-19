@@ -47,7 +47,7 @@ The Knowledge section captures what the customer data means. Sources are call tr
 
 Claim extraction uses the chat provider of mode `cloud`. In mode `off`, a local rule makes one claim from each sentence that names a catalog column. Every embed and extract call writes a row to `egress_log` with the destination, the model, the byte count, and a SHA-256 hash of the payload, never the text. A text guard blocks a payload with more than 30 percent numeric tokens or more than 8,000 characters. A CSV with more than 50 percent numeric cells is sensor data: it starts a run, and only its header names enter the corpus.
 
-Connectors live in the registry (`data/registry.db`) and serve all workspaces. Teams transcripts come from Microsoft Graph (polling every 10 minutes, or a webhook at `/api/webhooks/graph` when `notificationUrl` is set). Email comes from one shared mailbox through the Graph delta query. Slack uses an internal app in Socket Mode plus a history backfill. A source that no rule maps to a workspace waits in the Unassigned list on the Connectors page.
+Connectors live in the registry (`data/registry.db`) and serve all workspaces. Teams transcripts come from Microsoft Graph (polling every 10 minutes, or a webhook at `/api/webhooks/graph` when `notificationUrl` is set). Email comes from one shared mailbox through the Graph delta query. Slack uses an internal app in Socket Mode plus a history backfill. A source that no rule maps to a workspace waits in the Unassigned list on the Connectors page. A workspace can set a retention period in days. A daily job then removes each older source with its chunks, vectors, and claims.
 
 ## Rule 4: nothing leaves
 

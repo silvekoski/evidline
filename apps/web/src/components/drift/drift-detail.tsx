@@ -96,6 +96,18 @@ export function DriftDetail({ inference, runId, aliases, label, dt }: Props) {
           )}
           <figcaption className="text-xs text-muted-foreground">{summary}.</figcaption>
         </figure>
+        {claimMarks.length > 0 && (
+          <ul className="flex flex-col gap-1 text-sm" aria-label="Claims in the run window">
+            {claimMarks.map((m) => (
+              <li key={m.claimId} className="flex flex-wrap items-baseline gap-2">
+                <span className="font-mono text-xs text-muted-foreground">{label(m.at)}</span>
+                <Link to={m.href} className="underline-offset-4 hover:underline">
+                  {m.statement}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
         <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm md:grid-cols-[auto_1fr_auto_1fr]">
           {rows.map((row) => (
             <div key={row.term} className="contents">

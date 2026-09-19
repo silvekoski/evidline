@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { extname, join, relative } from "node:path";
 import { chunkSegments, extractClaimsLocally, fuseRanks, isAudioName, linkClaim, normalizeFile, verifyQuote, wordsToTurns, type Normalized, type SegmentDraft } from "@tpm/corpus";
 import type { CatalogColumn, Claim, CorpusStats, DataSpec, ExtractedClaim, OpenQuestion, SearchHit, Source, SourceKind } from "@tpm/schemas";
@@ -283,12 +283,36 @@ const runSensorFile: JobHandler = async (ctx, payload) => {
   await done;
 };
 
+export const RETENTION_INTERVAL_MS = 24 * 3600_000;
+
+export function applyRetention(ctx: AppContext, days: number, now: number = Date.now()): number {
+  const limit = new Date(now - days * 86_400_000).toISOString();
+  const old = ctx.corpus.sources.list({ to: limit });
+  for (const source of old) {
+    ctx.corpus.sources.delete(source.id);
+    if (source.blobPath && ctx.corpus.sources.byHash(source.contentHash) === null) rmSync(join(ctx.dir, source.blobPath), { force: true });
+  }
+  return old.length;
+}
+
+const retention: JobHandler = async (ctx, _payload, _job, resolve) => {
+  try {
+    for (const workspace of ctx.registry.workspaces.list()) {
+      if (workspace.retentionDays === null) continue;
+      const removed = applyRetention(resolve(workspace.slug), workspace.retentionDays);
+      if (removed) ctx.log(`retention: removed ${removed} sources older than ${workspace.retentionDays} days from ${workspace.slug}`);
+    }
+  } finally {
+    ctx.registry.jobs.enqueue(null, "retention", {}, { runAfter: new Date(Date.now() + RETENTION_INTERVAL_MS).toISOString(), dedupe: "retention" });
+  }
+};
+
 const reembed: JobHandler = async (ctx) => {
   ctx.corpus.chunks.clearVectors();
   enqueueEmbeds(ctx, ctx.corpus.chunks.unembeddedIds());
 };
 
-export const jobHandlers: Partial<Record<string, JobHandler>> = { normalize, chunk, embed, extract, link, "run-sensor-file": runSensorFile, reembed };
+export const jobHandlers: Partial<Record<string, JobHandler>> = { normalize, chunk, embed, extract, link, "run-sensor-file": runSensorFile, reembed, retention };
 
 const snippet = (text: string, query: string): string => {
   const words = query.toLowerCase().match(/[\p{L}\p{N}_]{3,}/gu) ?? [];

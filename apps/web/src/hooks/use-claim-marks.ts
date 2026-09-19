@@ -1,8 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { keys, listClaims } from "@/api";
+import { sourceHref } from "@/components/knowledge/locator";
 import { useRun } from "./use-run";
 
-export type ClaimMark = { at: number; label: string; claimId: number };
+export type ClaimMark = { at: number; label: string; claimId: number; href: string; statement: string; occurredAt: string };
 
 export function useClaimMarks(runId: string): ClaimMark[] {
   const run = useRun(runId);
@@ -14,6 +15,6 @@ export function useClaimMarks(runId: string): ClaimMark[] {
     const at = Math.round((Date.parse(claim.occurredAt) - t0) / dt);
     if (!Number.isFinite(at) || at < 0 || at >= n) return [];
     const day = claim.occurredAt.slice(0, 10);
-    return [{ at, label: `${claim.statement.slice(0, 32)}${claim.statement.length > 32 ? "…" : ""}, ${day}`, claimId: claim.id }];
+    return [{ at, label: `${claim.statement.slice(0, 32)}${claim.statement.length > 32 ? "…" : ""}, ${day}`, claimId: claim.id, href: sourceHref(claim.sourceId, claim.locator, claim.quote), statement: claim.statement, occurredAt: claim.occurredAt }];
   });
 }

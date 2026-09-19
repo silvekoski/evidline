@@ -8,11 +8,14 @@ export const Workspace = z.object({
   slug: WorkspaceSlug,
   name: z.string().min(1).max(80),
   domains: z.array(z.string().min(3).max(120)),
+  retentionDays: z.number().int().min(1).max(3650).nullable(),
   createdAt: z.string(),
 });
 export type Workspace = z.infer<typeof Workspace>;
 export const WorkspaceList = z.array(Workspace);
-export const CreateWorkspaceBody = Workspace.omit({ createdAt: true });
+export const CreateWorkspaceBody = Workspace.omit({ createdAt: true }).partial({ retentionDays: true });
+export const PatchWorkspaceBody = Workspace.pick({ name: true, domains: true, retentionDays: true }).partial();
+export type PatchWorkspaceBody = z.infer<typeof PatchWorkspaceBody>;
 export type CreateWorkspaceBody = z.infer<typeof CreateWorkspaceBody>;
 
 export const ConnectorKind = z.enum(["slack", "teams", "email", "upload"]);
@@ -202,7 +205,7 @@ export const CreateConnectorBody = z.object({
 });
 export type CreateConnectorBody = z.infer<typeof CreateConnectorBody>;
 
-export const JobType = z.enum(["normalize", "chunk", "embed", "extract", "link", "run-sensor-file", "connector-sync", "renew-subscriptions", "reembed"]);
+export const JobType = z.enum(["normalize", "chunk", "embed", "extract", "link", "run-sensor-file", "connector-sync", "renew-subscriptions", "retention", "reembed"]);
 export type JobType = z.infer<typeof JobType>;
 export const JobStatus = z.enum(["queued", "running", "done", "failed"]);
 export const Job = z.object({

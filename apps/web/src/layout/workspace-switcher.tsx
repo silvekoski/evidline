@@ -22,9 +22,10 @@ export function NewWorkspaceDialog({ onCreated, open: controlled, onOpenChange }
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [domains, setDomains] = useState("");
+  const [retention, setRetention] = useState("");
   const queryClient = useQueryClient();
   const create = useMutation({
-    mutationFn: () => createWorkspace({ name, slug: slug || slugify(name), domains: domains.split(/[\s,;]+/).filter(Boolean) }),
+    mutationFn: () => createWorkspace({ name, slug: slug || slugify(name), domains: domains.split(/[\s,;]+/).filter(Boolean), retentionDays: retention ? Number(retention) : null }),
     onSuccess: (w) => {
       void queryClient.invalidateQueries({ queryKey: keys.workspaces });
       setOpen(false);
@@ -64,6 +65,11 @@ export function NewWorkspaceDialog({ onCreated, open: controlled, onOpenChange }
             <Label htmlFor="ws-domains">Customer email domains</Label>
             <Input id="ws-domains" value={domains} placeholder="acme.example, plant.acme.example" onChange={(e) => setDomains(e.target.value)} />
             <p className="text-xs text-muted-foreground">Emails and Teams calls with these domains land in this workspace.</p>
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="ws-retention">Retention (days)</Label>
+            <Input id="ws-retention" type="number" min={1} max={3650} value={retention} placeholder="no limit" onChange={(e) => setRetention(e.target.value)} />
+            <p className="text-xs text-muted-foreground">A daily job removes each source older than this, with its chunks, vectors, and claims.</p>
           </div>
           <DialogFooter>
             <Button type="submit" disabled={create.isPending || name.trim() === ""}>

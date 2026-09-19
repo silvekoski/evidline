@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import Database from "better-sqlite3";
-import type { Connector, ConnectorKind, CreateConnectorBody, CreateWorkspaceBody, Job, JobType, UnassignedSource, Workspace, WorkspaceSlug } from "@tpm/schemas";
+import type { Connector, ConnectorKind, CreateConnectorBody, CreateWorkspaceBody, Job, JobType, PatchWorkspaceBody, UnassignedSource, Workspace, WorkspaceSlug } from "@tpm/schemas";
 import type { SecretBox } from "./secrets";
 
 const schema = `
@@ -35,11 +35,12 @@ export function openRegistry(path: string, secrets: SecretBox) {
   const db = new Database(path);
   db.pragma("journal_mode = WAL");
   db.exec(schema);
+  if (!(db.prepare("SELECT 1 FROM pragma_table_info('workspace') WHERE name = 'retention_days'").get())) db.exec("ALTER TABLE workspace ADD COLUMN retention_days INTEGER");
   const all = (sql: string, ...params: unknown[]) => db.prepare(sql).all(...params) as Row[];
   const one = (sql: string, ...params: unknown[]) => db.prepare(sql).get(...params) as Row | undefined;
   const run = (sql: string, ...params: unknown[]) => db.prepare(sql).run(...params);
 
-  const workspaceOf = (r: Row): Workspace => ({ slug: r.slug as string, name: r.name as string, domains: JSON.parse(r.domains as string) as string[], createdAt: r.created_at as string });
+  const workspaceOf = (r: Row): Workspace => ({ slug: r.slug as string, name: r.name as string, domains: JSON.parse(r.domains as string) as string[], retentionDays: (r.retention_days as number | null) ?? null, createdAt: r.created_at as string });
   const connectorOf = (r: Row): Connector => ({
     id: r.id as number,
     kind: r.kind as ConnectorKind,
@@ -75,8 +76,15 @@ export function openRegistry(path: string, secrets: SecretBox) {
         return r ? workspaceOf(r) : null;
       },
       create(body: CreateWorkspaceBody): Workspace {
-        run("INSERT INTO workspace (slug, name, domains, created_at) VALUES (?, ?, ?, ?)", body.slug, body.name, JSON.stringify(body.domains), nowIso());
+        run("INSERT INTO workspace (slug, name, domains, retention_days, created_at) VALUES (?, ?, ?, ?, ?)", body.slug, body.name, JSON.stringify(body.domains), body.retentionDays ?? null, nowIso());
         return workspaceOf(one("SELECT * FROM workspace WHERE slug = ?", body.slug)!);
+      },
+      update(slug: string, patch: PatchWorkspaceBody): Workspace | null {
+        const fields: Record<string, string> = { name: "name", domains: "domains", retentionDays: "retention_days" };
+        const entries = Object.entries(patch).filter(([, v]) => v !== undefined);
+        if (entries.length) run(`UPDATE workspace SET ${entries.map(([k]) => `${fields[k]} = ?`).join(", ")} WHERE slug = ?`, ...entries.map(([k, v]) => (k === "domains" ? JSON.stringify(v) : v)), slug);
+        const r = one("SELECT * FROM workspace WHERE slug = ?", slug);
+        return r ? workspaceOf(r) : null;
       },
       delete(slug: string): void {
         db.transaction(() => {

@@ -131,4 +131,5 @@ export async function transcriptGaps(ctx: AppContext, connector: ConnectorRow, d
 export function startSchedules(registry: Registry): void {
   for (const connector of registry.connectors.list()) scheduleSync(registry, connector);
   registry.jobs.enqueue(null, "renew-subscriptions", {}, { dedupe: "renew-subscriptions" });
+  registry.jobs.enqueue(null, "retention", {}, { dedupe: "retention" });
 }

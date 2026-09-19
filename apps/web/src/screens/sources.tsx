@@ -9,6 +9,7 @@ import { createUploadLink, getCorpusStats, keys, listSources, uploadSources } fr
 import { DataTable } from "@/components/data-table";
 import { EmptyState } from "@/components/empty-state";
 import { SourceKindBadge, sourceStatusWord } from "@/components/knowledge/badges";
+import { AliasImportButton } from "@/components/knowledge/alias-import";
 import { VoiceRecorder } from "@/components/knowledge/voice-recorder";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
@@ -106,6 +107,7 @@ export function SourcesScreen() {
             ))}
           </SelectContent>
         </Select>
+        <AliasImportButton />
         <Button variant="outline" size="sm" onClick={() => link.mutate()} disabled={link.isPending}>
           <LinkIcon aria-hidden="true" /> Upload link
         </Button>

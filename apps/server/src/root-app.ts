@@ -3,7 +3,7 @@ import { relative } from "node:path";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { Hono, type Context } from "hono";
 import { HTTPException } from "hono/http-exception";
-import { AssignBody, CreateWorkspaceBody, WorkspaceSlug } from "@tpm/schemas";
+import { AssignBody, CreateWorkspaceBody, PatchWorkspaceBody, WorkspaceSlug } from "@tpm/schemas";
 import { assignUnassigned, handleGraphNotification } from "./connector-service";
 import { badRequest, notFound, parseBody } from "./request";
 import { uploadFiles } from "./routes/knowledge";
@@ -30,6 +30,13 @@ export function createRootApp(manager: WorkspaceManager, opts: RootOptions) {
     const body = await parseBody(c, CreateWorkspaceBody);
     if (manager.registry.workspaces.get(body.slug)) throw badRequest(`workspace ${body.slug} exists`);
     return c.json(manager.create(body), 201);
+  });
+  app.patch("/api/workspaces/:slug", async (c) => {
+    const slug = WorkspaceSlug.safeParse(c.req.param("slug")).data;
+    const body = await parseBody(c, PatchWorkspaceBody);
+    const updated = slug ? manager.registry.workspaces.update(slug, body) : null;
+    if (!updated) throw notFound("workspace");
+    return c.json(updated);
   });
   app.delete("/api/workspaces/:slug", (c) => {
     const slug = WorkspaceSlug.safeParse(c.req.param("slug")).data;
