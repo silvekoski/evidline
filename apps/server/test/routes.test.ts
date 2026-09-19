@@ -9,6 +9,7 @@ import {
   Evidence,
   EvidenceSeries,
   IncidentReport,
+  LaneReport,
   LogEntry,
   QualityReport,
   Rule,
@@ -133,6 +134,11 @@ describe("api routes on a synthetic plant", () => {
     expect(quality.calibration).toHaveLength(2);
     expect(quality.checks).toHaveLength(12);
     expect(quality.rules.length).toBeGreaterThan(0);
+    const lanes = await get(f, `/api/runs/${run.id}/lanes`, LaneReport);
+    expect(lanes.lanes.map((l) => l.sensor)).toEqual(quality.checks.map((c) => c.value.sensor).sort());
+    expect(lanes.t).toHaveLength(lanes.lanes[0]!.values.length);
+    expect(lanes.t.length).toBeLessThanOrEqual(240);
+    expect(lanes.lanes.every((l) => l.band !== null && l.band.lo <= l.band.hi)).toBe(true);
     const drift = await get(f, `/api/runs/${run.id}/drift`, DriftReport);
     const severities = drift.drifts.map((d) => d.value.severity);
     expect(severities).toEqual([...severities].sort((a, b) => b - a));

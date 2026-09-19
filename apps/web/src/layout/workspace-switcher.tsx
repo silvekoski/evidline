@@ -93,7 +93,15 @@ export function WorkspaceSwitcher() {
     <NewWorkspaceDialog open={creating} onOpenChange={setCreating} onCreated={(w) => switchTo(w.slug)} />
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="outline" size="sm" role="combobox" aria-expanded={open} aria-label="Workspace" className="w-full justify-between group-data-[collapsible=icon]:hidden">
+        <Button
+          variant="outline"
+          size="sm"
+          role="combobox"
+          aria-expanded={open}
+          aria-label="Workspace"
+          data-tour="tour-workspace"
+          className="w-full justify-between group-data-[collapsible=icon]:hidden"
+        >
           <span className="truncate">{current?.name ?? slug}</span>
           <ChevronsUpDownIcon aria-hidden="true" className="opacity-60" />
         </Button>

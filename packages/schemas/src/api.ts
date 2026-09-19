@@ -32,6 +32,16 @@ export const QualityReport = z.object({
 });
 export type QualityReport = z.infer<typeof QualityReport>;
 
+export const Lane = z.object({
+  sensor: Alias,
+  values: z.array(z.number().nullable()),
+  band: z.object({ lo: z.number(), hi: z.number() }).nullable(),
+});
+export type Lane = z.infer<typeof Lane>;
+
+export const LaneReport = z.object({ runId: z.string(), t: z.array(z.number().int()), bucket: z.number().int().positive(), lanes: z.array(Lane) });
+export type LaneReport = z.infer<typeof LaneReport>;
+
 export const DriftReport = z.object({ runId: z.string(), drifts: z.array(DriftInference) });
 export type DriftReport = z.infer<typeof DriftReport>;
 

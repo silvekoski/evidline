@@ -3,6 +3,7 @@ import { Link } from "react-router";
 import { getColumnKnowledge, keys } from "@/api";
 import { ConfidenceBar } from "@/components/confidence-bar";
 import { ClaimCard } from "@/components/knowledge/claim-card";
+import { LOW_CONFIDENCE } from "@/components/sensors/knowledge-cell";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -18,7 +19,7 @@ export function KnowledgeTab({ sourceName }: { sourceName: string }) {
   const { column, claims, aliases } = knowledge.data;
   const confirmed = claims.filter((c) => c.status === "confirmed");
   const review = claims.filter((c) => c.status !== "confirmed");
-  const open = column.confidence < 0.5 && column.confirmedClaims === 0;
+  const open = column.confidence < LOW_CONFIDENCE && column.confirmedClaims === 0;
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-2 text-sm">

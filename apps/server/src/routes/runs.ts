@@ -5,7 +5,7 @@ import { HTTPException } from "hono/http-exception";
 import { CreateRunBody, SearchBody, type DriftReport, type IncidentReport, type Run, type SearchResponse, type SearchResult } from "@tpm/schemas";
 import type { AppContext } from "../context";
 import { runModelCalls } from "../model-calls";
-import { driftReport, incidentReport, qualityReport, sensorDetail, sensorReport } from "../reports";
+import { driftReport, incidentReport, laneReport, qualityReport, sensorDetail, sensorReport } from "../reports";
 import { badRequest, notFound, parseBody } from "../request";
 import { startRun } from "../run-service";
 import { registerModelCallsHook } from "../settings";
@@ -33,6 +33,7 @@ export function runsRoutes(ctx: AppContext) {
     .get("/:id/sensors", (c) => c.json(sensorReport(ctx.db, runOf(c.req.param("id")))))
     .get("/:id/sensors/:alias", (c) => c.json(sensorDetail(ctx.db, runOf(c.req.param("id")), c.req.param("alias").toUpperCase())))
     .get("/:id/quality", (c) => c.json(qualityReport(ctx.db, runOf(c.req.param("id")))))
+    .get("/:id/lanes", (c) => c.json(laneReport(ctx.db, runOf(c.req.param("id")))))
     .get("/:id/drift", (c) => {
       const run = runOf(c.req.param("id"));
       return c.json({ runId: run.id, drifts: driftReport(ctx.db, run) } satisfies DriftReport);

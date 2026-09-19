@@ -40,6 +40,7 @@ import {
   LogEntry,
   LogVerification,
   ModelSettings,
+  LaneReport,
   QualityReport,
   ReviewReport,
   Run,
@@ -101,6 +102,7 @@ export const keys = {
   sensors: (runId: string) => ["runs", runId, "sensors"] as const,
   sensor: (runId: string, alias: string) => ["runs", runId, "sensors", alias] as const,
   quality: (runId: string) => ["runs", runId, "quality"] as const,
+  lanes: (runId: string) => ["runs", runId, "lanes"] as const,
   drift: (runId: string) => ["runs", runId, "drift"] as const,
   incidents: (runId: string) => ["runs", runId, "incidents"] as const,
   search: (runId: string, text: string) => ["runs", runId, "search", text] as const,
@@ -200,6 +202,7 @@ export const getRun = (id: string) => request(Run, `/runs/${id}`);
 export const getSensors = (runId: string) => request(SensorReport, `/runs/${runId}/sensors`);
 export const getSensor = (runId: string, alias: string) => request(SensorDetail, `/runs/${runId}/sensors/${alias}`);
 export const getQuality = (runId: string) => request(QualityReport, `/runs/${runId}/quality`);
+export const getLanes = (runId: string) => request(LaneReport, `/runs/${runId}/lanes`);
 export const getDrift = (runId: string) => request(DriftReport, `/runs/${runId}/drift`);
 export const getIncidents = (runId: string) => request(IncidentReport, `/runs/${runId}/incidents`);
 export const searchRun = (runId: string, text: string) => request(SearchResult, `/runs/${runId}/search`, post({ text }));

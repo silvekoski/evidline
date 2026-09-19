@@ -237,13 +237,20 @@ const embed: JobHandler = async (ctx, payload) => {
 const promptColumns = (columns: ReturnType<typeof columnCandidates>): string[] =>
   columns.slice(0, 120).map((c) => `${c.name} (${c.alias})${c.hypothesis ? `: ${c.hypothesis}` : ""}${c.phrases.length ? ` also called ${c.phrases.join(", ")}` : ""}`);
 
+function chunkSpeaker(ctx: AppContext, chunk: Chunk): string | null {
+  if (chunk.locator.kind === "teams_call" && chunk.locator.speaker) return chunk.locator.speaker;
+  if (chunk.sourceId === null || chunk.segmentFrom === null || chunk.segmentTo === null) return null;
+  const speakers = new Set(ctx.corpus.segments.list(chunk.sourceId).slice(chunk.segmentFrom, chunk.segmentTo + 1).map((s) => s.speaker));
+  return speakers.size === 1 ? ([...speakers][0] ?? null) : null;
+}
+
 export async function extractForChunk(ctx: AppContext, chunkId: number): Promise<{ accepted: number; rejected: number }> {
   const chunk = ctx.corpus.chunks.get(chunkId);
   if (!chunk || chunk.sourceId === null) throw new Error(`chunk ${chunkId} not found`);
   const source = ctx.corpus.sources.get(chunk.sourceId);
   if (!source) throw new Error(`source ${chunk.sourceId} not found`);
   const columns = columnCandidates(ctx.corpus);
-  const speaker = chunk.locator.kind === "teams_call" ? chunk.locator.speaker : null;
+  const speaker = chunkSpeaker(ctx, chunk);
   const result = await ctx.textGateway.extract({ chunk: chunk.text, columns: promptColumns(columns), speaker });
   let claims: ExtractedClaim[];
   let provenanceSource: "model" | "local";

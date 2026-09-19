@@ -21,7 +21,9 @@ export function SensorsScreen() {
   const run = useRun();
   const lens = useLens();
   const report = useQuery({ queryKey: keys.sensors(runId), queryFn: () => getSensors(runId), enabled: runId !== "" });
-  const target = decodeURIComponent(useLocation().hash.slice(1));
+  const location = useLocation();
+  const target = decodeURIComponent(location.hash.slice(1));
+  const tab = new URLSearchParams(location.search).get("tab");
   const open = useOpenSensor();
   const sensors = report.data?.sensors ?? [];
   const rowOf = (id: string) => sensors.find((s) => s.alias === id || s.roleInferenceId === id || s.healthInferenceId === id || s.driftInferenceId === id) ?? null;
@@ -61,7 +63,7 @@ export function SensorsScreen() {
             run={run.data}
             report={report.data}
             row={selected}
-            initialTab={id === selected?.roleInferenceId ? "roles" : "fingerprint"}
+            initialTab={id === selected?.roleInferenceId ? "roles" : tab === "knowledge" ? "knowledge" : "fingerprint"}
             lens={lens}
             onClose={() => open(null)}
           />

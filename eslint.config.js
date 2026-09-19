@@ -9,7 +9,7 @@ const outboundModules = [
 ];
 const outboundPatterns = outboundModules.flatMap((m) => [m, `${m}/*`]);
 const outboundGlobals = ["fetch", "WebSocket", "XMLHttpRequest", "EventSource", "Request", "navigator"];
-const egressInternals = { name: "@tpm/egress", importNames: ["send", "sendForm", "getProvider", "createElevenLabsTranscriber", "transcriberFromEnv", "createOpenAiProvider", "createAzureProvider", "createOllamaProvider"], message: "Only the gateway may call a model." };
+const egressInternals = { name: "@tpm/egress", importNames: ["send", "sendForm", "getProvider", "createElevenLabsTranscriber", "transcriberFromEnv", "createOpenAiOcr", "ocrFromEnv", "createOpenAiProvider", "createAzureProvider", "createOllamaProvider"], message: "Only the gateway may call a model." };
 
 const noOutbound = {
   "no-restricted-imports": ["error", { paths: [egressInternals], patterns: [{ group: outboundPatterns, message: "Only packages/egress may reach the network." }] }],

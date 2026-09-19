@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { NavLink, useLocation, useNavigate } from "react-router";
-import { BookOpenIcon, CircleHelpIcon, FilesIcon, FileTextIcon, PlayIcon, PlugIcon } from "lucide-react";
+import { BookOpenIcon, CircleHelpIcon, FileTextIcon, FilesIcon, ListChecksIcon, PlayIcon, PlugIcon } from "lucide-react";
 import { keys, listRuns } from "@/api";
 import { useActiveRunId } from "@/hooks/use-active-run-id";
 import { useLens } from "@/hooks/use-lens";
@@ -23,10 +23,11 @@ import { screens, type ScreenSlug } from "./screens";
 import { WorkspaceSwitcher } from "./workspace-switcher";
 
 const knowledgeScreens = [
-  { path: "/sources", label: "Sources", icon: BookOpenIcon },
-  { path: "/open-questions", label: "Open questions", icon: CircleHelpIcon },
-  { path: "/spec", label: "Data spec", icon: FileTextIcon },
-  { path: "/connectors", label: "Connectors", icon: PlugIcon },
+  { path: "/sources", label: "Sources", icon: BookOpenIcon, tour: "tour-sources" },
+  { path: "/claims", label: "Review claims", icon: ListChecksIcon, tour: undefined },
+  { path: "/open-questions", label: "Open questions", icon: CircleHelpIcon, tour: undefined },
+  { path: "/spec", label: "Data spec", icon: FileTextIcon, tour: undefined },
+  { path: "/connectors", label: "Connectors", icon: PlugIcon, tour: "tour-connectors" },
 ];
 
 export function currentScreen(pathname: string): ScreenSlug | null {
@@ -81,7 +82,7 @@ export function AppSidebar() {
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton asChild isActive={pathname === "/"} tooltip="Run">
-                  <NavLink to="/">
+                  <NavLink to="/" data-tour="tour-run">
                     <PlayIcon aria-hidden="true" />
                     <span>Run</span>
                   </NavLink>
@@ -89,7 +90,7 @@ export function AppSidebar() {
               </SidebarMenuItem>
               <SidebarMenuItem>
                 <SidebarMenuButton asChild isActive={pathname === "/runs"} tooltip="Runs">
-                  <NavLink to="/runs">
+                  <NavLink to="/runs" data-tour="tour-runs">
                     <FilesIcon aria-hidden="true" />
                     <span>Runs</span>
                   </NavLink>
@@ -126,10 +127,10 @@ export function AppSidebar() {
           <SidebarGroupLabel>Knowledge</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {knowledgeScreens.map(({ path, label, icon: Icon }) => (
+              {knowledgeScreens.map(({ path, label, icon: Icon, tour }) => (
                 <SidebarMenuItem key={path}>
                   <SidebarMenuButton asChild isActive={pathname === path || pathname.startsWith(`${path}/`)} tooltip={label}>
-                    <NavLink to={path}>
+                    <NavLink to={path} data-tour={tour}>
                       <Icon aria-hidden="true" />
                       <span>{label}</span>
                     </NavLink>

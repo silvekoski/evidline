@@ -5,6 +5,7 @@ import type {
   DriftInference,
   HealthInference,
   Inference,
+  LaneReport,
   QualityReport,
   RoleInference,
   Run,
@@ -12,8 +13,11 @@ import type {
   SensorReport,
   SensorRow,
 } from "@tpm/schemas";
+import { bucketMeans, quantile } from "@tpm/core";
 import type { Db, SensorRecord } from "./db";
 import { notFound } from "./request";
+
+const lanePoints = 240;
 
 export const currentInferences = (db: Db, runId: string): Inference[] => db.inferences.list(runId).filter((i) => i.status !== "revised");
 
@@ -109,6 +113,24 @@ export function qualityReport(db: Db, run: Run): QualityReport {
   if (!baseline) throw notFound("run results");
   const calibration: CalibrationInference[] = ofStage(list, "calibration");
   return { runId: run.id, baseline, calibration, checks: ofStage(list, "health"), rules: db.rules.list(run.id) };
+}
+
+export function laneReport(db: Db, run: Run): LaneReport {
+  const baseline = ofStage(currentInferences(db, run.id), "baseline").at(-1);
+  if (!baseline) throw notFound("run results");
+  const { from, to } = baseline.value.window;
+  const bucket = Math.max(1, Math.ceil(run.gridSize / lanePoints));
+  const lanes = db.grids.series(run.id).map(({ alias, values }) => {
+    const ref = values.subarray(from, to);
+    const finite = ref.some((v) => Number.isFinite(v));
+    return {
+      sensor: alias,
+      values: Array.from(bucketMeans(values, bucket), (v) => (Number.isFinite(v) ? v : null)),
+      band: finite ? { lo: quantile(ref, 0.01), hi: quantile(ref, 0.99) } : null,
+    };
+  });
+  const t = Array.from({ length: Math.ceil(run.gridSize / bucket) }, (_, b) => b * bucket);
+  return { runId: run.id, t, bucket, lanes };
 }
 
 export const driftReport = (db: Db, run: Run): DriftInference[] => ofStage(currentInferences(db, run.id), "drift").sort((a, b) => b.value.severity - a.value.severity);

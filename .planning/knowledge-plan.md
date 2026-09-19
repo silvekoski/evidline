@@ -28,7 +28,7 @@ Date: 2026-09-19. Source: the PRD "Customer Knowledge Capture". This file record
 
 ### Linker
 
-- Three candidate scores add together. An exact alias phrase gives 1.0. A column name or alias token in the statement gives 0.6. The cosine between the claim vector and the column description vector gives up to 1.0. The link limit is 0.5.
+- Three candidate scores add together. An exact alias phrase gives 1.0. A column name or alias token in the statement gives 0.6. The cosine between the claim vector and the column description vector gives up to 1.0. The link limit is 0.75. With 0.5, the demo corpus linked almost every claim to `xmeas_7` and `xmeas_20` on cosine alone (0.5 to 0.7). A name or alias match still passes with 0.6 plus its cosine.
 - The name match is a normalized substring test over the catalog, not an FTS5 index. The catalog has under 100 rows, so an index adds nothing.
 
 ### Pipeline jobs

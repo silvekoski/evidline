@@ -18,6 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { DataTable } from "@/components/data-table";
 import { HealthBadge } from "./health-badge";
 import { Hypothesis } from "./hypothesis";
+import { KnowledgeCell } from "./knowledge-cell";
 import { useOpenSensor } from "./use-open-sensor";
 
 const column = createColumnHelper<SensorRow>();
@@ -38,6 +39,11 @@ const columns = [
     id: "hypothesisName",
     header: "Hypothesis",
     cell: ({ row }) => <Hypothesis name={row.original.hypothesisName} />,
+  }),
+  column.display({
+    id: "knowledge",
+    header: "Knowledge",
+    cell: ({ row }) => <KnowledgeCell alias={row.original.alias} sourceName={row.original.sourceName} />,
   }),
   column.accessor("roleConfidence", {
     header: "Confidence",

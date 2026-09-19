@@ -112,3 +112,13 @@ typescript 5.9, vite 7, @vitejs/plugin-react 5, vitest 4, react 19, react-router
 - PRD section 6 said one outbound host. Reviewers add a second host when `TPM_REVIEW_URL` differs from the primary endpoint. The record names the host and the Data flow totals list every host. The PRD sentences on four purposes and on cross-AI review are amended.
 - Reviews never run by themselves: each call bills concurrency units, four sequential calls take minutes, a second host receives data only after an operator action, and no stage waits for a hypothesis.
 - The review row offers "Ask about this" and "Override to {label}". They prefill the Question and Override dialogs through a small action request store. The operator still submits.
+
+## Quality screen (2026-09-20)
+
+- The screen leads with a verdict and four tiles: healthy, masked, share of the run under a mask, active rules. The mechanism text stays in the header.
+- Baseline and calibration are one "gate setup" strip. A Details button opens a sheet with the old card content.
+- The health table groups rows by health class. Rows with identical masked windows collapse into one row plus a "show N more" row. The healthy group starts collapsed.
+- `GET /runs/:id/lanes` returns at most 240 bucket means per sensor and the baseline p1 to p99 band. The lane column draws the signal, the band, the masks and the change points on one axis. Above 200 sensors, move the lanes to canvas.
+- A check has no direction field. The UI derives it: a passing check with statistic above the threshold has "above" as the good side. The margin is statistic over threshold on the failing side, so a margin above 1 is a fail.
+- The expanded row shows the evidence chart, the chain from file to inference, and all checks with the failed ones first.
+- Rules show violations as a share of the run. Selection plus "Activate" replaces one switch per row. The composer lives in a sheet behind "New rule" and offers the eight sentence forms as chips.
