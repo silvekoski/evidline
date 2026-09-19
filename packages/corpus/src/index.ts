@@ -9,5 +9,6 @@ export { ALIAS_SCORE, LINK_THRESHOLD, NAME_SCORE, cosine, linkClaim, type LinkCa
 export { RRF_K, fuseRanks, type Fused } from "./rrf";
 export { fileLocator, paragraphSegments } from "./normalize/text";
 export { SENSOR_NUMERIC_SHARE, classifySheets, parseCsv, parseXlsx, type Sheet, type TabularResult } from "./normalize/tabular";
-export { eml, normalizeFile, supportedExtensions, type FileInput } from "./normalize/file";
+export { PAGE_TEXT_MIN_CHARS, eml, normalizeFile, supportedExtensions, type FileInput } from "./normalize/file";
 export { TURN_GAP_S, audioExtensions, isAudioName, wordsToTurns } from "./transcript-words";
+export { OCR_SCALE, renderPdfPage } from "./normalize/pdf-render";

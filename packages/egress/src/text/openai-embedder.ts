@@ -11,10 +11,12 @@ const retryDelays = [2000, 5000, 10000];
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+export const embeddingsUrl = (url: string): string => (/\/embeddings\/?$/.test(url) ? url : `${url.replace(/\/$/, "")}/embeddings`);
+
 async function post(cfg: OpenAiEmbedConfig, input: string[]): Promise<number[][]> {
   const body = JSON.stringify({ model: cfg.model, input });
   for (let attempt = 0; ; attempt++) {
-    const res = await send(cfg.url, { headers: { "content-type": "application/json", authorization: `Bearer ${cfg.key}` }, body });
+    const res = await send(embeddingsUrl(cfg.url), { headers: { "content-type": "application/json", authorization: `Bearer ${cfg.key}` }, body });
     if (res.status === 429 && attempt < retryDelays.length) {
       await sleep(retryDelays[attempt]!);
       continue;

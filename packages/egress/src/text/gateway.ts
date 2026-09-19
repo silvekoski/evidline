@@ -7,6 +7,7 @@ import { createOpenAiEmbedder } from "./openai-embedder";
 import { extractTemplate, extractTemplateHash } from "./extract-template";
 import { textGuard } from "./guard";
 import type { EmbedKind, Embedder } from "./embedder";
+import { MAX_IMAGE_BYTES, ocrFromEnv, type OcrReader } from "./ocr";
 import { MAX_AUDIO_BYTES, transcriberFromEnv, type Transcriber } from "./transcriber";
 
 export type TextEgressStore = { write(row: Omit<TextEgressRow, "id">): void };
@@ -16,8 +17,11 @@ export type ExtractInput = { chunk: string; columns: string[]; speaker: string |
 
 export type TranscribeInput = { audio: Buffer; mediaType: string; language: string | null };
 
+export type OcrInput = { image: Buffer; mediaType: string; page: number };
+
 export type TextGateway = {
   embedder(): EmbedderInfo;
+  ocr(input: OcrInput): Promise<TextResult<string>>;
   transcriber(): EmbedderInfo | null;
   transcribe(input: TranscribeInput): Promise<TextResult<TranscriptionResponse>>;
   embed(texts: string[], kind: EmbedKind): Promise<TextResult<Float32Array[]>>;
@@ -32,6 +36,7 @@ export type TextGatewayOptions = {
   resolveEmbedder?: (mode: ModelMode) => Embedder;
   resolveProvider?: (mode: ModelMode) => Provider | null;
   resolveTranscriber?: (mode: ModelMode) => Transcriber | null;
+  resolveOcr?: (mode: ModelMode) => OcrReader | null;
 };
 
 const hashEmbedder = createHashEmbedder();
@@ -50,6 +55,7 @@ export function createTextGateway(opts: TextGatewayOptions): TextGateway {
   const embedderFor = opts.resolveEmbedder ?? embedderFromEnv;
   const providerFor = opts.resolveProvider ?? getProvider;
   const transcriberFor = opts.resolveTranscriber ?? ((mode: ModelMode) => (mode === "off" ? null : transcriberFromEnv()));
+  const ocrFor = opts.resolveOcr ?? ((mode: ModelMode) => (mode === "off" ? null : ocrFromEnv()));
   const log = (row: Omit<TextEgressRow, "id" | "time">) => opts.store.write({ time: nowIso(), ...row });
 
   return {
@@ -57,6 +63,29 @@ export function createTextGateway(opts: TextGatewayOptions): TextGateway {
     embedder() {
       const { name, model, dims, host } = embedderFor(opts.getMode());
       return { name, model, dims, host };
+    },
+    async ocr({ image, mediaType, page }) {
+      const mode = opts.getMode();
+      const reader = ocrFor(mode);
+      const base = { purpose: "ocr" as const, destination: reader?.host ?? "local", model: reader?.model ?? "none", texts: 1, bytes: image.byteLength, payloadHash: createHash("sha256").update(image).digest("hex") };
+      if (reader === null) {
+        const detail = mode === "off" ? "model off, the page image stays on the server" : "TPM_EMBED_KEY or TPM_OCR_KEY is not set";
+        log({ ...base, status: "blocked", detail, durationMs: null });
+        return { ok: false, reason: detail };
+      }
+      if (image.byteLength > MAX_IMAGE_BYTES) {
+        log({ ...base, status: "blocked", detail: "page image over 10 MB", durationMs: null });
+        return { ok: false, reason: "the page image is over 10 MB" };
+      }
+      const started = Date.now();
+      try {
+        const value = await reader.read(image, mediaType);
+        log({ ...base, status: "sent", detail: `page ${page}, ${value.length} characters`, durationMs: Date.now() - started });
+        return { ok: true, value, source: "model" };
+      } catch (e) {
+        log({ ...base, status: "error", detail: message(e), durationMs: Date.now() - started });
+        return { ok: false, reason: `${reader.name} call failed: ${message(e)}` };
+      }
     },
     transcriber() {
       const t = transcriberFor(opts.getMode());

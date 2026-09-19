@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { extname, join, relative } from "node:path";
-import { chunkSegments, extractClaimsLocally, fuseRanks, isAudioName, linkClaim, normalizeFile, verifyQuote, wordsToTurns, type Normalized, type SegmentDraft } from "@tpm/corpus";
+import { chunkSegments, extractClaimsLocally, fuseRanks, isAudioName, linkClaim, normalizeFile, paragraphSegments, renderPdfPage, verifyQuote, wordsToTurns, type Normalized, type SegmentDraft } from "@tpm/corpus";
 import type { CatalogColumn, Claim, CorpusStats, DataSpec, ExtractedClaim, OpenQuestion, SearchHit, Source, SourceKind } from "@tpm/schemas";
 import type { AppContext } from "./context";
 import { columnCandidates, enqueueEmbeds } from "./catalog";
@@ -122,13 +122,14 @@ const normalize: JobHandler = async (ctx, payload) => {
   try {
     const content = readFileSync(join(ctx.dir, source.blobPath));
     const result = isAudioName(source.title) ? await transcribeAudio(ctx, source, content) : await normalizeFile({ name: source.title, mediaType: source.mediaType, content, occurredAt: source.occurredAt });
+    const ocr = result.ocrPages.length ? await readPages(ctx, content, result) : null;
     ctx.corpus.transaction(() => {
       ctx.corpus.segments.replace(id, result.segments);
       ctx.corpus.raw.prepare("UPDATE source SET kind = ?, title = ?, occurred_at = ? WHERE id = ?").run(result.kind, result.title, result.occurredAt ?? source.occurredAt, id);
     });
     for (const attachment of result.attachments) ingestFile(ctx, { ...attachment, connectorId: source.connectorId, parentSourceId: id });
-    if (result.status === "needs_ocr") {
-      ctx.corpus.sources.setStatus(id, "needs_ocr", "The PDF has no text layer. Run OCR and upload the result.");
+    if (result.status === "needs_ocr" && ocr?.ok === false) {
+      ctx.corpus.sources.setStatus(id, "needs_ocr", `${result.ocrPages.length} of the pages have no text layer, and OCR is not available: ${ocr.reason}`);
       return;
     }
     if (result.status === "sensor_data") {
@@ -142,11 +143,27 @@ const normalize: JobHandler = async (ctx, payload) => {
   }
 };
 
+async function readPages(ctx: AppContext, pdf: Buffer, result: Normalized): Promise<{ ok: boolean; reason: string }> {
+  const read: SegmentDraft[] = [];
+  for (const page of result.ocrPages) {
+    const image = await renderPdfPage(pdf, page);
+    const text = await ctx.textGateway.ocr({ image, mediaType: "image/png", page });
+    if (!text.ok) return { ok: false, reason: text.reason };
+    read.push(...paragraphSegments(text.value, { page, block: page }));
+  }
+  result.segments = [...result.segments, ...read].sort((a, b) => pageOf(a) - pageOf(b) || charOf(a) - charOf(b));
+  result.status = "processed";
+  return { ok: true, reason: "" };
+}
+
+const pageOf = (s: SegmentDraft): number => (s.locator.kind === "file" ? (s.locator.page ?? 0) : 0);
+const charOf = (s: SegmentDraft): number => (s.locator.kind === "file" ? s.locator.charStart : 0);
+
 async function transcribeAudio(ctx: AppContext, source: Source, content: Buffer): Promise<Normalized> {
   const result = await ctx.textGateway.transcribe({ audio: content, mediaType: source.mediaType, language: process.env.TPM_TRANSCRIBE_LANGUAGE || null });
   if (!result.ok) throw new Error(`transcription failed: ${result.reason}`);
   const segments = wordsToTurns(result.value.words);
-  return { title: source.title, kind: "voice_note", occurredAt: source.occurredAt, status: "processed", segments: segments.length ? segments : result.value.text.trim() ? [{ text: result.value.text.trim(), speaker: null, block: 0, locator: { kind: "teams_call", startMs: 0, endMs: 0, speaker: null } }] : [], headers: [], attachments: [] };
+  return { title: source.title, kind: "voice_note", occurredAt: source.occurredAt, status: "processed", segments: segments.length ? segments : result.value.text.trim() ? [{ text: result.value.text.trim(), speaker: null, block: 0, locator: { kind: "teams_call", startMs: 0, endMs: 0, speaker: null } }] : [], headers: [], attachments: [], ocrPages: [] };
 }
 
 const chunk: JobHandler = async (ctx, payload) => {

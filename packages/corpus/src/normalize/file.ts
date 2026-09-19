@@ -12,6 +12,7 @@ import { fileLocator, paragraphSegments } from "./text";
 
 export type FileInput = { name: string; mediaType: string; content: Buffer; occurredAt?: string | null };
 
+export const PAGE_TEXT_MIN_CHARS = 20;
 export const supportedExtensions = [".pdf", ".docx", ".pptx", ".txt", ".md", ".vtt", ".eml", ".csv", ".xlsx"] as const;
 
 
@@ -23,6 +24,7 @@ const base = (input: FileInput, patch: Partial<Normalized>): Normalized => ({
   segments: [],
   headers: [],
   attachments: [],
+  ocrPages: [],
   ...patch,
 });
 
@@ -30,8 +32,8 @@ async function pdf(input: FileInput): Promise<Normalized> {
   const { text } = await extractText(new Uint8Array(input.content), { mergePages: false });
   const pages = Array.isArray(text) ? text : [text];
   const segments = pages.flatMap((pageText, i) => paragraphSegments(pageText, { page: i + 1, block: i + 1 }));
-  const chars = segments.reduce((n, s) => n + s.text.length, 0);
-  return base(input, { segments, status: chars < 20 * pages.length ? "needs_ocr" : "processed" });
+  const ocrPages = pages.flatMap((pageText, i) => (pageText.replace(/\s+/g, "").length < PAGE_TEXT_MIN_CHARS ? [i + 1] : []));
+  return base(input, { segments, ocrPages, status: ocrPages.length > 0 ? "needs_ocr" : "processed" });
 }
 
 async function docx(input: FileInput): Promise<Normalized> {

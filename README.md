@@ -41,7 +41,8 @@ The Knowledge section captures what the customer data means. Sources are call tr
 
 | Variable | Purpose |
 | --- | --- |
-| `TPM_EMBED_URL`, `TPM_EMBED_KEY`, `TPM_EMBED_MODEL`, `TPM_EMBED_DIMS` | OpenAI-compatible embeddings endpoint (Featherless, `Qwen/Qwen3-Embedding-4B`, 1024 kept dimensions). Without them, or in mode `off`, a local hashed trigram embedder runs and nothing leaves. |
+| `TPM_EMBED_URL`, `TPM_EMBED_KEY`, `TPM_EMBED_MODEL`, `TPM_EMBED_DIMS` | OpenAI-compatible API base (`https://api.featherless.ai/v1`) and key. The embedder posts to `<base>/embeddings` with `Qwen/Qwen3-Embedding-4B` and keeps 1024 dimensions. Without them, or in mode `off`, a local hashed trigram embedder runs and nothing leaves. |
+| `TPM_OCR_MODEL`, `TPM_OCR_URL`, `TPM_OCR_KEY` | Vision model for a PDF page without a text layer. Default `Qwen/Qwen3-VL-32B-Instruct` on the embeddings host and key. Each page goes as one PNG to `<base>/chat/completions`. About 6 s per page. |
 | `TPM_ELEVENLABS_KEY`, `TPM_ELEVENLABS_MODEL`, `TPM_TRANSCRIBE_LANGUAGE` | ElevenLabs Scribe for voice notes (`scribe_v1`, diarization on). Without the key, or in mode `off`, an audio upload fails with a reason and the audio stays on the server. |
 | `TPM_SECRET_KEY` | 32 bytes in hex. Encrypts connector tokens with AES-256-GCM. Without it the server writes a key to `data/secret.key`. |
 

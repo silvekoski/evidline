@@ -14,6 +14,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@napi-rs/canvas": "^1.0.9",
     "@tpm/schemas": "workspace:*",
     "csv-parse": "^7.0.2",
     "html-to-text": "^10.0.1",
@@ -25,8 +26,8 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@tpm/egress": "workspace:*",
     "@types/html-to-text": "^9.0.4",
-    "@types/mailparser": "^3.4.6",
-    "@tpm/egress": "workspace:*"
+    "@types/mailparser": "^3.4.6"
   }
 }

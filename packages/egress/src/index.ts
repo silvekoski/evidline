@@ -24,6 +24,7 @@ export { HASH_DIMS, createHashEmbedder, hashEmbed } from "./text/hash-embedder";
 export { normalize, type EmbedKind, type Embedder } from "./text/embedder";
 export { extractTemplate, extractTemplateHash } from "./text/extract-template";
 export { ELEVENLABS_URL, MAX_AUDIO_BYTES, type Transcriber } from "./text/transcriber";
+export { MAX_IMAGE_BYTES, OCR_DEFAULT_MODEL, ocrPrompt, type OcrReader } from "./text/ocr";
 export {
   createTextGateway,
   embedderFromEnv,
@@ -34,4 +35,5 @@ export {
   type TextGatewayOptions,
   type TextResult,
   type TranscribeInput,
+  type OcrInput,
 } from "./text/gateway";

@@ -58,4 +58,6 @@ Date: 2026-09-19. Source: the PRD "Customer Knowledge Capture". This file record
 ## Progress (2026-09-20)
 
 - In commits on main: M1 to M7 except the replay test, the Teams, email, and Slack connectors, source routing with an Unassigned list, Graph webhooks, ElevenLabs voice notes, retention per workspace, erasure by person, tag list import, transcript gaps, origin links, Slack files, claim markers with links. `pnpm check` passes with 305 tests.
-- Not done: the replay test and the golden set (need project material), OCR for a PDF without a text layer, `.msg`, IMAP, live runs of the connectors (need an Entra app, a Slack app, and a mailbox).
+- OCR: a page with under 20 characters of text layer renders to PNG at scale 2 and goes to a vision model through the text channel (`ocr` purpose). Live check on 2026-09-20: `Qwen/Qwen3-VL-32B-Instruct` on Featherless read a test page near-verbatim in 6.3 s. `Qwen/Qwen3-VL-8B-Instruct` and the 2.5-VL family are also there. The public model catalog answers 404, so the list came from probes.
+- Featherless base URL is `https://api.featherless.ai/v1`. The `/openai/v1` prefix answers 404 on every route.
+- Not done: the replay test and the golden set (need project material), `.msg`, IMAP, live runs of the connectors (need an Entra app, a Slack app, and a mailbox).

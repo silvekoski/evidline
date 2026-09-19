@@ -3,7 +3,8 @@ import type { AddressInfo } from "node:net";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { TextEgressRow } from "@tpm/schemas";
 import { createHashEmbedder, createTextGateway, hashEmbed, numericShare, textGuard } from "../src/index";
-import { createOpenAiEmbedder } from "../src/text/openai-embedder";
+import { createOpenAiEmbedder, embeddingsUrl } from "../src/text/openai-embedder";
+import { chatUrl, createOpenAiOcr } from "../src/text/ocr";
 import { createElevenLabsTranscriber } from "../src/text/transcriber";
 
 const dot = (a: Float32Array, b: Float32Array) => a.reduce((s, v, i) => s + v * b[i]!, 0);
@@ -137,5 +138,51 @@ describe("transcriber", () => {
     const result = await noKey.transcribe({ audio: Buffer.from("x"), mediaType: "audio/wav", language: null });
     expect(result).toEqual({ ok: false, reason: "TPM_ELEVENLABS_KEY is not set" });
     expect(store.rows.map((r) => r.status)).toEqual(["blocked", "blocked"]);
+  });
+});
+
+describe("ocr reader", () => {
+  let server: Server;
+  let url = "";
+  let seen: { auth: string | undefined; body: { model: string; messages: { content: { type: string; image_url?: { url: string } }[] }[] } } | null = null;
+  beforeAll(async () => {
+    server = createServer((req, res) => {
+      let raw = "";
+      req.on("data", (c: Buffer) => (raw += c.toString()));
+      req.on("end", () => {
+        seen = { auth: req.headers.authorization, body: JSON.parse(raw) };
+        res.setHeader("content-type", "application/json");
+        res.end(JSON.stringify(req.url?.endsWith("/chat/completions") ? { choices: [{ message: { content: " Dryer 3 steam valve\n\nrow one; row two " } }] } : { error: "wrong route" }));
+      });
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    url = `http://127.0.0.1:${(server.address() as AddressInfo).port}/v1`;
+  });
+  afterAll(() => new Promise<void>((resolve) => server.close(() => resolve())));
+
+  it("posts the page as a data url to chat completions on the base of the embeddings url and logs a row", async () => {
+    const store = memoryStore();
+    const gateway = createTextGateway({ store, getMode: () => "cloud", resolveOcr: () => createOpenAiOcr({ url, key: "k", model: "vl" }) });
+    const image = Buffer.from("PNG bytes");
+    const result = await gateway.ocr({ image, mediaType: "image/png", page: 3 });
+    expect(result).toEqual({ ok: true, value: "Dryer 3 steam valve\n\nrow one; row two", source: "model" });
+    expect(seen?.auth).toBe("Bearer k");
+    expect(seen?.body.model).toBe("vl");
+    expect(seen?.body.messages[0]!.content[1]!.image_url!.url).toBe(`data:image/png;base64,${image.toString("base64")}`);
+    expect(store.rows[0]).toMatchObject({ purpose: "ocr", status: "sent", bytes: image.byteLength, detail: "page 3, 37 characters" });
+    expect(JSON.stringify(store.rows[0])).not.toContain("Dryer");
+  });
+
+  it("blocks in mode off", async () => {
+    const store = memoryStore();
+    const result = await createTextGateway({ store, getMode: () => "off" }).ocr({ image: Buffer.from("x"), mediaType: "image/png", page: 1 });
+    expect(result.ok).toBe(false);
+    expect(store.rows[0]?.status).toBe("blocked");
+  });
+
+  it("derives the chat url from a base url or an embeddings url", () => {
+    expect(chatUrl("https://api.featherless.ai/v1")).toBe("https://api.featherless.ai/v1/chat/completions");
+    expect(chatUrl("https://api.featherless.ai/v1/embeddings")).toBe("https://api.featherless.ai/v1/chat/completions");
+    expect(embeddingsUrl("https://api.featherless.ai/v1/")).toBe("https://api.featherless.ai/v1/embeddings");
   });
 });

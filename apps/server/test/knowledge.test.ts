@@ -10,6 +10,7 @@ import { applyRetention, extractForChunk } from "../src/corpus-service";
 import { createRootApp } from "../src/root-app";
 import { createWorkspaceManager, migrateLegacyDb } from "../src/workspaces";
 import { fixture, type Fixture } from "./fixture";
+import { pdf } from "../../../packages/corpus/test/fixtures";
 
 const vtt = `WEBVTT
 
@@ -22,9 +23,9 @@ const vtt = `WEBVTT
 const notes = "# Reactor\n\nxmeas_7 is the reactor pressure in kPa gauge. We log it every 3 minutes.\n";
 const sensorCsv = ["time,xmeas_7,xmeas_2", ...Array.from({ length: 40 }, (_, i) => `2026-01-01T00:0${i % 10}:00Z,${1000 + i * 1.25},${i * 7.5}`)].join("\n");
 
-const form = (files: Record<string, string>) => {
+const form = (files: Record<string, string | Buffer>) => {
   const body = new FormData();
-  for (const [name, text] of Object.entries(files)) body.append("files", new File([text], name));
+  for (const [name, content] of Object.entries(files)) body.append("files", new File([typeof content === "string" ? content : new Uint8Array(content)], name));
   return body;
 };
 
@@ -36,7 +37,7 @@ beforeEach(() => {
 });
 afterEach(() => f.close());
 
-const upload = async (files: Record<string, string>) => {
+const upload = async (files: Record<string, string | Buffer>) => {
   const res = await f.app.request("/api/sources/upload", { method: "POST", body: form(files) });
   expect(res.status).toBe(201);
   return (await res.json()) as (Source & { created: boolean })[];
@@ -287,5 +288,25 @@ describe("erasure", () => {
     const second = await f.app.request("/api/erasure", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ person: "Anna Data" }) });
     expect(await second.json()).toMatchObject({ sourcesRemoved: 1 });
     expect(f.ctx.corpus.sources.count()).toBe(0);
+  });
+});
+
+describe("ocr", () => {
+  it("reads a page without a text layer through the OCR reader and keeps page locators", async () => {
+    const pages: number[] = [];
+    f.ctx.textGateway = { ...f.ctx.textGateway, ocr: async ({ image, page }) => { pages.push(page); expect(image.subarray(1, 4).toString()).toBe("PNG"); return { ok: true, source: "model", value: `Scanned page ${page}: xmeas_7 is the reactor pressure.` }; } };
+    const [source] = await upload({ "scan.pdf": pdf(["", "Typed page two has text.", ""]) });
+    await drain();
+    const after = f.ctx.corpus.sources.get(source!.id)!;
+    expect(after.status).toBe("processed");
+    expect(pages).toEqual([1, 3]);
+    const segments = f.ctx.corpus.segments.list(after.id);
+    expect(segments.map((s) => [s.locator.kind === "file" ? s.locator.page : null, s.text])).toEqual([[1, "Scanned page 1: xmeas_7 is the reactor pressure."], [2, "Typed page two has text."], [3, "Scanned page 3: xmeas_7 is the reactor pressure."]]);
+  });
+
+  it("keeps the status needs_ocr with the reason when OCR is off", async () => {
+    const [source] = await upload({ "scan.pdf": pdf([""]) });
+    await drain();
+    expect(f.ctx.corpus.sources.get(source!.id)).toMatchObject({ status: "needs_ocr", error: expect.stringContaining("model off") });
   });
 });

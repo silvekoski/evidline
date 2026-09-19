@@ -249,7 +249,7 @@ export const MeetingGapList = z.array(MeetingGap);
 export const TextEgressRow = z.object({
   id: z.number().int(),
   time: z.string(),
-  purpose: z.enum(["embed", "extract", "transcribe"]),
+  purpose: z.enum(["embed", "extract", "transcribe", "ocr"]),
   destination: z.string(),
   model: z.string(),
   texts: z.number().int(),
