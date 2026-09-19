@@ -1,9 +1,9 @@
 import { parse } from "node:path";
-import { buildLeakIndex, createGateway, getProvider, type EgressStore, type Gateway, type LeakIndex } from "@tpm/egress";
+import { buildLeakIndex, createGateway, type EgressStore, type Gateway, type LeakIndex } from "@tpm/egress";
 import { EgressPayload, InvestigationTool, Stage } from "@tpm/schemas";
 import type { Db } from "./db";
 import { newEgressId } from "./ids";
-import { getModelSettings } from "./settings";
+import { getModelMode } from "./settings";
 
 const cacheSize = 4;
 const emptyIndex = buildLeakIndex([], []);
@@ -33,7 +33,7 @@ export function forbiddenNames(db: Db, runId: string): string[] {
   const fields = sourceNames.filter((name) => name.includes(".")).map((name) => name.slice(0, name.indexOf(".")));
   const categoryValues = sourceNames.flatMap((name) => [...name.matchAll(splitValue)].map((m) => m[1] as string));
   const runNames = run ? [...run.quarantined, run.name, parse(run.name).name] : [];
-  return [...sourceNames, ...fields, ...categoryValues, ...runNames].filter((name) => !payloadVocabulary.has(name.toLowerCase()));
+  return [...sourceNames, ...fields, ...categoryValues, ...runNames].filter((name) => !/^\d+$/.test(name) && !payloadVocabulary.has(name.toLowerCase()));
 }
 
 export function createLeakIndexCache(db: Db): (runId: string | null) => LeakIndex {
@@ -65,8 +65,7 @@ export function createSqliteStore(db: Db): EgressStore {
 export function wireGateway(db: Db): Gateway {
   return createGateway({
     store: createSqliteStore(db),
-    getSettings: () => getModelSettings(db),
-    getProvider,
+    getMode: () => getModelMode(db),
     leakIndex: createLeakIndexCache(db),
     nowIso: () => new Date().toISOString(),
     newId: newEgressId,

@@ -113,7 +113,15 @@ export function planPayload(ctx: AppContext, run: Run, inference: Inference, que
     question,
     dt: run.timeBase.dt,
     n: run.gridSize,
-    inference: { stage: inference.stage, claim: inference.claim.slice(0, 300), sensor, onset, baseline: { from: baseline.from, to: baseline.to }, masked },
+    inference: {
+      stage: inference.stage,
+      claim: inference.claim.slice(0, 300),
+      sensor,
+      onset,
+      responsible: inference.stage === "drift" ? inference.value.responsible : null,
+      baseline: { from: baseline.from, to: baseline.to },
+      masked,
+    },
     catalog: catalogFor(ctx, run.id, preferred),
     tools: InvestigationTool.options,
   };
@@ -181,9 +189,12 @@ export function outcome(inference: Inference, r: ToolResult, n: number, override
   return null;
 }
 
+const engineValue = (i: Inference): unknown =>
+  i.stage === "role" ? { ...i.value, hypothesisName: null, hypothesisConfidence: null } : i.stage === "diagnosis" ? { ...i.value, prose: null } : i.value;
+
 export function changedPairs(before: Inference[], after: Inference[]): { before: Inference; after: Inference }[] {
   const key = (i: Inference): string => `${i.stage}|${i.sensor ?? ""}`;
-  const shape = (i: Inference): string => JSON.stringify(i.value).replaceAll(`ev-${i.runId}-`, "ev-");
+  const shape = (i: Inference): string => JSON.stringify(engineValue(i)).replaceAll(`ev-${i.runId}-`, "ev-");
   const groups = new Map<string, Inference[]>();
   for (const i of after) groups.set(key(i), [...(groups.get(key(i)) ?? []), i]);
   return before.flatMap((b) => {

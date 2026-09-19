@@ -4,6 +4,7 @@ import { createColumnHelper } from "@tanstack/react-table";
 import { Link } from "react-router";
 import type { Lens, LogEntry } from "@tpm/schemas";
 import { EvidenceChip } from "@/components/evidence-chip";
+import { InferenceLink } from "@/components/inference-link";
 import { screenPath, type ScreenSlug } from "@/layout/screens";
 import { HashCell } from "./hash-cell";
 
@@ -40,15 +41,7 @@ export function logColumns(runId: string, lens: Lens, screens: Map<string, Scree
       header: "Inference",
       cell: ({ getValue }) => {
         const id = getValue();
-        const screen = screens.get(id);
-        if (id === "") return null;
-        return screen ? (
-          <Link to={screenPath(runId, screen, id)} className={idLink}>
-            {id}
-          </Link>
-        ) : (
-          <span className="font-mono text-xs text-muted-foreground">{id}</span>
-        );
+        return id === "" ? null : <InferenceLink runId={runId} id={id} screen={screens.get(id)} className={idLink} />;
       },
     }),
     column.accessor("evidenceIds", {

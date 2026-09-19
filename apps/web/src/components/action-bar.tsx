@@ -32,7 +32,7 @@ export function ActionBar({ inference, className }: { inference: Inference; clas
   const thread = useQuery({
     queryKey: keys.thread(inference.id),
     queryFn: () => getThread(inference.id),
-    enabled: inference.status !== "proposed",
+    enabled: inference.status !== "proposed" || inference.supersedes !== null,
   });
 
   const settle = (response: ActionResponse) => {

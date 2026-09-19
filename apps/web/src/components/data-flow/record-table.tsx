@@ -6,7 +6,8 @@ import { PenLineIcon } from "lucide-react";
 import type { EgressRecord } from "@tpm/schemas";
 import { Badge } from "@/components/ui/badge";
 import { DataTable } from "@/components/data-table";
-import { InferenceLink } from "./inference-link";
+import { InferenceLink } from "@/components/inference-link";
+import { screenForPurpose } from "@/layout/screens";
 import { GuardMarks } from "./record-badges";
 
 const column = createColumnHelper<EgressRecord>();
@@ -58,7 +59,7 @@ export function RecordTable({ records, current, onOpen }: { records: EgressRecor
       column.accessor("inferenceId", {
         header: "Inference",
         sortUndefined: "last",
-        cell: ({ row }) => <InferenceLink record={row.original} className={linkClass} />,
+        cell: ({ row }) => <InferenceLink runId={row.original.runId} id={row.original.inferenceId} screen={screenForPurpose[row.original.purpose]} className={linkClass} />,
       }),
     ],
     [onOpen],

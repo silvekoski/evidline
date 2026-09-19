@@ -101,6 +101,7 @@ export const PlanInvestigationPayload = z
         claim: z.string().max(300),
         sensor: Alias.nullable(),
         onset: z.number().int().nullable(),
+        responsible: Alias.nullable(),
         baseline: PayloadWindow,
         masked: z.array(PayloadWindow).max(20),
       })

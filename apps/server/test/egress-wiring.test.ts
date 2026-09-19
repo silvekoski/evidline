@@ -49,6 +49,16 @@ describe("gateway wiring", () => {
     ]);
   });
 
+  it("drops a digit-only category value", () => {
+    f.ctx.db.sensors.saveAll([
+      { runId: "0123abcd", alias: "S03", index: 2, sourceName: "postcode.share[02100]", fingerprint: {} as never, relations: [], redundancyGroup: null, peers: [], flowIndex: 2 },
+    ]);
+    const names = forbiddenNames(f.ctx.db, "0123abcd");
+    expect(names).toContain("postcode.share[02100]");
+    expect(names).toContain("postcode");
+    expect(names).not.toContain("02100");
+  });
+
   it("drops a column header that equals a payload vocabulary word", async () => {
     f.ctx.db.runs.save(run("89abcdef", { name: "plant-b.csv", quarantined: ["State", "index", "faultNumber"] }));
     f.ctx.db.sensors.saveAll([

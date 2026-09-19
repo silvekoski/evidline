@@ -1,5 +1,5 @@
 import { ActivityIcon, ListChecksIcon, ScrollTextIcon, ShieldCheckIcon, StethoscopeIcon, TrendingUpIcon } from "lucide-react";
-import type { Lens, Stage } from "@tpm/schemas";
+import type { Lens, Purpose, Stage } from "@tpm/schemas";
 import { capitalize } from "@/lib/format";
 
 export type ScreenSlug = "sensors" | "quality" | "drift" | "diagnosis" | "log" | "data-flow";
@@ -22,5 +22,7 @@ export const screenForStage: Record<Stage, ScreenSlug> = {
   drift: "drift",
   diagnosis: "diagnosis",
 };
+
+export const screenForPurpose: Partial<Record<Purpose, ScreenSlug>> = { name_role: "sensors", compile_rule: "quality", explain_diagnosis: "diagnosis" };
 
 export const screenPath = (runId: string, slug: ScreenSlug, hash?: string) => ({ pathname: `/runs/${runId}/${slug}`, hash: hash ? `#${hash}` : "" });

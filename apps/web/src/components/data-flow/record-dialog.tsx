@@ -7,14 +7,15 @@ import { getInference, keys } from "@/api";
 import { ActionBar } from "@/components/action-bar";
 import { ConfidenceBar } from "@/components/confidence-bar";
 import { EvidenceChip } from "@/components/evidence-chip";
+import { InferenceLink } from "@/components/inference-link";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { screenForPurpose } from "@/layout/screens";
 import { formatMs, formatTime } from "@/lib/format";
-import { InferenceLink } from "./inference-link";
 import { guardState } from "./record-badges";
 import { HashMatch } from "./template-panel";
 
@@ -209,7 +210,7 @@ function RecordBody({ record, runHashes }: { record: EgressRecord; runHashes: Pa
         ) : (
           <>
             <p className="text-xs text-muted-foreground">
-              Linked inference <InferenceLink record={record} className={linkClass} />
+              Linked inference <InferenceLink runId={record.runId} id={record.inferenceId} screen={screenForPurpose[record.purpose]} className={linkClass} />
             </p>
             <LinkedInference id={record.inferenceId} />
           </>

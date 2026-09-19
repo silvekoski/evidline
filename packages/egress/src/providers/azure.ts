@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { send, type Provider } from "../gateway";
+import type { Provider } from "../gateway";
+import { send } from "./transport";
 import { jsonSchemaOf } from "./json-schema";
 
 export type AzureConfig = { endpoint: string; key: string; deployment: string; region: string | null };

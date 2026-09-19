@@ -1,20 +1,14 @@
 import type { ZodType } from "zod";
-import type { EgressPayload, EgressRecord, GuardResult, ModelMode, ModelSettings, ProviderInfo, Purpose, TemplateInfo } from "@tpm/schemas";
+import type { EgressPayload, EgressRecord, GuardResult, ModelMode, ProviderInfo, Purpose, TemplateInfo } from "@tpm/schemas";
 import { fallback, fallbackMissingReason } from "./fallback";
 import { issueSummary, payloadGuards, recordGuard } from "./guards";
 import type { LeakIndex } from "./leak";
+import { getProvider } from "./providers/from-env";
 import { roundPayload } from "./round";
 import { responseSchema, templates } from "./templates";
 
 export type Provider = ProviderInfo & { call(payloadText: string, template: string, schema: ZodType): Promise<string> };
 export type EgressStore = { write(record: EgressRecord): void; update(id: string, patch: Partial<EgressRecord>): void };
-
-export type Transport = (url: string, init: { headers: Record<string, string>; body: string }) => Promise<{ status: number; text: string }>;
-
-export const send: Transport = async (url, { headers, body }) => {
-  const res = await fetch(url, { method: "POST", headers, body, signal: AbortSignal.timeout(60_000) });
-  return { status: res.status, text: await res.text() };
-};
 
 export type CallContext = { runId: string | null; inferenceId: string | null; operatorText: boolean };
 export type CallResult<T> =
@@ -22,27 +16,35 @@ export type CallResult<T> =
 
 export type Gateway = {
   call<T>(purpose: Purpose, payload: EgressPayload, ctx: CallContext): Promise<CallResult<T>>;
+  provider(mode: ModelMode): ProviderInfo | null;
   templates(): TemplateInfo;
 };
 
 export type GatewayOptions = {
   store: EgressStore;
-  getSettings: () => ModelSettings;
-  getProvider: (mode: ModelMode) => Provider | null;
+  getMode: () => ModelMode;
   leakIndex: (runId: string | null) => LeakIndex;
   nowIso: () => string;
   newId: () => string;
+  resolveProvider?: (mode: ModelMode) => Provider | null;
 };
 
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 const noProviderMessage = (mode: ModelMode) => `no provider configured for mode ${mode}`;
+const infoOf = ({ name, model, region, host }: Provider): ProviderInfo => ({ name, model, region, host });
 
 export function createGateway(opts: GatewayOptions): Gateway {
+  const resolve = opts.resolveProvider ?? getProvider;
+  const providerFor = (mode: ModelMode): Provider | null => (mode === "off" ? null : resolve(mode));
   return {
     templates: () => templates(),
+    provider(mode) {
+      const provider = providerFor(mode);
+      return provider === null ? null : infoOf(provider);
+    },
     async call<T>(purpose: Purpose, payload: EgressPayload, ctx: CallContext): Promise<CallResult<T>> {
-      const { mode } = opts.getSettings();
-      const provider = mode === "off" ? null : opts.getProvider(mode);
+      const mode = opts.getMode();
+      const provider = providerFor(mode);
       const text = JSON.stringify(roundPayload(payload));
       const input = { purpose, payload, text, index: opts.leakIndex(ctx.runId) };
       const guards: GuardResult[] = [];
@@ -60,7 +62,7 @@ export function createGateway(opts: GatewayOptions): Gateway {
         time: opts.nowIso(),
         purpose,
         mode,
-        provider: provider ? { name: provider.name, model: provider.model, region: provider.region, host: provider.host } : null,
+        provider: provider === null ? null : infoOf(provider),
         payload: text,
         payloadBytes: Buffer.byteLength(text, "utf8"),
         guards: [...guards, recordGuard(id)],

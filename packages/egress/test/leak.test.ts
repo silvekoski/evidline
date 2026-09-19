@@ -73,6 +73,12 @@ describe("leak index", () => {
     expect(scanForLeaks("values 0 1 2", small).valueHits).toBe(1);
   });
 
+  it("does not match a forbidden name against the counter of an evidence id or an alias", () => {
+    const codes = buildLeakIndex([], ["02100", "S01"]);
+    expect(scanForLeaks('{"evidenceIds":["ev-cd8a167a-02100","ev-cd8a167a-02101"],"sensor":"S01"}', codes).nameHits).toBe(0);
+    expect(scanForLeaks('{"question":"orders from 02100 dropped"}', codes).nameHits).toBe(1);
+  });
+
   it("counts a run inside one JSON value and skips a flat run", () => {
     const small = buildLeakIndex([{ alias: "S01", values: Float64Array.from([0, 1, 0, 0, 0, 5, 5, 5, 22.2, 22.2, 22.2]) }], []);
     expect(scanForLeaks('{"p95":0,"p99":1,"mad":0}', small).valueHits).toBe(0);

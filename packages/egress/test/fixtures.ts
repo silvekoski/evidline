@@ -69,7 +69,7 @@ export const explainPayload: EgressPayload = {
   ],
 };
 
-export const planPayload = (stage: string, question = "Is this right?", sensor: string | null = "S03"): EgressPayload => ({
+export const planPayload = (stage: string, question = "Is this right?", sensor: string | null = "S03", responsible: string | null = null): EgressPayload => ({
   purpose: "plan_investigation",
   question,
   dt: 180000,
@@ -79,6 +79,7 @@ export const planPayload = (stage: string, question = "Is this right?", sensor: 
     claim: "S03 drifts from sample 12000",
     sensor,
     onset: 12000,
+    responsible,
     baseline: { from: 0, to: 9000 },
     masked: [{ from: 15000, to: 20000 }],
   },
@@ -133,8 +134,8 @@ export function testGateway(opts: { mode: ModelMode; provider?: Provider | null;
   let counter = 0;
   const gateway = createGateway({
     store,
-    getSettings: () => ({ mode: opts.mode, provider: null }),
-    getProvider: () => opts.provider ?? null,
+    getMode: () => opts.mode,
+    resolveProvider: () => opts.provider ?? null,
     leakIndex: () => opts.index ?? buildLeakIndex([], []),
     nowIso: () => "2026-09-19T12:00:00Z",
     newId: () => `eg-${String(++counter).padStart(3, "0")}`,

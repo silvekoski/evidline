@@ -74,6 +74,7 @@ export const keys = {
   evidence: (id: string) => ["evidence", id] as const,
   evidenceSeries: (id: string) => ["evidence", id, "series"] as const,
   inference: (id: string) => ["inferences", id] as const,
+  inferenceHead: (id: string) => ["inferences", id, "head"] as const,
   thread: (id: string) => ["inferences", id, "thread"] as const,
   log: (runId?: string) => ["log", runId ?? "all"] as const,
   logVerify: ["log", "verify"] as const,
@@ -101,6 +102,7 @@ export const runModelCalls = (runId: string) => request(nothing, `/runs/${runId}
 export const getEvidence = (id: string) => request(Evidence, `/evidence/${id}`);
 export const getEvidenceSeries = (id: string) => request(EvidenceSeries, `/evidence/${id}/series`);
 export const getInference = (id: string) => request(Inference, `/inferences/${id}`);
+export const getInferenceHead = (id: string) => request(Inference, `/inferences/${id}/head`);
 export const getThread = (id: string) => request(arrayOf(ThreadEntry), `/inferences/${id}/thread`);
 export const acceptInference = (id: string) => request(ActionResponse, `/inferences/${id}/accept`, post());
 export const questionInference = (id: string, text: string) =>

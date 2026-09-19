@@ -8,7 +8,7 @@ const payloads: Record<Purpose, EgressPayload> = {
   name_role: nameRolePayload,
   compile_rule: compileRulePayload("S03 must stay below 20"),
   explain_diagnosis: explainPayload,
-  plan_investigation: planPayload("drift"),
+  plan_investigation: planPayload("drift", undefined, "S03", "S04"),
 };
 
 describe("gateway with a mock provider", () => {
@@ -87,8 +87,8 @@ describe("gateway with a mock provider", () => {
         },
         update: () => undefined,
       },
-      getSettings: () => ({ mode: "cloud", provider: null }),
-      getProvider: () => provider,
+      getMode: () => "cloud",
+      resolveProvider: () => provider,
       leakIndex: () => buildLeakIndex([], []),
       nowIso: () => "2026-09-19T12:00:00Z",
       newId: () => "eg-x",

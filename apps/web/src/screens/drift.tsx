@@ -4,6 +4,7 @@ import { useLocation } from "react-router";
 import { TrendingUpIcon } from "lucide-react";
 import { getDrift, keys } from "@/api";
 import { useActiveRunId } from "@/hooks/use-active-run-id";
+import { useHeadId } from "@/hooks/use-head-id";
 import { useLens } from "@/hooks/use-lens";
 import { useRun } from "@/hooks/use-run";
 import { useTimeBase } from "@/hooks/use-time-base";
@@ -28,7 +29,7 @@ export function DriftScreen() {
 
   const sorted = [...(report.data?.drifts ?? [])].sort((a, b) => b.value.severity - a.value.severity || a.value.sensor.localeCompare(b.value.sensor));
   const drifting = sorted.filter((d) => d.value.drifting);
-  const target = hash.slice(1);
+  const target = useHeadId(hash.slice(1), report.data !== undefined && !sorted.some((d) => d.id === hash.slice(1)));
   const selected = sorted.find((d) => d.id === target || d.value.sensor === target) ?? sorted[0];
   const visible = filter === "drifting" ? drifting : sorted;
   const aliases = new Set(sorted.map((d) => d.value.sensor));

@@ -5,6 +5,7 @@ import { StethoscopeIcon } from "lucide-react";
 import { faultFamily, type DiagnosisInference, type FaultFamily } from "@tpm/schemas";
 import { getIncidents, getSensors, keys } from "@/api";
 import { useActiveRunId } from "@/hooks/use-active-run-id";
+import { useHeadId } from "@/hooks/use-head-id";
 import { useLens } from "@/hooks/use-lens";
 import { useRun } from "@/hooks/use-run";
 import { useTimeBase } from "@/hooks/use-time-base";
@@ -40,8 +41,8 @@ export function DiagnosisScreen() {
   const sensors = useQuery({ queryKey: keys.sensors(runId), queryFn: () => getSensors(runId), enabled: runId !== "" });
   const health = new Map((sensors.data?.sensors ?? []).map((s) => [s.alias, s.health]));
 
-  const target = hash.slice(1);
   const list = incidents.data?.incidents ?? [];
+  const target = useHeadId(hash.slice(1), incidents.data !== undefined && !list.some((i) => i.id === hash.slice(1)));
   const current = list.find((i) => i.id === target) ?? list.find((i) => mentions(i, target)) ?? null;
   const highlight = current && current.id !== target ? target : null;
 

@@ -33,6 +33,13 @@ describe("repositories", () => {
     expect(f.ctx.db.grids.load("nope")).toBeNull();
   });
 
+  it("round-trips the sibling sets of a records grid", () => {
+    const records: Grid = { ...grid, aliases: ["S01", "S02", "S03", "S04"], values: [...grid.values, ...grid.values], siblings: [["S02", "S04"]] };
+    f.ctx.db.grids.save("0123abcd", records);
+    expect(f.ctx.db.grids.load("0123abcd")).toEqual(records);
+    expect(f.ctx.db.grids.series("0123abcd").map((s) => s.alias)).toEqual(["S01", "S02", "S03", "S04"]);
+  });
+
   it("stores evidence with derived series and inferences by stage", () => {
     const evidence: Evidence = {
       id: "ev-0123abcd-00001",

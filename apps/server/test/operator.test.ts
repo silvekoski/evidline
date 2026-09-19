@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { ActionResponse, type DiagnosisInference, type Inference, type RoleInference } from "@tpm/schemas";
+import { ActionResponse, Inference, type DiagnosisInference, type RoleInference } from "@tpm/schemas";
 import type { PipelineOutput } from "../src/pipeline-worker";
 import { appendLog } from "../src/log";
-import { addThread, headOf, outcome, overridesOf, threadOf } from "../src/operator";
+import { addThread, changedPairs, headOf, outcome, overridesOf, threadOf } from "../src/operator";
 import { fixture, run, type Fixture } from "./fixture";
 
 const runId = "0123abcd";
@@ -67,6 +67,19 @@ describe("outcome", () => {
   });
 });
 
+describe("changedPairs", () => {
+  const child = (i: Inference, patch: Partial<Inference["value"]> = {}): Inference =>
+    ({ ...i, runId: "89abcdef", id: i.id.replace(runId, "89abcdef"), evidenceIds: [`ev-89abcdef-00001`], value: { ...i.value, ...patch } }) as Inference;
+
+  it("ignores model text and evidence run ids and reports engine changes only", () => {
+    const named = role(1, "S01", "controlled", { value: { ...role(1, "S01", "controlled").value, hypothesisName: "pressure", hypothesisConfidence: 0.6 } });
+    const explained: DiagnosisInference = { ...diagnosis, value: { ...diagnosis.value, prose: { text: "Process fault.", source: "model", validation: { pass: true, errors: [], sentences: [] } } } };
+    const before = [named, role(2, "S02", "actuator"), explained];
+    const after = [child(named, { hypothesisName: null, hypothesisConfidence: null }), child(role(2, "S02", "actuator"), { role: "setpoint" }), child(explained, { prose: null })];
+    expect(changedPairs(before, after).map((p) => [p.before.id, p.after.id])).toEqual([["inf-0123abcd-00002", "inf-89abcdef-00002"]]);
+  });
+});
+
 describe("supersedes chain", () => {
   let f: Fixture;
   beforeEach(() => {
@@ -92,6 +105,10 @@ describe("supersedes chain", () => {
     const child = role(1, "S01", "controlled", { runId: "89abcdef", id: "inf-89abcdef-00001", supersedes: second.id });
     f.ctx.db.inferences.saveAll([first, second, child]);
     expect(headOf(f.ctx.db, first).id).toBe(second.id);
+    const head = await f.app.request(`/api/inferences/${first.id}/head`);
+    expect(head.status).toBe(200);
+    expect(Inference.parse(await head.json())).toMatchObject({ id: second.id, status: "proposed" });
+    expect((await f.app.request("/api/inferences/inf-0123abcd-00099/head")).status).toBe(404);
     const res = await f.app.request(`/api/inferences/${first.id}/accept`, { method: "POST" });
     expect(res.status).toBe(200);
     const action = ActionResponse.parse(await res.json());

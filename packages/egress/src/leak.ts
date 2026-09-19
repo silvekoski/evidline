@@ -1,5 +1,5 @@
 import { roundSig } from "./round";
-import { escapeRegExp, numberToken } from "./tokens";
+import { aliasToken, escapeRegExp, evidenceIdToken, numberToken } from "./tokens";
 
 export type LeakIndex = { has(triple: [number, number, number]): boolean; names: string[]; size: number };
 
@@ -89,11 +89,12 @@ export function scanValues(payloadText: string, index: LeakIndex): { hits: numbe
 }
 
 export function scanNames(payloadText: string, index: LeakIndex): { hits: number; detail: string } {
+  const text = payloadText.replace(evidenceIdToken, " ").replace(aliasToken, " ");
   const found: string[] = [];
   let hits = 0;
   for (const name of index.names) {
     const pattern = new RegExp(`(?<!\\w)${escapeRegExp(JSON.stringify(name).slice(1, -1))}(?!\\w)`, "gi");
-    const count = payloadText.match(pattern)?.length ?? 0;
+    const count = text.match(pattern)?.length ?? 0;
     if (count > 0) {
       hits += count;
       found.push(name);

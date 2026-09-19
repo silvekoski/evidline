@@ -111,7 +111,7 @@ function questionCenter(question: string, dt: number | null): number | null {
 }
 
 function plan(p: PayloadOf<"plan_investigation">): PlanInvestigationResponse | null {
-  const { stage, sensor, onset, baseline, masked } = p.inference;
+  const { stage, sensor, onset, responsible, baseline, masked } = p.inference;
   const span = Math.max(1, Math.round(0.02 * p.n));
   const center = questionCenter(p.question, p.dt);
   const rest = { from: baseline.to, to: p.n };
@@ -120,7 +120,8 @@ function plan(p: PayloadOf<"plan_investigation">): PlanInvestigationResponse | n
     const role = p.catalog.find((c) => c.alias === sensor)?.role ?? "unknown";
     calls.push({ tool: "test_role", sensor, role }, { tool: "compare_windows", sensor, a: baseline, b: rest });
   } else if (stage === "drift" && sensor) {
-    calls.push({ tool: "find_changepoints", sensor, near: center ?? onset ?? baseline.to, span }, { tool: "rerun_without", sensor });
+    calls.push({ tool: "find_changepoints", sensor, near: center ?? onset ?? baseline.to, span });
+    if (responsible !== null) calls.push({ tool: "rerun_without", sensor: responsible });
   } else if (stage === "diagnosis" && sensor) {
     const incident = { from: onset ?? masked[0]?.from ?? baseline.to, to: p.n };
     calls.push({ tool: "rerun_without", sensor }, { tool: "compare_windows", sensor, a: baseline, b: incident });

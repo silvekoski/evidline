@@ -25,6 +25,7 @@ export function inferencesRoutes(ctx: AppContext) {
 
   return new Hono()
     .get("/:id", (c) => c.json(inferenceOf(c.req.param("id"))))
+    .get("/:id/head", (c) => c.json(headOf(db, inferenceOf(c.req.param("id")))))
     .get("/:id/thread", (c) => c.json(threadOf(db, inferenceOf(c.req.param("id")))))
     .post("/:id/accept", (c) => {
       const accepted = db.transaction(() => {

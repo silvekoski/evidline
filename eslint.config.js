@@ -9,9 +9,10 @@ const outboundModules = [
 ];
 const outboundPatterns = outboundModules.flatMap((m) => [m, `${m}/*`]);
 const outboundGlobals = ["fetch", "WebSocket", "XMLHttpRequest", "EventSource", "Request", "navigator"];
+const egressInternals = { name: "@tpm/egress", importNames: ["send", "getProvider", "createOpenAiProvider", "createAzureProvider", "createOllamaProvider"], message: "Only the gateway may call a model." };
 
 const noOutbound = {
-  "no-restricted-imports": ["error", { patterns: [{ group: outboundPatterns, message: "Only packages/egress may reach the network." }] }],
+  "no-restricted-imports": ["error", { paths: [egressInternals], patterns: [{ group: outboundPatterns, message: "Only packages/egress may reach the network." }] }],
   "no-restricted-globals": ["error", ...outboundGlobals.map((name) => ({ name, message: "Only packages/egress may reach the network." }))],
   "no-restricted-syntax": [
     "error",
@@ -23,7 +24,7 @@ const noOutbound = {
 
 const pureCore = {
   ...noOutbound,
-  "no-restricted-imports": ["error", { patterns: [{ group: ["node:*", "fs", "path", "os", "worker_threads", "crypto", "stream", "events", ...outboundPatterns], message: "packages/core is pure. No I/O." }] }],
+  "no-restricted-imports": ["error", { paths: [egressInternals], patterns: [{ group: ["node:*", "fs", "path", "os", "worker_threads", "crypto", "stream", "events", ...outboundPatterns], message: "packages/core is pure. No I/O." }] }],
 };
 
 export default tseslint.config(

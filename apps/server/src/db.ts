@@ -76,7 +76,15 @@ function defineTable<T extends object>(
   };
 }
 
-const reservedGridKeys = new Set(["time", "episodes"]);
+const reservedGridKeys = new Set(["time", "episodes", "siblings"]);
+
+function siblingSets(aliases: string[], membership: Float64Array): string[][] {
+  const sets = new Map<number, string[]>();
+  membership.forEach((set, i) => {
+    if (set >= 0) sets.set(set, [...(sets.get(set) ?? []), aliases[i]!]);
+  });
+  return [...sets.values()];
+}
 
 export function openDb(path: string = process.env.DB_PATH ?? dbPath) {
   if (path !== ":memory:") mkdirSync(dirname(path), { recursive: true });
@@ -225,6 +233,10 @@ export function openDb(path: string = process.env.DB_PATH ?? dbPath) {
           });
           if (grid.time) grids.upsert({ runId, alias: "time", values: grid.time });
           grids.upsert({ runId, alias: "episodes", values: Float64Array.from([...grid.episodes.map((e) => e.from), grid.n]) });
+          if (grid.siblings) {
+            const setOf = new Map(grid.siblings.flatMap((set, s) => set.map((alias) => [alias, s] as const)));
+            grids.upsert({ runId, alias: "siblings", values: Float64Array.from(grid.aliases, (alias) => setOf.get(alias) ?? -1) });
+          }
         }),
       series: (runId: string): GridSeries[] =>
         grids.many("WHERE run_id = ? ORDER BY length(alias), alias", runId).filter((row) => !reservedGridKeys.has(row.alias)),
@@ -235,14 +247,17 @@ export function openDb(path: string = process.env.DB_PATH ?? dbPath) {
         const run = runs.one("WHERE id = ?", runId);
         if (!bounds || !run) return null;
         const series = rows.filter((row) => !reservedGridKeys.has(row.alias));
+        const aliases = series.map((row) => row.alias);
         const starts = Array.from(bounds.subarray(0, bounds.length - 1));
+        const membership = rows.find((row) => row.alias === "siblings")?.values;
         return {
-          aliases: series.map((row) => row.alias),
+          aliases,
           values: series.map((row) => row.values),
           n: bounds[bounds.length - 1] ?? 0,
           dt: run.timeBase.dt,
           time: rows.find((row) => row.alias === "time")?.values ?? null,
           episodes: starts.map((from, i) => ({ from, to: bounds[i + 1] ?? from, n: (bounds[i + 1] ?? from) - from })),
+          ...(membership ? { siblings: siblingSets(aliases, membership) } : {}),
         };
       },
     },

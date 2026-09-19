@@ -61,17 +61,18 @@ describe("explain_diagnosis fallback", () => {
 });
 
 describe("plan_investigation fallback", () => {
-  const plan = (stage: string, question?: string, sensor?: string | null) =>
-    (fallback("plan_investigation", planPayload(stage, question, sensor)) as PlanInvestigationResponse | null)?.calls ?? null;
+  const plan = (stage: string, question?: string, sensor?: string | null, responsible?: string | null) =>
+    (fallback("plan_investigation", planPayload(stage, question, sensor, responsible)) as PlanInvestigationResponse | null)?.calls ?? null;
 
   it("plans by stage", () => {
     expect(plan("role")).toEqual([
       { tool: "test_role", sensor: "S03", role: "controlled" },
       { tool: "compare_windows", sensor: "S03", a: { from: 0, to: 9000 }, b: { from: 9000, to: 20000 } },
     ]);
-    expect(plan("drift")).toEqual([
+    expect(plan("drift")).toEqual([{ tool: "find_changepoints", sensor: "S03", near: 12000, span: 400 }]);
+    expect(plan("drift", undefined, "S03", "S04")).toEqual([
       { tool: "find_changepoints", sensor: "S03", near: 12000, span: 400 },
-      { tool: "rerun_without", sensor: "S03" },
+      { tool: "rerun_without", sensor: "S04" },
     ]);
     expect(plan("diagnosis")).toEqual([
       { tool: "rerun_without", sensor: "S03" },

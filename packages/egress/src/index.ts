@@ -18,18 +18,4 @@ export {
 export { responseSchema, templates } from "./templates";
 export { fallback, fallbackMissingReason, ruleSentenceForms } from "./fallback";
 export { validateProse } from "./validator";
-export {
-  createGateway,
-  send,
-  type CallContext,
-  type CallResult,
-  type EgressStore,
-  type Gateway,
-  type GatewayOptions,
-  type Provider,
-  type Transport,
-} from "./gateway";
-export { createAzureProvider, type AzureConfig } from "./providers/azure";
-export { createOllamaProvider, type OllamaConfig } from "./providers/ollama";
-export { createOpenAiProvider, type OpenAiConfig } from "./providers/openai";
-export { getProvider } from "./providers/from-env";
+export { createGateway, type CallContext, type CallResult, type EgressStore, type Gateway, type GatewayOptions, type Provider } from "./gateway";

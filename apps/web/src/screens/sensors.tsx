@@ -11,6 +11,7 @@ import { StructureStrip } from "@/components/sensors/structure-strip";
 import { useOpenSensor } from "@/components/sensors/use-open-sensor";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useActiveRunId } from "@/hooks/use-active-run-id";
+import { useHeadId } from "@/hooks/use-head-id";
 import { useLens } from "@/hooks/use-lens";
 import { useRun } from "@/hooks/use-run";
 import { capitalize } from "@/lib/format";
@@ -23,10 +24,9 @@ export function SensorsScreen() {
   const target = decodeURIComponent(useLocation().hash.slice(1));
   const open = useOpenSensor();
   const sensors = report.data?.sensors ?? [];
-  const selected =
-    target === ""
-      ? null
-      : (sensors.find((s) => s.alias === target || s.roleInferenceId === target || s.healthInferenceId === target || s.driftInferenceId === target) ?? null);
+  const rowOf = (id: string) => sensors.find((s) => s.alias === id || s.roleInferenceId === id || s.healthInferenceId === id || s.driftInferenceId === id) ?? null;
+  const id = useHeadId(target, report.data !== undefined && rowOf(target) === null);
+  const selected = target === "" ? null : rowOf(id);
   const alias = selected?.alias ?? null;
 
   useScrollTarget(alias);
@@ -61,7 +61,7 @@ export function SensorsScreen() {
             run={run.data}
             report={report.data}
             row={selected}
-            initialTab={target === selected?.roleInferenceId ? "roles" : "fingerprint"}
+            initialTab={id === selected?.roleInferenceId ? "roles" : "fingerprint"}
             lens={lens}
             onClose={() => open(null)}
           />

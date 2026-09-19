@@ -63,7 +63,7 @@ const text: Record<Purpose, string> = {
   ].join("\n"),
   plan_investigation: [
     "You plan an investigation for one operator question about one inference.",
-    "You get a JSON object: question, dt, n, inference (stage, claim, sensor, onset, baseline window, masked windows),",
+    "You get a JSON object: question, dt, n, inference (stage, claim, sensor, onset, responsible sensor, baseline window, masked windows),",
     "a catalog of sensors with alias, signal type and role, and the list of tool names.",
     "Use only aliases from the catalog and only tools from the list. Pick 1 to 4 tool calls that test the question.",
     units,

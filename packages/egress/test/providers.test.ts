@@ -1,7 +1,10 @@
 import { createServer, type IncomingMessage, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createAzureProvider, createOllamaProvider, getProvider, templates } from "../src/index";
+import { templates } from "../src/index";
+import { createAzureProvider } from "../src/providers/azure";
+import { getProvider } from "../src/providers/from-env";
+import { createOllamaProvider } from "../src/providers/ollama";
 import { nameRolePayload, replies, testGateway } from "./fixtures";
 
 type Seen = { method: string; url: string; headers: IncomingMessage["headers"]; body: Record<string, unknown> };

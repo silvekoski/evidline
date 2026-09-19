@@ -74,8 +74,8 @@ const store = memoryStore();
 let counter = 0;
 const gateway = createGateway({
   store,
-  getSettings: () => ({ mode: "cloud", provider: null }),
-  getProvider: () => provider,
+  getMode: () => "cloud",
+  resolveProvider: () => provider,
   leakIndex: () => index,
   nowIso: () => new Date().toISOString(),
   newId: () => `eg-${RUN_ID}-${String(++counter).padStart(5, "0")}`,
@@ -138,7 +138,7 @@ const payloads: EgressPayload[] = [
     question: "Is S01 drifting?",
     dt: grid.dt,
     n: N,
-    inference: { stage: "drift", claim: result.drifts[0]!.claim.slice(0, 300), sensor: "S01", onset: result.drifts[0]!.value.onset, baseline: { from: 0, to: result.baseline.value.window.to }, masked: [] },
+    inference: { stage: "drift", claim: result.drifts[0]!.claim.slice(0, 300), sensor: "S01", onset: result.drifts[0]!.value.onset, responsible: result.drifts[0]!.value.responsible, baseline: { from: 0, to: result.baseline.value.window.to }, masked: [] },
     catalog,
     tools: ["compare_windows", "test_relation", "find_changepoints", "rerun_without", "test_role", "check_rule"],
   },
