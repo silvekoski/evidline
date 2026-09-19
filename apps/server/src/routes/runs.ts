@@ -2,9 +2,10 @@ import { statSync } from "node:fs";
 import { isAbsolute, relative, resolve } from "node:path";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
-import { CreateRunBody, SearchBody, type DriftReport, type IncidentReport, type Run, type SearchResponse, type SearchResult } from "@tpm/schemas";
+import { CreateRunBody, SearchBody, type DriftReport, type IncidentReport, type RoleInference, type Run, type SearchResponse, type SearchResult } from "@tpm/schemas";
 import type { AppContext } from "../context";
 import { runModelCalls } from "../model-calls";
+import { nameCheckJob, runNameChecks } from "../name-checks";
 import { driftReport, incidentReport, laneReport, qualityReport, sensorDetail, sensorReport } from "../reports";
 import { badRequest, notFound, parseBody } from "../request";
 import { startRun } from "../run-service";
@@ -49,6 +50,19 @@ export function runsRoutes(ctx: AppContext) {
       const result = await ctx.gateway.call<SearchResponse>("search", payload, { runId: run.id, inferenceId: null, operatorText: true });
       if (!result.ok) throw new HTTPException(422, { message: result.reason });
       return c.json({ query: result.value, egressId: result.recordId } satisfies SearchResult);
+    })
+    .get("/:id/name-checks", (c) => {
+      const run = runOf(c.req.param("id"));
+      return c.json({ pending: nameCheckJob(run.id), models: ctx.gateway.reviewers().map((r) => r.model) });
+    })
+    .post("/:id/name-checks", async (c) => {
+      const run = runOf(c.req.param("id"));
+      if (run.status !== "done") throw new HTTPException(409, { message: `run ${run.id} is ${run.status}` });
+      if (ctx.gateway.reviewers().length === 0) throw new HTTPException(422, { message: "no reviewer: set TPM_REVIEW_KEY and mode cloud" });
+      const heads = ctx.db.inferences.list(run.id, "role").filter((i): i is RoleInference => i.stage === "role" && i.status !== "revised");
+      if (nameCheckJob(run.id)) throw new HTTPException(409, { message: `name checks for run ${run.id} are in flight` });
+      void runNameChecks(ctx, run.id, heads).catch((e: unknown) => ctx.log(`name checks failed: ${e instanceof Error ? e.message : String(e)}`));
+      return c.json({ runId: run.id, sensors: heads.length, models: ctx.gateway.reviewers().map((r) => r.model) }, 202);
     })
     .post("/:id/model-calls", async (c) => {
       const run = runOf(c.req.param("id"));

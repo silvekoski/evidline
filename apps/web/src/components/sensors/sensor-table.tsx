@@ -18,6 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { DataTable } from "@/components/data-table";
 import { HealthBadge } from "./health-badge";
 import { Hypothesis } from "./hypothesis";
+import { NameCheckMarks } from "./name-checks";
 import { KnowledgeCell } from "./knowledge-cell";
 import { useOpenSensor } from "./use-open-sensor";
 
@@ -38,7 +39,12 @@ const columns = [
   column.accessor((row) => row.hypothesisName ?? "", {
     id: "hypothesisName",
     header: "Hypothesis",
-    cell: ({ row }) => <Hypothesis name={row.original.hypothesisName} />,
+    cell: ({ row }) => (
+      <span className="inline-flex flex-wrap items-center gap-2">
+        <Hypothesis name={row.original.hypothesisName} />
+        <NameCheckMarks checks={row.original.nameChecks} />
+      </span>
+    ),
   }),
   column.display({
     id: "knowledge",

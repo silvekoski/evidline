@@ -13,8 +13,10 @@ import { ConnectorsScreen } from "@/screens/connectors";
 import { DataFlowScreen } from "@/screens/data-flow";
 import { DiagnosisScreen } from "@/screens/diagnosis";
 import { DriftScreen } from "@/screens/drift";
+import { LoginScreen } from "@/screens/login";
 import { LogScreen } from "@/screens/log";
 import { OpenQuestionsScreen } from "@/screens/open-questions";
+import { ProfileScreen } from "@/screens/profile";
 import { PublicUploadScreen } from "@/screens/public-upload";
 import { QualityScreen } from "@/screens/quality";
 import { RunScreen } from "@/screens/run";
@@ -49,6 +51,7 @@ const routes = [
       { path: "open-questions", element: <OpenQuestionsScreen /> },
       { path: "spec", element: <SpecScreen /> },
       { path: "connectors", element: <ConnectorsScreen /> },
+      { path: "profile", element: <ProfileScreen /> },
     ],
   },
 ];
@@ -75,6 +78,7 @@ function WorkspaceApp({ slug, onSwitch }: { slug: string; onSwitch: (slug: strin
 export function App() {
   const [slug, setSlug] = useState(() => workspaceSlug());
   const [publicToken] = useState(() => /^\/upload\/([A-Za-z0-9_-]+)$/.exec(window.location.pathname)?.[1] ?? null);
+  const [isLoginRoute] = useState(() => window.location.pathname === "/login");
   useEffect(() => {
     const onPop = () => setSlug(workspaceSlug());
     window.addEventListener("popstate", onPop);
@@ -91,7 +95,9 @@ export function App() {
   const rootClient = useMemo(makeQueryClient, []);
   return (
     <>
-      {publicToken ? (
+      {isLoginRoute ? (
+        <LoginScreen />
+      ) : publicToken ? (
         <QueryClientProvider client={rootClient}>
           <PublicUploadScreen token={publicToken} />
         </QueryClientProvider>

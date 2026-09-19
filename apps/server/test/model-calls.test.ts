@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { EgressPayload, type DiagnosisInference, type Evidence, type RoleInference } from "@tpm/schemas";
 import { verifyLog } from "../src/log";
 import { runModelCalls } from "../src/model-calls";
@@ -6,6 +6,7 @@ import { addThread, threadOf } from "../src/operator";
 import { explanationPayload } from "../src/payloads";
 import { createInference } from "../src/persist";
 import { fixture, run, type Fixture } from "./fixture";
+import { namesAgree } from "../src/name-checks";
 
 let f: Fixture;
 const evidenceId = "ev-0123abcd-00001";
@@ -121,4 +122,13 @@ it("caps naming concurrency at four and preserves deterministic roles", async ()
     expect(role.stage === "role" && role.value.role).toBe("controlled");
     expect(role.stage === "role" && role.value.hypothesisName).toBe("Temperature");
   }
+});
+
+describe("name agreement", () => {
+  it("compares names by shared content words", () => {
+    expect(namesAgree("Reactor pressure", "reactor pressure (kPa)")).toBe(true);
+    expect(namesAgree("Valve Position Feedback", "valve position")).toBe(true);
+    expect(namesAgree("Process temperature", "Production Cycle Counter")).toBe(false);
+    expect(namesAgree(null, "x")).toBeNull();
+  });
 });

@@ -57,6 +57,7 @@ export const SensorRow = z.object({
   healthInferenceId: z.string(),
   driftInferenceId: z.string().nullable(),
   notes: z.array(z.string()),
+  nameChecks: z.array(z.object({ model: z.string(), name: z.string().nullable(), agrees: z.boolean().nullable() })),
 });
 export type SensorRow = z.infer<typeof SensorRow>;
 

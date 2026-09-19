@@ -43,6 +43,8 @@ import {
   LaneReport,
   QualityReport,
   ReviewReport,
+  NameCheckReport,
+  NameCheckJob,
   Run,
   RunEvent,
   RunList,
@@ -110,6 +112,8 @@ export const keys = {
   evidenceSeries: (id: string) => ["evidence", id, "series"] as const,
   inference: (id: string) => ["inferences", id] as const,
   inferenceHead: (id: string) => ["inferences", id, "head"] as const,
+  nameChecks: (id: string) => ["inferences", id, "name-checks"] as const,
+  nameCheckStatus: (runId: string) => ["runs", runId, "name-checks"] as const,
   thread: (id: string) => ["inferences", id, "thread"] as const,
   reviews: (id: string) => ["inferences", id, "reviews"] as const,
   log: (runId?: string) => ["log", runId ?? "all"] as const,
@@ -213,6 +217,11 @@ export const getInference = (id: string) => request(Inference, `/inferences/${id
 export const getInferenceHead = (id: string) => request(Inference, `/inferences/${id}/head`);
 export const getThread = (id: string) => request(arrayOf(ThreadEntry), `/inferences/${id}/thread`);
 export const getReviews = (id: string) => request(ReviewReport, `/inferences/${id}/reviews`);
+const NameCheckStatus = { parse: (x: unknown) => x as { pending: NameCheckJob | null; models: string[] } };
+export const getNameCheckStatus = (runId: string) => request(NameCheckStatus, `/runs/${runId}/name-checks`);
+export const startNameChecks = (runId: string) => request({ parse: (x) => x as { runId: string; sensors: number; models: string[] } }, `/runs/${runId}/name-checks`, post());
+export const getNameChecks = (id: string) => request(NameCheckReport, `/inferences/${id}/name-checks`);
+export const requestNameCheck = (id: string) => request(NameCheckReport, `/inferences/${id}/name-check`, post());
 export const requestReview = (id: string) => request(ReviewReport, `/inferences/${id}/review`, post());
 export const acceptInference = (id: string) => request(ActionResponse, `/inferences/${id}/accept`, post());
 export const questionInference = (id: string, text: string) =>

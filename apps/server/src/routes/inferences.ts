@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
-import { OverrideBody, QuestionBody, type ActionResponse, type DiagnosisInference, type Inference, type OverrideValue, type PlanInvestigationResponse, type Stage } from "@tpm/schemas";
+import { OverrideBody, QuestionBody, type ActionResponse, type DiagnosisInference,
+  type RoleInference, type Inference, type OverrideValue, type PlanInvestigationResponse, type Stage } from "@tpm/schemas";
 import type { AppContext } from "../context";
 import { executeTool, type ToolResult } from "../investigation-tools";
 import { appendLog, type LogInput } from "../log";
@@ -8,6 +9,7 @@ import { addThread, changedPairs, clampCall, describeCall, describeOverride, hea
 import { createInference, leadSensor, storedSource, type InferenceDraft } from "../persist";
 import { currentInferences } from "../reports";
 import { badRequest, notFound, parseBody } from "../request";
+import { nameCheckReport, runNameChecks } from "../name-checks";
 import { reviewJob, reviewReport, runReviews } from "../reviews";
 import { startRun } from "../run-service";
 import { getModelMode } from "../settings";
@@ -25,6 +27,11 @@ export function inferencesRoutes(ctx: AppContext) {
     appendLog(db, { type, actor, runId: inference.runId, inferenceId: inference.id, evidenceIds: [], egressId: null, before: null, after: null, reason: null, ...patch });
   };
   const response = (inference: Inference, rerunId: string | null, changed: ActionResponse["changed"]): ActionResponse => ({ inference, thread: threadOf(db, inference), rerunId, changed });
+  const roleOf = (id: string): RoleInference => {
+    const head = headOf(db, inferenceOf(id));
+    if (head.stage !== "role") throw badRequest("name checks exist for a role only");
+    return head;
+  };
   const diagnosisOf = (id: string): DiagnosisInference => {
     const head = headOf(db, inferenceOf(id));
     if (head.stage !== "diagnosis") throw badRequest("reviews exist for a diagnosis only");
@@ -35,6 +42,13 @@ export function inferencesRoutes(ctx: AppContext) {
     .get("/:id", (c) => c.json(inferenceOf(c.req.param("id"))))
     .get("/:id/head", (c) => c.json(headOf(db, inferenceOf(c.req.param("id")))))
     .get("/:id/thread", (c) => c.json(threadOf(db, inferenceOf(c.req.param("id")))))
+    .get("/:id/name-checks", (c) => c.json(nameCheckReport(ctx, roleOf(c.req.param("id")))))
+    .post("/:id/name-check", async (c) => {
+      const head = roleOf(c.req.param("id"));
+      if (ctx.gateway.reviewers().length === 0) throw new HTTPException(422, { message: "no reviewer: set TPM_REVIEW_KEY and mode cloud" });
+      if (!(await runNameChecks(ctx, head.runId, [head]))) throw new HTTPException(409, { message: "name checks for this run are in flight" });
+      return c.json(nameCheckReport(ctx, head));
+    })
     .get("/:id/reviews", (c) => c.json(reviewReport(ctx, diagnosisOf(c.req.param("id")))))
     .post("/:id/review", (c) => {
       const head = diagnosisOf(c.req.param("id"));

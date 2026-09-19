@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import type { ZodType } from "zod";
 import {
+  CheckNameResponse,
   CompileRuleResponse,
   CrossReviewResponse,
   ExplainDiagnosisResponse,
@@ -37,6 +38,17 @@ const text: Record<Purpose, string> = {
     "histogram shares, noise, acfTime, period, flat share, monotonic share, distinct values, hold,",
     "the role from the engine with its confidence, and the peers it leads and follows with lag, rho and n.",
     "The role and the relations are facts from the engine. Your answer is a hypothesis.",
+    units,
+    "Response schema: name (string, at most 60 characters, a physical quantity or an equipment reading),",
+    "quantity (string, at most 40 characters, the kind of quantity or its usual unit),",
+    "confidence (number from 0 to 1), reason (string, at most 200 characters).",
+  ].join("\n"),
+  check_name: [
+    "You give a second, independent opinion on the physical quantity of one sensor of an industrial process.",
+    "You get a JSON summary of one sensor: alias, n, signal type, missing rate, quantiles p1 to p99, MAD,",
+    "histogram shares, noise, acfTime, period, flat share, monotonic share, distinct values, hold,",
+    "the role from the engine with its confidence, and the peers it leads and follows with lag, rho and n.",
+    "You do not see the name that another model proposed. Reason from the statistics and the role only.",
     units,
     "Response schema: name (string, at most 60 characters, a physical quantity or an equipment reading),",
     "quantity (string, at most 40 characters, the kind of quantity or its usual unit),",
@@ -126,6 +138,7 @@ export const templates: (() => TemplateInfo) & Record<Purpose, string> = Object.
 
 export const responseSchema: Record<Purpose, ZodType> = {
   name_role: NameRoleResponse,
+  check_name: CheckNameResponse,
   compile_rule: CompileRuleResponse,
   explain_diagnosis: ExplainDiagnosisResponse,
   plan_investigation: PlanInvestigationResponse,

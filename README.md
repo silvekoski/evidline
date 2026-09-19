@@ -56,7 +56,7 @@ In mode `cloud`, the Diagnosis screen can ask a set of open models for a second 
 
 | Variable | Meaning |
 | --- | --- |
-| `TPM_REVIEW_KEY` | The API key. Reviews are off without it. |
+| `TPM_REVIEW_KEY` | The API key. With the default Featherless URL, `TPM_EMBED_KEY` works as a fallback. Reviews are off without a key. |
 | `TPM_REVIEW_URL` | Chat completions URL. Default `https://api.featherless.ai/v1/chat/completions`. |
 | `TPM_REVIEW_MODELS` | Comma separated model ids. Default `Qwen/Qwen3.8-Flash-Next`, `deepseek-ai/DeepSeek-V4.1-Flash`, `zai-org/GLM-5.3-Flash`, `moonshotai/Kimi-K2-Instruct`. |
 | `TPM_REVIEW_REGION` | Optional region label for the record. |

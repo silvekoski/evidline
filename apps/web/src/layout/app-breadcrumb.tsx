@@ -6,7 +6,7 @@ import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbP
 import { currentScreen } from "./app-sidebar";
 import { screens } from "./screens";
 
-const pageTitles: Record<string, string> = { runs: "Runs", sources: "Sources", claims: "Review claims", "open-questions": "Open questions", spec: "Data spec", connectors: "Connectors" };
+const pageTitles: Record<string, string> = { runs: "Runs", sources: "Sources", claims: "Review claims", "open-questions": "Open questions", spec: "Data spec", connectors: "Connectors", profile: "Profile settings" };
 
 export function AppBreadcrumb() {
   const { pathname } = useLocation();

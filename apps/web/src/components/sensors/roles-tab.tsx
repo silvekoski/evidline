@@ -9,6 +9,7 @@ import { EvidenceChip } from "@/components/evidence-chip";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Hypothesis } from "./hypothesis";
+import { NameCheckPanel } from "./name-checks";
 
 export function RolesTab({ detail }: { detail: SensorDetail }) {
   const inference = useQuery({ queryKey: keys.inference(detail.roleInferenceId), queryFn: () => getInference(detail.roleInferenceId) });
@@ -80,6 +81,7 @@ export function RolesTab({ detail }: { detail: SensorDetail }) {
         </div>
         <p className="text-xs text-muted-foreground">The model proposes the name from the fingerprint summary. No later stage reads it, so a wrong name cannot cause a wrong diagnosis.</p>
       </section>
+      <NameCheckPanel inferenceId={detail.roleInferenceId} hypothesis={detail.hypothesisName} />
     </div>
   );
 }

@@ -1,14 +1,17 @@
 import { useQuery } from "@tanstack/react-query";
 import { NavLink, useLocation, useNavigate } from "react-router";
-import { BookOpenIcon, CircleHelpIcon, FileTextIcon, FilesIcon, ListChecksIcon, PlayIcon, PlugIcon } from "lucide-react";
+import { BookOpenIcon, CircleHelpIcon, FileTextIcon, FilesIcon, ListChecksIcon, LogOutIcon, PlayIcon, PlugIcon, UserIcon } from "lucide-react";
 import { keys, listRuns } from "@/api";
 import { useActiveRunId } from "@/hooks/use-active-run-id";
 import { useLens } from "@/hooks/use-lens";
+import { UserAvatar } from "@/components/user-avatar";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
@@ -19,6 +22,7 @@ import {
   SidebarMenuSkeleton,
   SidebarRail,
 } from "@/components/ui/sidebar";
+import { demoUser } from "@/lib/demo-user";
 import { screens, type ScreenSlug } from "./screens";
 import { WorkspaceSwitcher } from "./workspace-switcher";
 
@@ -141,6 +145,36 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
+      <SidebarFooter>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <SidebarMenuButton size="lg" tooltip={demoUser.name}>
+                  <UserAvatar name={demoUser.name} />
+                  <span className="flex flex-col items-start truncate group-data-[collapsible=icon]:hidden">
+                    <span className="truncate text-sm">{demoUser.name}</span>
+                    <span className="truncate text-xs text-muted-foreground">{demoUser.email}</span>
+                  </span>
+                </SidebarMenuButton>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" side="top">
+                <DropdownMenuItem asChild>
+                  <NavLink to="/profile">
+                    <UserIcon aria-hidden="true" />
+                    Profile
+                  </NavLink>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={() => window.location.assign("/login")}>
+                  <LogOutIcon aria-hidden="true" />
+                  Log out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarFooter>
       <SidebarRail />
     </Sidebar>
   );

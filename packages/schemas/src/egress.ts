@@ -3,7 +3,7 @@ import { Alias, Domain, FaultClass, HealthClass, InferenceStatus, Role, SignalTy
 import { InvestigationPlan, Stage, StatKey, TraceTest } from "./inference.js";
 import { RuleJson } from "./rule.js";
 
-export const Purpose = z.enum(["name_role", "compile_rule", "explain_diagnosis", "plan_investigation", "search", "cross_review"]);
+export const Purpose = z.enum(["name_role", "check_name", "compile_rule", "explain_diagnosis", "plan_investigation", "search", "cross_review"]);
 export type Purpose = z.infer<typeof Purpose>;
 
 export const ModelMode = z.enum(["off", "local", "cloud"]);
@@ -52,6 +52,7 @@ export const SensorSummary = z
 export type SensorSummary = z.infer<typeof SensorSummary>;
 
 export const NameRolePayload = z.object({ purpose: z.literal("name_role"), dt: num.nullable(), sensor: SensorSummary }).strict();
+export const CheckNamePayload = z.object({ purpose: z.literal("check_name"), dt: num.nullable(), sensor: SensorSummary }).strict();
 
 export const CatalogEntry = z.object({ alias: Alias, signalType: SignalType, role: Role }).strict();
 
@@ -116,6 +117,7 @@ export const SearchPayload = z.object({ purpose: z.literal("search"), query: z.s
 
 export const EgressPayload = z.discriminatedUnion("purpose", [
   NameRolePayload,
+  CheckNamePayload,
   CompileRulePayload,
   ExplainDiagnosisPayload,
   PlanInvestigationPayload,
@@ -128,6 +130,9 @@ export const NameRoleResponse = z
   .object({ name: z.string().max(60), quantity: z.string().max(40), confidence: z.number().min(0).max(1), reason: z.string().max(200) })
   .strict();
 export type NameRoleResponse = z.infer<typeof NameRoleResponse>;
+const clipped = (max: number) => z.string().transform((s) => (s.length > max ? `${s.slice(0, max - 1)}…` : s));
+export const CheckNameResponse = z.object({ name: clipped(60), quantity: clipped(40), confidence: z.number().min(0).max(1), reason: clipped(200) });
+export type CheckNameResponse = z.infer<typeof CheckNameResponse>;
 export const CompileRuleResponse = z.object({ rule: RuleJson }).strict();
 export type CompileRuleResponse = z.infer<typeof CompileRuleResponse>;
 export const ExplainDiagnosisResponse = z
@@ -232,3 +237,20 @@ export type ReviewJob = z.infer<typeof ReviewJob>;
 
 export const ReviewReport = z.object({ pending: ReviewJob.nullable(), reviews: z.array(Review) });
 export type ReviewReport = z.infer<typeof ReviewReport>;
+
+export const NameCheck = z.object({
+  egressId: z.string(),
+  time: z.string(),
+  model: z.string(),
+  host: z.string(),
+  name: z.string().nullable(),
+  quantity: z.string().nullable(),
+  confidence: z.number().nullable(),
+  agrees: z.boolean().nullable(),
+  error: z.string().nullable(),
+});
+export type NameCheck = z.infer<typeof NameCheck>;
+export const NameCheckJob = z.object({ runId: z.string(), done: z.number().int(), total: z.number().int(), model: z.string() });
+export type NameCheckJob = z.infer<typeof NameCheckJob>;
+export const NameCheckReport = z.object({ pending: NameCheckJob.nullable(), checks: z.array(NameCheck) });
+export type NameCheckReport = z.infer<typeof NameCheckReport>;

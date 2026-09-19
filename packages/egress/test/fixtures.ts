@@ -132,6 +132,7 @@ export function capturingProvider(reply: (purpose: string) => string): Provider 
 
 export const replies: Record<string, string> = {
   name_role: JSON.stringify({ name: "temperature", quantity: "degrees", confidence: 0.6, reason: "slow and smooth" }),
+  check_name: JSON.stringify({ name: "temperature", quantity: "degrees", confidence: 0.6, reason: "slow and smooth" }),
   compile_rule: JSON.stringify({ rule: { type: "range", sensor: "S03", source: "S03 must stay below 20", max: 20 } }),
   explain_diagnosis: JSON.stringify({ sentences: [{ text: "Sensor fault: dead.", evidenceIds: [evidenceId(1)] }] }),
   plan_investigation: JSON.stringify({ calls: [{ tool: "rerun_without", sensor: "S03" }], rationale: "mask the suspect" }),

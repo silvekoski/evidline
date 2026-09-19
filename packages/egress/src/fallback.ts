@@ -137,6 +137,7 @@ function plan(p: PayloadOf<"plan_investigation">): PlanInvestigationResponse | n
 
 export const fallbackMissingReason: Record<Purpose, string> = {
   name_role: "no fallback for name_role, model off",
+  check_name: "no fallback for check_name, model off",
   compile_rule: "sentence not understood, model off",
   explain_diagnosis: "trace has no steps, model off",
   plan_investigation: "no fixed plan for this stage, model off",
@@ -148,6 +149,7 @@ export function fallback(purpose: Purpose, payload: EgressPayload): unknown | nu
   if (payload.purpose !== purpose) return null;
   switch (payload.purpose) {
     case "name_role":
+    case "check_name":
       return null;
     case "compile_rule": {
       const rule = parseRule(payload.sentence, payload.dt);

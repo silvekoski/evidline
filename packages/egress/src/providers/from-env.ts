@@ -31,9 +31,9 @@ export function getProvider(mode: ModelMode): Provider | null {
 
 export function getReviewers(): Provider[] {
   const env = process.env;
-  const key = env.TPM_REVIEW_KEY;
-  if (!key) return [];
   const url = env.TPM_REVIEW_URL || defaultReviewUrl;
+  const key = env.TPM_REVIEW_KEY || (new URL(url).host === new URL(defaultReviewUrl).host ? env.TPM_EMBED_KEY : undefined);
+  if (!key) return [];
   const models = (env.TPM_REVIEW_MODELS ?? "").split(",").map((m) => m.trim()).filter((m) => m !== "");
   return (models.length ? models : defaultReviewModels).map((model) =>
     createOpenAiProvider({ url, key, model, region: env.TPM_REVIEW_REGION || null, structured: false }),

@@ -1,0 +1,93 @@
+import { jsonText } from "@tpm/egress";
+import { CheckNameResponse, type EgressRecord, type NameCheck, type NameCheckJob, type NameCheckReport, type RoleInference } from "@tpm/schemas";
+import type { AppContext } from "./context";
+import { appendLog } from "./log";
+import { chainOf } from "./operator";
+import { sensorSummary } from "./payloads";
+
+const jobs = new Map<string, NameCheckJob>();
+export const nameCheckJob = (runId: string): NameCheckJob | null => jobs.get(runId) ?? null;
+
+const stop = new Set(["the", "of", "a", "an", "in", "for", "and", "or", "to", "sensor", "signal", "reading", "measurement", "value", "indicator", "process", "level", "rate"]);
+const tokens = (name: string): Set<string> => new Set(name.toLowerCase().normalize("NFKC").match(/[\p{L}\p{N}]+/gu)?.filter((t) => !stop.has(t)).map((t) => t.replace(/s$/, "")) ?? []);
+
+export function namesAgree(a: string | null, b: string | null): boolean | null {
+  if (a === null || b === null) return null;
+  const ta = tokens(a);
+  const tb = tokens(b);
+  if (ta.size === 0 || tb.size === 0) return a.trim().toLowerCase() === b.trim().toLowerCase();
+  let shared = 0;
+  for (const t of ta) if (tb.has(t)) shared++;
+  return shared / Math.min(ta.size, tb.size) >= 0.5;
+}
+
+function checkOf(record: EgressRecord, hypothesis: string | null): NameCheck {
+  const reply = record.status === "sent" && record.response !== null ? CheckNameResponse.safeParse(JSON.parse(jsonText(record.response))).data ?? null : null;
+  const error =
+    record.status === "blocked" ? (record.guards.find((g) => !g.pass)?.detail ?? "blocked")
+    : record.status === "off" ? "model off"
+    : record.status === "error" ? "The reviewer call failed."
+    : reply === null ? "response failed the schema"
+    : null;
+  return {
+    egressId: record.id,
+    time: record.time,
+    model: record.provider?.model ?? "",
+    host: record.provider?.host ?? "",
+    name: reply?.name ?? null,
+    quantity: reply?.quantity ?? null,
+    confidence: reply?.confidence ?? null,
+    agrees: namesAgree(reply?.name ?? null, hypothesis),
+    error,
+  };
+}
+
+export function nameChecks(ctx: AppContext, head: RoleInference): NameCheck[] {
+  const byModel = new Map<string, NameCheck>();
+  for (const inference of chainOf(ctx.db, head)) {
+    for (const record of ctx.db.egress.byInference(inference.id, "check_name")) {
+      const check = checkOf(record, head.value.hypothesisName);
+      if (!byModel.has(check.model) || byModel.get(check.model)!.time < check.time) byModel.set(check.model, check);
+    }
+  }
+  return [...byModel.values()].sort((a, b) => a.model.localeCompare(b.model));
+}
+
+export const nameCheckReport = (ctx: AppContext, head: RoleInference): NameCheckReport => ({ pending: jobs.get(head.runId) ?? null, checks: nameChecks(ctx, head) });
+
+export async function runNameChecks(ctx: AppContext, runId: string, heads: RoleInference[]): Promise<boolean> {
+  if (jobs.has(runId)) return false;
+  const models = ctx.gateway.reviewers().map((r) => r.model);
+  const run = ctx.db.runs.get(runId);
+  if (!run || models.length === 0) return false;
+  const work = heads.flatMap((head) => models.map((model) => ({ head, model })));
+  jobs.set(runId, { runId, done: 0, total: work.length, model: models[0] ?? "" });
+  try {
+    let cursor = 0;
+    await Promise.all(
+      Array.from({ length: Math.min(4, work.length) }, async () => {
+        while (cursor < work.length) {
+          const { head, model } = work[cursor++]!;
+          const payload = { purpose: "check_name" as const, dt: run.timeBase.dt, sensor: sensorSummary(ctx, runId, head.value.sensor) };
+          const result = await ctx.gateway.call<CheckNameResponse>("check_name", payload, { runId, inferenceId: head.id, operatorText: false }, model);
+          appendLog(ctx.db, {
+            type: "model-call",
+            actor: "agent",
+            runId,
+            inferenceId: head.id,
+            evidenceIds: head.evidenceIds,
+            egressId: result.recordId,
+            before: null,
+            after: result.ok ? { purpose: "check_name", model, name: result.value.name, confidence: result.value.confidence, agrees: namesAgree(result.value.name, head.value.hypothesisName) } : null,
+            reason: result.ok ? null : `${model}: ${result.reason}`,
+          });
+          const job = jobs.get(runId);
+          if (job) jobs.set(runId, { ...job, done: job.done + 1, model });
+        }
+      }),
+    );
+  } finally {
+    jobs.delete(runId);
+  }
+  return true;
+}

@@ -16,6 +16,7 @@ import {
 const ctx = { runId: "0123abcd", inferenceId: "inf-0123abcd-00001", operatorText: false };
 const payloads: Record<Purpose, EgressPayload> = {
   name_role: nameRolePayload,
+  check_name: { ...nameRolePayload, purpose: "check_name" } as EgressPayload,
   compile_rule: compileRulePayload("S03 must stay below 20"),
   explain_diagnosis: explainPayload,
   plan_investigation: planPayload("drift", undefined, "S03", "S04"),

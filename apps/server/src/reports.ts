@@ -1,3 +1,6 @@
+import { jsonText } from "@tpm/egress";
+import { CheckNameResponse } from "@tpm/schemas";
+import { namesAgree } from "./name-checks";
 import type {
   BaselineInference,
   CalibrationInference,
@@ -52,12 +55,22 @@ function notesByAlias(db: Db, run: Run): Map<string, string[]> {
   return byAlias;
 }
 
-type RowContext = { roles: Map<string, RoleInference>; health: Map<string, HealthInference>; drifts: Map<string, DriftInference>; notes: Map<string, string[]> };
+type RowContext = { roles: Map<string, RoleInference>; health: Map<string, HealthInference>; drifts: Map<string, DriftInference>; notes: Map<string, string[]>; checks: (role: RoleInference) => SensorRow["nameChecks"] };
 
 function rowContext(db: Db, run: Run): RowContext {
   const list = currentInferences(db, run.id);
   const bySensor = <I extends Inference>(items: I[]): Map<string, I> => new Map(items.map((i) => [i.sensor ?? "", i]));
-  return { roles: bySensor(ofStage(list, "role")), health: bySensor(ofStage(list, "health")), drifts: bySensor(ofStage(list, "drift")), notes: notesByAlias(db, run) };
+  const checks = (role: RoleInference): SensorRow["nameChecks"] => {
+    const byModel = new Map<string, { model: string; name: string | null; agrees: boolean | null }>();
+    for (const record of db.egress.byInference(role.id, "check_name")) {
+      const model = record.provider?.model ?? "";
+      if (byModel.has(model)) continue;
+      const reply = record.status === "sent" && record.response !== null ? CheckNameResponse.safeParse(JSON.parse(jsonText(record.response))).data ?? null : null;
+      byModel.set(model, { model, name: reply?.name ?? null, agrees: namesAgree(reply?.name ?? null, role.value.hypothesisName) });
+    }
+    return [...byModel.values()].sort((a, b) => a.model.localeCompare(b.model));
+  };
+  return { roles: bySensor(ofStage(list, "role")), health: bySensor(ofStage(list, "health")), drifts: bySensor(ofStage(list, "drift")), notes: notesByAlias(db, run), checks };
 }
 
 function sensorRow(sensor: SensorRecord, c: RowContext): SensorRow {
@@ -78,6 +91,7 @@ function sensorRow(sensor: SensorRecord, c: RowContext): SensorRow {
     healthInferenceId: health.id,
     driftInferenceId: c.drifts.get(sensor.alias)?.id ?? null,
     notes: c.notes.get(sensor.alias) ?? [],
+    nameChecks: c.checks(role),
   };
 }
 
