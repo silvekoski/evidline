@@ -56,7 +56,13 @@ describe("repositories", () => {
     f.ctx.db.evidence.saveSeries(evidence.id, { expected: Float64Array.from([1, 2, 3]) });
     expect(f.ctx.db.evidence.get(evidence.id)).toEqual(evidence);
     expect(f.ctx.db.evidence.list("0123abcd")).toHaveLength(1);
-    expect(f.ctx.db.evidence.series(evidence.id)).toEqual({ expected: Float64Array.from([1, 2, 3]) });
+    expect(f.ctx.db.evidence.series(evidence.id, 3)).toEqual({ expected: Float64Array.from([1, 2, 3]) });
+    const long = Float64Array.from({ length: 10000 }, (_, i) => i);
+    f.ctx.db.evidence.saveSeries(evidence.id, { deviation: long });
+    const stored = f.ctx.db.evidence.series(evidence.id, 10000).deviation!;
+    expect(stored).toHaveLength(10000);
+    expect(stored[0]).toBeCloseTo(1, 5);
+    expect(Math.abs((stored[9999] ?? 0) - 9999)).toBeLessThan(3);
     const role: Inference = {
       id: inferenceId("0123abcd", 2),
       runId: "0123abcd",

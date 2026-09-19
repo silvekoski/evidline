@@ -18,7 +18,7 @@ export function evidenceRoutes(ctx: AppContext) {
       const evidence = evidenceOf(c.req.param("id"));
       const { from, to } = evidence.window;
       const bucket = Math.max(1, Math.ceil((to - from) / maxPoints));
-      const derived = ctx.db.evidence.series(evidence.id);
+      const derived = ctx.db.evidence.series(evidence.id, ctx.db.runs.get(evidence.runId)?.gridSize ?? to);
       const series = Object.fromEntries(
         [...evidence.chart.series, ...(evidence.chart.secondary ?? [])].flatMap((s) => {
           const values = "sensor" in s.source ? ctx.db.grids.get(evidence.runId, s.source.sensor) : derived[s.source.derived];

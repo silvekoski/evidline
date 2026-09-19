@@ -1,7 +1,7 @@
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import Database from "better-sqlite3";
-import type { Grid, Peer } from "@tpm/core";
+import { bucketMeans, type Grid, type Peer } from "@tpm/core";
 import type { EgressRecord, Evidence, Fingerprint, Inference, RedundancyGroup, Relation, Rule, Run, Stage, ThreadEntry } from "@tpm/schemas";
 import { dbPath } from "./paths";
 
@@ -20,7 +20,9 @@ export type LogRow = { seq: number; runId: string; text: string; hash: string };
 export type GridSeries = { alias: string; values: Float64Array };
 
 type GridRow = GridSeries & { runId: string };
-type SeriesRow = { evidenceId: string; key: string; values: Float64Array };
+type SeriesRow = { evidenceId: string; key: string; stride: number; values: Float64Array };
+
+const maxSeriesPoints = 4096;
 type SettingRow = { key: string; value: string };
 
 type ColumnType = "text" | "int" | "real" | "bool" | "json" | "blob";
@@ -142,7 +144,7 @@ export function openDb(path: string = process.env.DB_PATH ?? dbPath) {
     { id: "text", runId: "text", kind: "text", sensors: "json", window: "json", method: "text", stats: "json", verdict: "text", chart: "json" },
     [["runId"]],
   );
-  const evidenceSeries = defineTable<SeriesRow>(db, prepare, "evidence_series", ["evidenceId", "key"], { evidenceId: "text", key: "text", values: "blob" });
+  const evidenceSeries = defineTable<SeriesRow>(db, prepare, "evidence_series", ["evidenceId", "key"], { evidenceId: "text", key: "text", stride: "int", values: "blob" });
   const inferences = defineTable<Inference>(
     db,
     prepare,
@@ -264,14 +266,26 @@ export function openDb(path: string = process.env.DB_PATH ?? dbPath) {
     evidence: {
       saveAll: (items: Evidence[]): void => transaction(() => items.forEach(evidence.upsert)),
       saveSeries: (evidenceId: string, derived: Record<string, Float64Array>): void =>
-        transaction(() => Object.entries(derived).forEach(([key, values]) => evidenceSeries.upsert({ evidenceId, key, values }))),
+        transaction(() =>
+          Object.entries(derived).forEach(([key, values]) => {
+            const stride = Math.max(1, Math.ceil(values.length / maxSeriesPoints));
+            evidenceSeries.upsert({ evidenceId, key, stride, values: stride === 1 ? values : bucketMeans(values, stride) });
+          }),
+        ),
       get: (id: string): Evidence | null => evidence.one("WHERE id = ?", id),
       list: (runId: string): Evidence[] => evidence.many("WHERE run_id = ? ORDER BY id", runId),
       count: (runId: string): number => (prepare("SELECT COUNT(*) AS count FROM evidence WHERE run_id = ?").get(runId) as { count: number }).count,
       relationsOf: (runId: string, alias: string): Evidence[] =>
         evidence.many("WHERE run_id = ? AND kind IN ('correlation', 'lag') AND sensors LIKE ? ORDER BY id", runId, `%"${alias}"%`),
-      series: (evidenceId: string): Record<string, Float64Array> =>
-        Object.fromEntries(evidenceSeries.many("WHERE evidence_id = ?", evidenceId).map((row) => [row.key, row.values])),
+      series: (evidenceId: string, length: number): Record<string, Float64Array> =>
+        Object.fromEntries(
+          evidenceSeries.many("WHERE evidence_id = ?", evidenceId).map((row) => {
+            if (row.stride === 1) return [row.key, row.values];
+            const expanded = new Float64Array(length);
+            for (let t = 0; t < length; t++) expanded[t] = row.values[Math.min(row.values.length - 1, Math.floor(t / row.stride))] ?? NaN;
+            return [row.key, expanded];
+          }),
+        ),
     },
     inferences: {
       save: inferences.upsert,
