@@ -9,7 +9,7 @@ const outboundModules = [
 ];
 const outboundPatterns = outboundModules.flatMap((m) => [m, `${m}/*`]);
 const outboundGlobals = ["fetch", "WebSocket", "XMLHttpRequest", "EventSource", "Request", "navigator"];
-const egressInternals = { name: "@tpm/egress", importNames: ["send", "getProvider", "createOpenAiProvider", "createAzureProvider", "createOllamaProvider"], message: "Only the gateway may call a model." };
+const egressInternals = { name: "@tpm/egress", importNames: ["send", "sendForm", "getProvider", "createElevenLabsTranscriber", "transcriberFromEnv", "createOpenAiProvider", "createAzureProvider", "createOllamaProvider"], message: "Only the gateway may call a model." };
 
 const noOutbound = {
   "no-restricted-imports": ["error", { paths: [egressInternals], patterns: [{ group: outboundPatterns, message: "Only packages/egress may reach the network." }] }],
@@ -35,7 +35,8 @@ export default tseslint.config(
     languageOptions: { globals: { ...globals.node, ...globals.browser } },
     rules: { "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_", varsIgnorePattern: "^_" }] },
   },
-  { files: ["packages/adapters/**", "packages/schemas/**", "apps/server/**", "scripts/**"], rules: noOutbound },
+  { files: ["packages/adapters/**", "packages/schemas/**", "packages/corpus/**", "apps/server/**", "scripts/**"], rules: noOutbound },
+  { files: ["packages/connectors/**"], rules: { ...noOutbound, "no-restricted-globals": "off" } },
   { files: ["packages/core/src/**"], rules: pureCore },
   { files: ["packages/core/test/**"], rules: noOutbound },
 );
