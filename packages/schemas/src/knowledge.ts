@@ -53,6 +53,7 @@ export const Source = z.object({
   occurredAt: z.string(),
   contentHash: z.string(),
   blobPath: z.string().nullable(),
+  externalUrl: z.string().nullable(),
   mediaType: z.string(),
   bytes: z.number().int(),
   status: SourceStatus,

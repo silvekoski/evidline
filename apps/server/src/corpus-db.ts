@@ -135,6 +135,7 @@ const migrations = [
   );
   CREATE TABLE embedding_meta (id INTEGER PRIMARY KEY CHECK (id = 1), name TEXT NOT NULL, model TEXT NOT NULL, dims INTEGER NOT NULL);
   `,
+  `ALTER TABLE source ADD COLUMN external_url TEXT;`,
 ];
 
 export type SourceDraft = Omit<Source, "id" | "workspace" | "segments" | "chunks" | "claims" | "createdAt"> & { parentSourceId: number | null };
@@ -184,6 +185,7 @@ export function openCorpus(db: Database.Database, workspace: WorkspaceSlug) {
     occurredAt: r.occurred_at as string,
     contentHash: r.content_hash as string,
     blobPath: r.blob_path as string | null,
+    externalUrl: (r.external_url as string | null) ?? null,
     mediaType: r.media_type as string,
     bytes: r.bytes as number,
     status: r.status as SourceStatus,
@@ -258,8 +260,8 @@ export function openCorpus(db: Database.Database, workspace: WorkspaceSlug) {
     sources: {
       insert(draft: SourceDraft): Source {
         const info = run(
-          "INSERT INTO source (connector_id, kind, external_id, title, occurred_at, content_hash, blob_path, media_type, bytes, status, error, run_id, parent_source_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-          draft.connectorId ?? 0, draft.kind, draft.externalId, draft.title, draft.occurredAt, draft.contentHash, draft.blobPath, draft.mediaType, draft.bytes, draft.status, draft.error, draft.runId, draft.parentSourceId, nowIso(),
+          "INSERT INTO source (connector_id, kind, external_id, title, occurred_at, content_hash, blob_path, external_url, media_type, bytes, status, error, run_id, parent_source_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+          draft.connectorId ?? 0, draft.kind, draft.externalId, draft.title, draft.occurredAt, draft.contentHash, draft.blobPath, draft.externalUrl, draft.mediaType, draft.bytes, draft.status, draft.error, draft.runId, draft.parentSourceId, nowIso(),
         );
         return sourceOf(one(`${sourceSql} WHERE s.id = ?`, info.lastInsertRowid)!);
       },
@@ -287,8 +289,8 @@ export function openCorpus(db: Database.Database, workspace: WorkspaceSlug) {
         return all(`${sourceSql} ${where.length ? `WHERE ${where.join(" AND ")}` : ""} ORDER BY s.occurred_at DESC, s.id DESC`, ...params).map(sourceOf);
       },
       setStatus: (id: number, status: SourceStatus, error: string | null = null): void => void run("UPDATE source SET status = ?, error = ? WHERE id = ?", status, error, id),
-      update: (id: number, patch: Partial<Pick<Source, "title" | "occurredAt" | "runId" | "contentHash" | "blobPath" | "bytes">>): void => {
-        const fields: Record<string, string> = { title: "title", occurredAt: "occurred_at", runId: "run_id", contentHash: "content_hash", blobPath: "blob_path", bytes: "bytes" };
+      update: (id: number, patch: Partial<Pick<Source, "title" | "occurredAt" | "runId" | "contentHash" | "blobPath" | "bytes" | "externalUrl">>): void => {
+        const fields: Record<string, string> = { title: "title", occurredAt: "occurred_at", runId: "run_id", contentHash: "content_hash", blobPath: "blob_path", bytes: "bytes", externalUrl: "external_url" };
         const entries = Object.entries(patch).filter(([, v]) => v !== undefined);
         if (entries.length === 0) return;
         run(`UPDATE source SET ${entries.map(([k]) => `${fields[k]} = ?`).join(", ")} WHERE id = ?`, ...entries.map(([, v]) => v), id);

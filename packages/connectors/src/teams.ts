@@ -14,7 +14,7 @@ export const TeamsConfig = z.object({
 export type TeamsConfig = z.infer<typeof TeamsConfig>;
 
 type Transcript = { id: string; meetingId: string; meetingOrganizerId?: string; createdDateTime: string; transcriptContentUrl?: string };
-type Meeting = { id: string; subject?: string | null; startDateTime?: string; participants?: { organizer?: { upn?: string }; attendees?: { upn?: string }[] } };
+type Meeting = { id: string; subject?: string | null; startDateTime?: string; joinWebUrl?: string; participants?: { organizer?: { upn?: string }; attendees?: { upn?: string }[] } };
 type User = { id: string };
 
 const meetingDomains = (meeting: Meeting | null): string[] => {
@@ -44,6 +44,7 @@ export async function transcriptSource(graph: GraphClient, userId: string, trans
     segments,
     attachments: [],
     hint: { domains: meetingDomains(meeting) },
+    externalUrl: meeting?.joinWebUrl ?? null,
   };
 }
 

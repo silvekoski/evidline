@@ -2,7 +2,7 @@ import { z } from "zod";
 import { SocketModeClient } from "@slack/socket-mode";
 import { WebClient } from "@slack/web-api";
 import type { SegmentDraft } from "@tpm/corpus";
-import type { Connector, RawSource, SyncContext, SyncItem } from "./types";
+import type { Connector, RawAttachment, RawSource, SyncContext, SyncItem } from "./types";
 
 export const SlackConfig = z.object({
   channels: z.record(z.string(), z.string()),
@@ -18,6 +18,7 @@ export type SlackApi = {
   replies(channel: string, ts: string): Promise<SlackMessage[]>;
   userName(user: string): Promise<string>;
   permalink(channel: string, ts: string): Promise<string | null>;
+  download(url: string): Promise<Buffer | null>;
 };
 
 export const GROUP_GAP_S = 30 * 60;
@@ -51,6 +52,11 @@ export function slackApi(botToken: string): SlackApi {
     async permalink(channel, ts) {
       const res = await client.chat.getPermalink({ channel, message_ts: ts }).catch(() => null);
       return res?.permalink ?? null;
+    },
+    async download(url) {
+      const res = await fetch(url, { headers: { authorization: `Bearer ${botToken}` }, signal: AbortSignal.timeout(120_000) }).catch(() => null);
+      if (!res?.ok || res.headers.get("content-type")?.includes("text/html")) return null;
+      return Buffer.from(await res.arrayBuffer());
     },
   };
 }
@@ -89,14 +95,23 @@ export async function threadSource(api: SlackApi, channel: string, group: { id: 
     segments.push({ text, speaker: m.user ? await api.userName(m.user) : null, block: i, locator: { kind: "slack_thread", channelId: channel, ts: m.ts, threadTs: m.thread_ts ?? null } });
   }
   const first = group.messages[0]!;
+  const attachments: RawAttachment[] = [];
+  for (const m of group.messages) {
+    for (const f of m.files ?? []) {
+      if (!f.name || !f.url_private_download) continue;
+      const content = await api.download(f.url_private_download);
+      if (content) attachments.push({ name: f.name, mediaType: f.mimetype ?? "application/octet-stream", content });
+    }
+  }
   return {
     kind: "slack_thread",
     externalId: `${channel}:${group.id}`,
     title: `#${channel} ${(first.text ?? "").slice(0, 60) || "thread"}`,
     occurredAt: tsToIso(first.ts),
     segments,
-    attachments: [],
+    attachments,
     hint: { channelId: channel },
+    externalUrl: await api.permalink(channel, first.ts),
   };
 }
 

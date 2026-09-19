@@ -4,7 +4,7 @@ import { createSlackConnector, groupMessages, sourceForEvent, type SlackApi, typ
 const t = (seconds: number) => `${seconds}.000100`;
 const messages: SlackMessage[] = [
   { ts: t(1000), user: "U1", text: "Dryer 3 valve sticks after a wash", reply_count: 1 },
-  { ts: t(1100), thread_ts: t(1000), user: "U2", text: "Yes, xmv_6 lags by an hour" },
+  { ts: t(1100), thread_ts: t(1000), user: "U2", text: "Yes, xmv_6 lags by an hour", files: [{ name: "tags.csv", mimetype: "text/csv", url_private_download: "https://files.slack.com/tags.csv" }] },
   { ts: t(3000), user: "U1", text: "Separate note one" },
   { ts: t(3600), user: "U2", text: "Separate note two, within 30 minutes" },
   { ts: t(9000), user: "U1", text: "Much later" },
@@ -15,7 +15,8 @@ const api: SlackApi = {
   history: async () => ({ messages: messages.filter((m) => !m.thread_ts || m.thread_ts === m.ts), nextCursor: undefined }),
   replies: async (_channel, ts) => messages.filter((m) => m.ts === ts || m.thread_ts === ts),
   userName: async (user) => ({ U1: "Matti", U2: "Anna" })[user] ?? user,
-  permalink: async () => null,
+  permalink: async (channel, ts) => `https://acme.slack.com/archives/${channel}/p${ts.replace(".", "")}`,
+  download: async () => Buffer.from("tag;description\nxmv_6;Dryer valve\n"),
 };
 
 describe("slack connector", () => {
@@ -30,7 +31,8 @@ describe("slack connector", () => {
     const items = [];
     for await (const item of connector.sync({ channels: { C1: "acme" }, appToken: null, backfillDays: 90 }, "xoxb-token", null, { transport: async () => { throw new Error("no http"); }, now: () => new Date(20000 * 1000), log: () => {} })) items.push(item);
     expect(items).toHaveLength(3);
-    expect(items[0]!.source).toMatchObject({ kind: "slack_thread", externalId: `C1:${t(1000)}`, hint: { channelId: "C1" } });
+    expect(items[0]!.source).toMatchObject({ kind: "slack_thread", externalId: `C1:${t(1000)}`, hint: { channelId: "C1" }, externalUrl: `https://acme.slack.com/archives/C1/p${t(1000).replace(".", "")}` });
+    expect(items[0]!.source.attachments.map((a) => a.name)).toEqual(["tags.csv"]);
     expect(items[0]!.source.segments.map((s) => s.speaker)).toEqual(["Matti", "Anna"]);
     expect(items[0]!.source.segments[1]!.locator).toEqual({ kind: "slack_thread", channelId: "C1", ts: t(1100), threadTs: t(1000) });
     expect(JSON.parse(items[2]!.cursor!)).toEqual({ C1: t(9000) });

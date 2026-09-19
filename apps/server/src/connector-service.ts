@@ -36,7 +36,7 @@ export function deliver(registry: Registry, resolve: Resolve, connector: Connect
     }
     return workspace;
   }
-  ingestRaw(ctx, { kind: source.kind, connectorId: connector.id, externalId: source.externalId, title: source.title, occurredAt: source.occurredAt, segments: source.segments, attachments: source.attachments.map((a) => ({ name: a.name, mediaType: a.mediaType, content: a.content })) });
+  ingestRaw(ctx, { kind: source.kind, connectorId: connector.id, externalId: source.externalId, title: source.title, occurredAt: source.occurredAt, segments: source.segments, attachments: source.attachments.map((a) => ({ name: a.name, mediaType: a.mediaType, content: a.content })), externalUrl: source.externalUrl ?? null });
   return workspace;
 }
 

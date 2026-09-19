@@ -19,6 +19,7 @@ export type FileIngest = {
   externalId?: string;
   occurredAt?: string | null;
   parentSourceId?: number | null;
+  externalUrl?: string | null;
 };
 
 export type RawIngest = {
@@ -29,6 +30,7 @@ export type RawIngest = {
   occurredAt: string;
   segments: SegmentDraft[];
   attachments?: FileIngest[];
+  externalUrl?: string | null;
 };
 
 const sha256 = (buf: Buffer | string) => createHash("sha256").update(buf).digest("hex");
@@ -65,6 +67,7 @@ export function ingestFile(ctx: AppContext, input: FileIngest): { source: Source
     occurredAt: input.occurredAt ?? new Date().toISOString(),
     contentHash: hash,
     blobPath: relative(ctx.dir, blob),
+    externalUrl: input.externalUrl ?? null,
     mediaType: input.mediaType || mediaTypeOf(input.name),
     bytes: input.content.byteLength,
     status: "received",
@@ -90,6 +93,7 @@ export function ingestRaw(ctx: AppContext, raw: RawIngest): { source: Source; cr
       occurredAt: raw.occurredAt,
       contentHash: hash,
       blobPath: null,
+      externalUrl: raw.externalUrl ?? null,
       mediaType: "text/plain",
       bytes: Buffer.byteLength(raw.segments.map((s) => s.text).join("\n")),
       status: "received",
@@ -97,7 +101,7 @@ export function ingestRaw(ctx: AppContext, raw: RawIngest): { source: Source; cr
       runId: null,
       parentSourceId: null,
     });
-  if (existing) ctx.corpus.sources.update(source.id, { title: raw.title, occurredAt: raw.occurredAt, contentHash: hash });
+  if (existing) ctx.corpus.sources.update(source.id, { title: raw.title, occurredAt: raw.occurredAt, contentHash: hash, externalUrl: raw.externalUrl ?? null });
   ctx.corpus.segments.replace(source.id, raw.segments);
   for (const attachment of raw.attachments ?? []) ingestFile(ctx, { ...attachment, connectorId: raw.connectorId, parentSourceId: source.id });
   ctx.jobs.enqueue("chunk", { sourceId: source.id, previous: existing ? true : false });

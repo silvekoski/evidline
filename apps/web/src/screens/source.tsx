@@ -82,6 +82,13 @@ export function SourceScreen() {
               </a>
             </Button>
           )}
+          {source.externalUrl && (
+            <Button asChild variant="outline" size="sm">
+              <a href={source.externalUrl} target="_blank" rel="noreferrer">
+                <ExternalLinkIcon aria-hidden="true" /> Open in {source.kind === "slack_thread" ? "Slack" : "Teams"}
+              </a>
+            </Button>
+          )}
           {source.runId && (
             <Button asChild variant="outline" size="sm">
               <Link to={`/runs/${source.runId}/sensors`}>Run {source.runId}</Link>

@@ -14,6 +14,7 @@ export type RawSource = {
   segments: SegmentDraft[];
   attachments: RawAttachment[];
   hint: WorkspaceHint;
+  externalUrl?: string | null;
   deleted?: boolean;
 };
 
