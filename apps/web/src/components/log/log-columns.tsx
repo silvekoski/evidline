@@ -1,14 +1,12 @@
+import { expandColumn } from "@/components/data-table";
+import { formatTimeSeconds } from "@/lib/format";
 import { createColumnHelper } from "@tanstack/react-table";
 import { Link } from "react-router";
-import { ChevronDownIcon, ChevronRightIcon } from "lucide-react";
 import type { Lens, LogEntry } from "@tpm/schemas";
 import { EvidenceChip } from "@/components/evidence-chip";
-import { Button } from "@/components/ui/button";
-import { CollapsibleTrigger } from "@/components/ui/collapsible";
 import { screenPath, type ScreenSlug } from "@/layout/screens";
 import { HashCell } from "./hash-cell";
 
-export type ColumnMeta = { align?: "right"; className?: string };
 
 export const actorWord = (actor: LogEntry["actor"], lens: Lens) => (actor === "agent" ? "agent" : lens.operator);
 
@@ -18,24 +16,13 @@ const idLink = "rounded-sm font-mono text-xs underline-offset-4 hover:underline 
 
 export function logColumns(runId: string, lens: Lens, screens: Map<string, ScreenSlug>) {
   return [
-    column.display({
-      id: "expand",
-      header: () => <span className="sr-only">Details</span>,
-      meta: { className: "w-8 pr-0" },
-      cell: ({ row }) => (
-        <CollapsibleTrigger asChild>
-          <Button variant="ghost" size="icon-xs" aria-label={`Details of entry ${row.original.seq}`}>
-            {row.getIsExpanded() ? <ChevronDownIcon aria-hidden="true" /> : <ChevronRightIcon aria-hidden="true" />}
-          </Button>
-        </CollapsibleTrigger>
-      ),
-    }),
-    column.accessor("seq", { header: "Seq", meta: { align: "right" } }),
+    expandColumn<LogEntry>((entry) => `Details of entry ${entry.seq}`),
+    column.accessor("seq", { header: "Seq", meta: { numeric: true } }),
     column.accessor("time", {
       header: "Time",
       cell: ({ getValue }) => (
         <time dateTime={getValue()} className="font-mono text-xs">
-          {getValue()}
+          {formatTimeSeconds(getValue())}
         </time>
       ),
     }),

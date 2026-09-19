@@ -1,5 +1,9 @@
 import type { ComponentProps } from "react";
 import {
+  BanIcon,
+  PowerOffIcon,
+  SendIcon,
+  TriangleAlertIcon,
   CheckIcon,
   CircleDashedIcon,
   CircleHelpIcon,
@@ -13,12 +17,16 @@ import {
   TrendingUpIcon,
 } from "lucide-react";
 import { cn } from "cn";
-import { faultFamily, healthToFault, type FaultFamily, type HealthClass, type InferenceStatus } from "@tpm/schemas";
+import { faultFamily, healthToFault, type FaultFamily, type HealthClass, type InferenceStatus, type EgressRecord } from "@tpm/schemas";
 import { Badge } from "@/components/ui/badge";
 
-export type StatusKind = "healthy" | "drift" | FaultFamily | "hypothesis" | InferenceStatus;
+export type StatusKind = "healthy" | "drift" | FaultFamily | "hypothesis" | InferenceStatus | EgressRecord["status"];
 
 const styles: Record<StatusKind, { icon: typeof CheckIcon; word: string; variant: ComponentProps<typeof Badge>["variant"]; className?: string }> = {
+  sent: { icon: SendIcon, word: "sent", variant: "outline" },
+  blocked: { icon: BanIcon, word: "blocked", variant: "default" },
+  off: { icon: PowerOffIcon, word: "off", variant: "outline", className: "text-muted-foreground" },
+  error: { icon: TriangleAlertIcon, word: "error", variant: "default" },
   healthy: { icon: CircleIcon, word: "Healthy", variant: "outline", className: "text-muted-foreground" },
   drift: { icon: TrendingUpIcon, word: "Drift", variant: "outline", className: "border-dashed border-foreground" },
   sensor: { icon: CircleOffIcon, word: "Sensor fault", variant: "default" },

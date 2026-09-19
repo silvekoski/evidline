@@ -1,4 +1,5 @@
-import { useCallback, useEffect, type ReactNode } from "react";
+import { useScrollTarget } from "@/hooks/use-scroll-target";
+import { useCallback, type ReactNode } from "react";
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router";
 import { ShieldCheckIcon } from "lucide-react";
@@ -60,9 +61,7 @@ export function DataFlowScreen() {
   const selectedId = selected?.id ?? null;
   const runHashes = run.data?.templateHashes;
 
-  useEffect(() => {
-    if (selectedId) document.getElementById(selectedId)?.scrollIntoView({ block: "nearest" });
-  }, [selectedId]);
+  useScrollTarget(selectedId);
 
   return (
     <>

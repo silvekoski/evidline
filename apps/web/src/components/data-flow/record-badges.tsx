@@ -1,26 +1,6 @@
-import { BanIcon, CheckIcon, MinusIcon, PowerOffIcon, SendIcon, TriangleAlertIcon, XIcon } from "lucide-react";
+import { CheckIcon, MinusIcon, XIcon } from "lucide-react";
 import { cn } from "cn";
-import { GuardName, type EgressRecord, type GuardResult } from "@tpm/schemas";
-import { Badge } from "@/components/ui/badge";
-
-type RecordStatus = EgressRecord["status"];
-
-const statusStyles: Record<RecordStatus, { icon: typeof CheckIcon; variant: "default" | "outline"; className?: string }> = {
-  sent: { icon: SendIcon, variant: "outline" },
-  blocked: { icon: BanIcon, variant: "default" },
-  off: { icon: PowerOffIcon, variant: "outline", className: "text-muted-foreground" },
-  error: { icon: TriangleAlertIcon, variant: "default" },
-};
-
-export function RecordStatusBadge({ status, className }: { status: RecordStatus; className?: string }) {
-  const { icon: Icon, variant, className: statusClass } = statusStyles[status];
-  return (
-    <Badge variant={variant} className={cn("font-normal", statusClass, className)}>
-      <Icon aria-hidden="true" />
-      {status}
-    </Badge>
-  );
-}
+import { GuardName, type GuardResult } from "@tpm/schemas";
 
 type GuardState = "pass" | "fail" | "not run";
 

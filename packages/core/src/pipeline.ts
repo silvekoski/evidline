@@ -55,7 +55,7 @@ function boundByHealth(grid: Grid, fps: Fingerprint[], found: BaselineResult, si
   return {
     ...found,
     value: { ...found.value, window: window(0, cut) },
-    claim: `Baseline is the first ${cut} samples. ${sensor} fails the ${health} check from sample ${first.from} to the end of the grid, so the baseline ends before it${cut === first.from ? "" : `, at the episode boundary at sample ${cut}`}. ${found.claim}`,
+    claim: `Baseline is the first ${cut} samples. The change points alone gave the first ${end} samples, but ${sensor} fails the ${health} check from sample ${first.from} to the end of the grid, so the baseline ends before it${cut === first.from ? "" : `, at the episode boundary at sample ${cut}`}.`,
     evidenceIds: [...found.evidenceIds, evidenceId],
   };
 }

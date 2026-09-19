@@ -7,7 +7,7 @@ import { ConfidenceBar } from "@/components/confidence-bar";
 import { StatusBadge, healthKind } from "@/components/status-badge";
 import { useLens } from "@/hooks/use-lens";
 import { capitalize, formatNumber } from "@/lib/format";
-import { DataTable, expandColumn } from "./data-table";
+import { DataTable, expandColumn } from "@/components/data-table";
 import { EvidenceChips } from "./inference-footer";
 import { SampleRange, type DayLabel } from "./sample-range";
 

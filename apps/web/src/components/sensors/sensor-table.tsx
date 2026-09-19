@@ -15,7 +15,7 @@ import { StatusBadge } from "@/components/status-badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { DataTable } from "./data-table";
+import { DataTable } from "@/components/data-table";
 import { HealthBadge } from "./health-badge";
 import { Hypothesis } from "./hypothesis";
 import { useOpenSensor } from "./use-open-sensor";
@@ -42,7 +42,7 @@ const columns = [
   column.accessor("roleConfidence", {
     header: "Confidence",
     cell: ({ getValue }) => <ConfidenceBar value={getValue()} className="justify-end" />,
-    meta: { align: "right" },
+    meta: { numeric: true },
   }),
   column.accessor("health", {
     header: "Health",
@@ -164,6 +164,7 @@ export function SensorTable({ sensors, current, lens }: { sensors: SensorRow[]; 
       </div>
       <DataTable
         table={table}
+        label="Sensors"
         empty={`No ${lens.sensor} matches the filters.`}
         rowProps={(row) => ({
           id: row.original.alias,

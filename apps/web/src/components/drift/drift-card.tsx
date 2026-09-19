@@ -8,12 +8,12 @@ import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/componen
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatNumber } from "@/lib/format";
 import { DeviationSparkline } from "./drift-charts";
-import { deviationLimit, inRangeLine, isDrifting, useResidual } from "./drift-data";
+import { deviationLimit, inRangeLine, useResidual } from "./drift-data";
 
 export function DriftCard({ inference, selected, label }: { inference: DriftInference; selected: boolean; label: (sample: number) => string }) {
   const { value } = inference;
   const residual = useResidual(inference);
-  const limit = deviationLimit(value, residual.evidence?.chart);
+  const limit = deviationLimit(residual.evidence?.chart);
   const { hash } = useLocation();
   const targeted = hash === `#${value.sensor}` || hash === `#${inference.id}`;
   const ref = useRef<HTMLAnchorElement>(null);
@@ -40,7 +40,7 @@ export function DriftCard({ inference, selected, label }: { inference: DriftInfe
       <Card size="sm" className={cn("h-full gap-2", selected && "ring-foreground")}>
         <CardHeader>
           <CardTitle className="font-mono">{value.sensor}</CardTitle>
-          <CardAction>{isDrifting(value) ? <StatusBadge kind="drift" /> : <StatusBadge kind="healthy" label="No drift" />}</CardAction>
+          <CardAction>{value.drifting ? <StatusBadge kind="drift" /> : <StatusBadge kind="healthy" label="No drift" />}</CardAction>
         </CardHeader>
         <CardContent className="flex flex-col gap-1.5">
           <div className="flex justify-between gap-2 font-mono text-xs text-muted-foreground tabular-nums">

@@ -50,3 +50,11 @@ typescript 5.9, vite 7, @vitejs/plugin-react 5, vitest 4, react 19, react-router
 
 - Norrin gave an OpenAI-compatible endpoint (vLLM, Mistral Large 3, EU hosting on DataCrunch). Mode `cloud` uses it through the `openai` provider. The key lives in `.env` (git-ignored); the server loads it with `process.loadEnvFile`.
 - The endpoint supports strict JSON schema output. A live call takes about 1 s.
+
+## Measured on the demo stream (2026-09-19)
+
+- Pipeline time about 19 s for 20,160 rows and 52 sensors. Baseline: the first 11,520 samples (the dead sensor cuts it at an episode boundary).
+- Incidents: `Sensor fault: dead` on S18 from sample 11,835. `Sensor fault: drift` on S07 (ranked first, responsible, in range at detection, onset 14,431 against the injection at 14,112). `Process fault: degradation` for the fault 13 episode (onset 19,448 against the truth 19,360).
+- The engine labels fault 13 as degradation, not slow degradation: the deviation after the onset is not monotone because the control loops react. The demo says what the engine says.
+- Ranked contributions come from normalized maximum deviations with drivers before victims. PCA T2 and SPE stay as supporting evidence in the trace. The agent measured that raw PCA contributions ranked by unit size on this data.
+- Roles on TE: 25 of 52 sensors are unknown or tied. Tightly coupled pressures form a redundancy group by the PRD rule. Sensors with a clear role for the demo: S46 (upstream, confidence 1.0), S12, S15, S17, S48, S49, S52 (redundant pairs of a level and its valve), S43 (downstream 0.67).

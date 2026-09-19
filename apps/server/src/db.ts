@@ -209,6 +209,7 @@ export function openDb(path: string = process.env.DB_PATH ?? dbPath) {
       save: runs.upsert,
       get: (id: string): Run | null => runs.one("WHERE id = ?", id),
       list: (): Run[] => runs.many("ORDER BY created_at DESC, rowid DESC"),
+      byName: (name: string): Run[] => runs.many("WHERE name = ? ORDER BY created_at DESC, rowid DESC", name),
     },
     sensors: {
       saveAll: (rows: SensorRecord[]): void => transaction(() => rows.forEach(sensors.upsert)),
@@ -227,6 +228,7 @@ export function openDb(path: string = process.env.DB_PATH ?? dbPath) {
         }),
       series: (runId: string): GridSeries[] =>
         grids.many("WHERE run_id = ? ORDER BY length(alias), alias", runId).filter((row) => !reservedGridKeys.has(row.alias)),
+      get: (runId: string, alias: string): Float64Array | null => grids.one("WHERE run_id = ? AND alias = ?", runId, alias)?.values ?? null,
       load(runId: string): Grid | null {
         const rows = grids.many("WHERE run_id = ? ORDER BY length(alias), alias", runId);
         const bounds = rows.find((row) => row.alias === "episodes")?.values;
@@ -250,6 +252,9 @@ export function openDb(path: string = process.env.DB_PATH ?? dbPath) {
         transaction(() => Object.entries(derived).forEach(([key, values]) => evidenceSeries.upsert({ evidenceId, key, values }))),
       get: (id: string): Evidence | null => evidence.one("WHERE id = ?", id),
       list: (runId: string): Evidence[] => evidence.many("WHERE run_id = ? ORDER BY id", runId),
+      count: (runId: string): number => (prepare("SELECT COUNT(*) AS count FROM evidence WHERE run_id = ?").get(runId) as { count: number }).count,
+      relationsOf: (runId: string, alias: string): Evidence[] =>
+        evidence.many("WHERE run_id = ? AND kind IN ('correlation', 'lag') AND sensors LIKE ? ORDER BY id", runId, `%"${alias}"%`),
       series: (evidenceId: string): Record<string, Float64Array> =>
         Object.fromEntries(evidenceSeries.many("WHERE evidence_id = ?", evidenceId).map((row) => [row.key, row.values])),
     },
@@ -261,6 +266,8 @@ export function openDb(path: string = process.env.DB_PATH ?? dbPath) {
         stage === undefined
           ? inferences.many("WHERE run_id = ? ORDER BY seq", runId)
           : inferences.many("WHERE run_id = ? AND stage = ? ORDER BY seq", runId, stage),
+      nextSeq: (runId: string): number =>
+        (prepare("SELECT COALESCE(MAX(seq), 0) + 1 AS seq FROM inferences WHERE run_id = ?").get(runId) as { seq: number }).seq,
     },
     rules: {
       save: rules.upsert,

@@ -12,7 +12,7 @@ import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle }
 import { Skeleton } from "@/components/ui/skeleton";
 import { capitalize, formatNumber } from "@/lib/format";
 import { DriftCharts } from "./drift-charts";
-import { deviationLimit, inRangeLine, isDrifting, useResidual } from "./drift-data";
+import { deviationLimit, inRangeLine, useResidual } from "./drift-data";
 
 type Props = {
   inference: DriftInference;
@@ -26,7 +26,7 @@ export function DriftDetail({ inference, runId, aliases, label, dt }: Props) {
   const { value } = inference;
   const lens = useLens();
   const residual = useResidual(inference);
-  const limit = deviationLimit(value, residual.evidence?.chart);
+  const limit = deviationLimit(residual.evidence?.chart);
   const spec = residual.evidence?.chart;
   const at = (sample: number) => (dt === null ? label(sample) : `${label(sample)}, sample ${sample.toLocaleString("en-US")}`);
   const alias = (a: string) =>
@@ -72,7 +72,7 @@ export function DriftDetail({ inference, runId, aliases, label, dt }: Props) {
       <CardHeader>
         <CardTitle className="flex flex-wrap items-center gap-2">
           <span className="font-mono">{value.sensor}</span>
-          {isDrifting(value) ? <StatusBadge kind="drift" /> : <StatusBadge kind="healthy" label="No drift" />}
+          {value.drifting ? <StatusBadge kind="drift" /> : <StatusBadge kind="healthy" label="No drift" />}
           <span className="font-mono text-xs font-normal text-muted-foreground">{inference.id}</span>
         </CardTitle>
         <CardDescription>{inference.claim}</CardDescription>

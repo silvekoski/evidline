@@ -1,47 +1,17 @@
-import { useMemo, useState } from "react";
-import {
-  createColumnHelper,
-  flexRender,
-  getCoreRowModel,
-  getSortedRowModel,
-  useReactTable,
-  type Header,
-  type SortingState,
-} from "@tanstack/react-table";
+import { useMemo } from "react";
+import { createColumnHelper } from "@tanstack/react-table";
+import { DataTable } from "@/components/data-table";
 import { Link } from "react-router";
-import { ArrowDownIcon, ArrowUpDownIcon, ArrowUpIcon } from "lucide-react";
-import { cn } from "cn";
 import type { RankedSensor } from "@tpm/schemas";
 import { useLens } from "@/hooks/use-lens";
 import { screenPath } from "@/layout/screens";
-import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatNumber } from "@/lib/format";
 
 type Row = RankedSensor & { rank: number };
-type Meta = { right?: boolean };
 
 const column = createColumnHelper<Row>();
-const right = { right: true } satisfies Meta;
-const isRight = (meta: unknown) => (meta as Meta | undefined)?.right === true;
-
-const sortIcon = { asc: ArrowUpIcon, desc: ArrowDownIcon, false: ArrowUpDownIcon } as const;
-const ariaSort = { asc: "ascending", desc: "descending", false: "none" } as const;
-
-function SortableHead({ header }: { header: Header<Row, unknown> }) {
-  const { column: col } = header;
-  const sorted = col.getIsSorted() || "false";
-  const Icon = sortIcon[sorted];
-  return (
-    <TableHead scope="col" aria-sort={ariaSort[sorted]} className={cn("h-8", isRight(col.columnDef.meta) && "text-right")}>
-      <Button variant="ghost" size="xs" className={cn("-mx-2 h-7 font-medium", isRight(col.columnDef.meta) && "flex-row-reverse")} onClick={col.getToggleSortingHandler()}>
-        {flexRender(col.columnDef.header, header.getContext())}
-        <Icon className={cn(sorted === "false" && "text-muted-foreground")} aria-hidden="true" />
-      </Button>
-    </TableHead>
-  );
-}
+const right = { numeric: true };
 
 export function RankedTable({
   ranked,
@@ -55,7 +25,6 @@ export function RankedTable({
   label: (sample: number) => string;
 }) {
   const lens = useLens();
-  const [sorting, setSorting] = useState<SortingState>([{ id: "contribution", desc: true }]);
   const data = useMemo(() => ranked.map((r, i) => ({ ...r, rank: i + 1 })), [ranked]);
   const columns = useMemo(
     () => [
@@ -97,46 +66,15 @@ export function RankedTable({
     ],
     [runId, label],
   );
-  const table = useReactTable({
-    data,
-    columns,
-    state: { sorting },
-    onSortingChange: setSorting,
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-  });
-  const rows = table.getRowModel().rows;
-
   return (
-    <Table>
-      <TableHeader>
-        {table.getHeaderGroups().map((group) => (
-          <TableRow key={group.id} className="hover:bg-transparent">
-            {group.headers.map((header) => (
-              <SortableHead key={header.id} header={header} />
-            ))}
-          </TableRow>
-        ))}
-      </TableHeader>
-      <TableBody>
-        {rows.length === 0 ? (
-          <TableRow className="hover:bg-transparent">
-            <TableCell colSpan={columns.length} className="py-3 text-center text-muted-foreground">
-              No ranked {lens.sensor}. The health gate masked every candidate.
-            </TableCell>
-          </TableRow>
-        ) : (
-          rows.map((row) => (
-            <TableRow key={row.id} data-state={row.original.sensor === current ? "selected" : undefined}>
-              {row.getVisibleCells().map((cell) => (
-                <TableCell key={cell.id} className={cn("py-1", isRight(cell.column.columnDef.meta) && "text-right font-mono tabular-nums")}>
-                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                </TableCell>
-              ))}
-            </TableRow>
-          ))
-        )}
-      </TableBody>
-    </Table>
+    <DataTable
+      data={data}
+      columns={columns}
+      label="Ranked sensors"
+      initialSorting={[{ id: "contribution", desc: true }]}
+      getRowId={(row) => row.sensor}
+      empty={`No ranked ${lens.sensor}. The health gate masked every candidate.`}
+      rowProps={(row) => ({ "data-state": row.original.sensor === current ? "selected" : undefined })}
+    />
   );
 }

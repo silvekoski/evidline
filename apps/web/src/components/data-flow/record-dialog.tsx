@@ -1,3 +1,4 @@
+import { StatusBadge } from "@/components/status-badge";
 import { useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { CheckIcon, XIcon } from "lucide-react";
@@ -14,7 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { formatMs, formatTime } from "@/lib/format";
 import { InferenceLink } from "./inference-link";
-import { guardState, RecordStatusBadge } from "./record-badges";
+import { guardState } from "./record-badges";
 import { HashMatch } from "./template-panel";
 
 const linkClass = "rounded-sm font-mono text-xs underline-offset-4 hover:underline focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none";
@@ -114,7 +115,7 @@ function RecordBody({ record, runHashes }: { record: EgressRecord; runHashes: Pa
       <DialogHeader>
         <DialogTitle className="flex flex-wrap items-center gap-2">
           <span className="font-mono">{record.id}</span>
-          <RecordStatusBadge status={record.status} />
+          <StatusBadge kind={record.status} />
           {record.operatorText && (
             <Badge variant="outline" className="font-normal">
               operator text

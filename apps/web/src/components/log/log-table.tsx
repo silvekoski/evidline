@@ -1,23 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  flexRender,
   getCoreRowModel,
   getFilteredRowModel,
   getPaginationRowModel,
   getSortedRowModel,
   useReactTable,
-  type Column,
   type ColumnFiltersState,
   type ExpandedState,
-  type Header,
   type PaginationState,
   type SortingState,
 } from "@tanstack/react-table";
-import { ArrowDownIcon, ArrowUpDownIcon, ArrowUpIcon, ListFilterIcon, SearchIcon } from "lucide-react";
-import { cn } from "cn";
+import { ListFilterIcon, SearchIcon } from "lucide-react";
 import { LogType, type Lens, type LogEntry } from "@tpm/schemas";
 import { Button } from "@/components/ui/button";
-import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -31,42 +26,13 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Table, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { ScreenSlug } from "@/layout/screens";
-import { actorWord, logColumns, type ColumnMeta } from "./log-columns";
+import { actorWord, logColumns } from "./log-columns";
+import { DataTable } from "@/components/data-table";
 import { LogEntryDetail } from "./log-entry-detail";
 
 const pageSize = 50;
 const all = "all";
-
-const metaOf = <T,>(column: Column<LogEntry, T>) => column.columnDef.meta as ColumnMeta | undefined;
-
-const sortIcon = { asc: ArrowUpIcon, desc: ArrowDownIcon, false: ArrowUpDownIcon } as const;
-const ariaSort = { asc: "ascending", desc: "descending", false: "none" } as const;
-
-function SortHead({ header }: { header: Header<LogEntry, unknown> }) {
-  const { column } = header;
-  const meta = metaOf(column);
-  const right = meta?.align === "right";
-  const content = flexRender(column.columnDef.header, header.getContext());
-  if (!column.getCanSort()) {
-    return (
-      <TableHead scope="col" className={cn("h-8", right && "text-right", meta?.className)}>
-        {content}
-      </TableHead>
-    );
-  }
-  const sorted = column.getIsSorted() || "false";
-  const Icon = sortIcon[sorted];
-  return (
-    <TableHead scope="col" aria-sort={ariaSort[sorted]} className={cn("h-8", right && "text-right", meta?.className)}>
-      <Button variant="ghost" size="xs" className={cn("-mx-2 h-7 font-medium", right && "flex-row-reverse")} onClick={column.getToggleSortingHandler()}>
-        {content}
-        <Icon className={cn(sorted === "false" && "text-muted-foreground")} aria-hidden="true" />
-      </Button>
-    </TableHead>
-  );
-}
 
 export function LogTable({
   entries,
@@ -143,11 +109,7 @@ export function LogTable({
   const types = (table.getColumn("type")?.getFilterValue() as string[] | undefined) ?? [];
   const setTypes = (next: string[]) => table.getColumn("type")?.setFilterValue(next.length === 0 ? undefined : next);
   const actor = (table.getColumn("actor")?.getFilterValue() as LogEntry["actor"] | undefined) ?? all;
-  const rows = table.getRowModel().rows;
-  const span = table.getVisibleLeafColumns().length;
   const shown = orderedRows.length;
-  const first = shown === 0 ? 0 : pagination.pageIndex * pageSize + 1;
-  const last = Math.min(shown, (pagination.pageIndex + 1) * pageSize);
 
   return (
     <div className="flex flex-col gap-3">
@@ -213,63 +175,17 @@ export function LogTable({
           {shown} of {entries.length} entries
         </p>
       </div>
-      <Table aria-label="Decision log">
-        <TableHeader>
-          {table.getHeaderGroups().map((group) => (
-            <TableRow key={group.id} className="hover:bg-transparent">
-              {group.headers.map((header) => (
-                <SortHead key={header.id} header={header} />
-              ))}
-            </TableRow>
-          ))}
-        </TableHeader>
-        {rows.length === 0 ? (
-          <tbody>
-            <TableRow className="hover:bg-transparent">
-              <TableCell colSpan={span} className="py-6 text-center text-muted-foreground">
-                No entry matches the filters.
-              </TableCell>
-            </TableRow>
-          </tbody>
-        ) : (
-          rows.map((row) => (
-            <Collapsible key={row.id} asChild open={row.getIsExpanded()} onOpenChange={(open) => row.toggleExpanded(open)}>
-              <tbody className="border-b last:border-0">
-                <TableRow id={`log-${row.id}`} className="border-0" data-state={target !== "" && row.original.inferenceId === target ? "selected" : undefined}>
-                  {row.getVisibleCells().map((cell) => {
-                    const meta = metaOf(cell.column);
-                    return (
-                      <TableCell key={cell.id} className={cn("py-1", meta?.align === "right" && "text-right font-mono tabular-nums", meta?.className)}>
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                      </TableCell>
-                    );
-                  })}
-                </TableRow>
-                <CollapsibleContent asChild>
-                  <TableRow className="border-0 hover:bg-transparent">
-                    <TableCell colSpan={span} className="p-3 whitespace-normal">
-                      <LogEntryDetail entry={row.original} />
-                    </TableCell>
-                  </TableRow>
-                </CollapsibleContent>
-              </tbody>
-            </Collapsible>
-          ))
-        )}
-      </Table>
-      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-        <p aria-live="polite">
-          Rows {first} to {last} of {shown}
-        </p>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()}>
-            Previous
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => table.nextPage()} disabled={!table.getCanNextPage()}>
-            Next
-          </Button>
-        </div>
-      </div>
+      <DataTable
+        table={table}
+        label="Decision log"
+        empty="No entry matches the filters."
+        pagination
+        renderExpanded={(row) => <LogEntryDetail entry={row.original} />}
+        rowProps={(row) => ({
+          id: `log-${row.id}`,
+          "data-state": target !== "" && row.original.inferenceId === target ? "selected" : undefined,
+        })}
+      />
     </div>
   );
 }

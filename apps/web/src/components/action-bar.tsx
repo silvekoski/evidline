@@ -164,23 +164,54 @@ function OverrideDialog({
         );
       case "diagnosis":
         return (
-          <Field label="Fault class" id="override-fault">
-            <Select
-              value={value?.kind === "faultClass" ? value.faultClass : inference.value.faultClass}
-              onValueChange={(faultClass) => setValue({ kind: "faultClass", faultClass: faultClass as FaultClass })}
-            >
-              <SelectTrigger id="override-fault" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {FaultClass.options.map((fc) => (
-                  <SelectItem key={fc} value={fc}>
-                    {faultLabel(fc)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
+          <>
+            <Field label="Override" id="override-kind">
+              <Select
+                value={value?.kind === "responsible" ? "responsible" : "faultClass"}
+                onValueChange={(kind) => setValue(kind === "responsible"
+                  ? { kind: "responsible", sensor: inference.value.ranked[0]?.sensor ?? "" }
+                  : { kind: "faultClass", faultClass: inference.value.faultClass })}
+              >
+                <SelectTrigger id="override-kind" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="faultClass">Fault class</SelectItem>
+                  <SelectItem value="responsible" disabled={inference.value.ranked.length === 0}>Responsible {lens.sensor}</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
+            {value?.kind === "responsible" ? (
+              <Field label={`Responsible ${lens.sensor}`} id="override-responsible">
+                <Select value={value.sensor} onValueChange={(sensor) => setValue({ kind: "responsible", sensor })}>
+                  <SelectTrigger id="override-responsible" className="w-full font-mono">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {inference.value.ranked.map(({ sensor }) => <SelectItem key={sensor} value={sensor}>{sensor}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </Field>
+            ) : (
+              <Field label="Fault class" id="override-fault">
+                <Select
+                  value={value?.kind === "faultClass" ? value.faultClass : inference.value.faultClass}
+                  onValueChange={(faultClass) => setValue({ kind: "faultClass", faultClass: faultClass as FaultClass })}
+                >
+                  <SelectTrigger id="override-fault" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {FaultClass.options.map((fc) => (
+                      <SelectItem key={fc} value={fc}>
+                        {faultLabel(fc)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+            )}
+          </>
         );
       case "baseline": {
         const window = value?.kind === "baseline" ? value.window : inference.value.window;

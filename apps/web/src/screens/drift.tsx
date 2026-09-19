@@ -8,7 +8,6 @@ import { useLens } from "@/hooks/use-lens";
 import { useRun } from "@/hooks/use-run";
 import { useTimeBase } from "@/hooks/use-time-base";
 import { DriftCard } from "@/components/drift/drift-card";
-import { isDrifting } from "@/components/drift/drift-data";
 import { DriftDetail } from "@/components/drift/drift-detail";
 import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
@@ -28,7 +27,7 @@ export function DriftScreen() {
   const report = useQuery({ queryKey: keys.drift(runId), queryFn: () => getDrift(runId), enabled: runId !== "" });
 
   const sorted = [...(report.data?.drifts ?? [])].sort((a, b) => b.value.severity - a.value.severity || a.value.sensor.localeCompare(b.value.sensor));
-  const drifting = sorted.filter((d) => isDrifting(d.value));
+  const drifting = sorted.filter((d) => d.value.drifting);
   const target = hash.slice(1);
   const selected = sorted.find((d) => d.id === target || d.value.sensor === target) ?? sorted[0];
   const visible = filter === "drifting" ? drifting : sorted;

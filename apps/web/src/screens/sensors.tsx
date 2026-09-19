@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useScrollTarget } from "@/hooks/use-scroll-target";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "react-router";
 import { ActivityIcon } from "lucide-react";
@@ -29,9 +29,7 @@ export function SensorsScreen() {
       : (sensors.find((s) => s.alias === target || s.roleInferenceId === target || s.healthInferenceId === target || s.driftInferenceId === target) ?? null);
   const alias = selected?.alias ?? null;
 
-  useEffect(() => {
-    if (alias) document.getElementById(alias)?.scrollIntoView({ block: "nearest" });
-  }, [alias]);
+  useScrollTarget(alias);
 
   const failed = sensors.filter((s) => s.health !== "healthy").length;
   const title = capitalize(lens.sensors);

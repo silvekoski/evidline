@@ -5,7 +5,7 @@ import { cn } from "cn";
 import type { CalibrationInference, CalibrationValue } from "@tpm/schemas";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatNumber } from "@/lib/format";
-import { DataTable } from "./data-table";
+import { DataTable } from "@/components/data-table";
 import { InferenceFooter } from "./inference-footer";
 import type { DayLabel } from "./sample-range";
 

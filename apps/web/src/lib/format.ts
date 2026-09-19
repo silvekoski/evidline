@@ -32,3 +32,7 @@ export function shortHash(hash: string): string {
 export function capitalize(word: string): string {
   return word.charAt(0).toUpperCase() + word.slice(1);
 }
+
+export function formatTimeSeconds(iso: string): string {
+  return iso.slice(0, 19).replace("T", " ");
+}

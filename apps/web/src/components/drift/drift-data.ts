@@ -2,17 +2,15 @@ import { useQueries, useQuery } from "@tanstack/react-query";
 import type { ChartSpec, DriftInference, DriftValue, Evidence, EvidenceSeries } from "@tpm/schemas";
 import { getEvidence, getEvidenceSeries, keys } from "@/api";
 
-export const isDrifting = (value: DriftValue) => value.severity >= 1 && (value.pValue < 0.01 || value.onset !== null);
-
 export function inRangeLine(value: DriftValue): string {
-  const drift = isDrifting(value) ? "drift found" : "no drift";
+  const drift = value.drifting ? "drift found" : "no drift";
   return value.inRange ? `In range, no alarm, ${drift}` : `Out of range, ${drift}`;
 }
 
 export const deviationKey = (value: DriftValue) => (value.method === "distribution" ? "distance" : "deviation");
 
-export const deviationLimit = (value: DriftValue, spec: ChartSpec | undefined): number | null =>
-  spec?.threshold ?? (value.severity > 0 ? value.maxDeviation / value.severity : null);
+export const deviationLimit = (spec: ChartSpec | undefined): number | null =>
+  spec?.threshold ?? null;
 
 export type Residual = { evidence: Evidence | undefined; series: EvidenceSeries | undefined; error: Error | null };
 

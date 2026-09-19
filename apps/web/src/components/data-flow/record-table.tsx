@@ -1,11 +1,13 @@
+import { StatusBadge } from "@/components/status-badge";
+import { formatTimeSeconds } from "@/lib/format";
 import { useMemo, useState } from "react";
 import { createColumnHelper, getCoreRowModel, getSortedRowModel, useReactTable, type SortingState } from "@tanstack/react-table";
 import { PenLineIcon } from "lucide-react";
 import type { EgressRecord } from "@tpm/schemas";
 import { Badge } from "@/components/ui/badge";
-import { DataTable } from "./data-table";
+import { DataTable } from "@/components/data-table";
 import { InferenceLink } from "./inference-link";
-import { GuardMarks, RecordStatusBadge } from "./record-badges";
+import { GuardMarks } from "./record-badges";
 
 const column = createColumnHelper<EgressRecord>();
 
@@ -27,7 +29,7 @@ export function RecordTable({ records, current, onOpen }: { records: EgressRecor
             }}
             aria-label={`Open record ${row.original.id}`}
           >
-            <time dateTime={getValue()}>{getValue().slice(0, 19).replace("T", " ")}</time>
+            <time dateTime={getValue()}>{formatTimeSeconds(getValue())}</time>
           </button>
         ),
       }),
@@ -46,8 +48,8 @@ export function RecordTable({ records, current, onOpen }: { records: EgressRecor
         ),
       }),
       column.accessor("mode", { header: "Mode" }),
-      column.accessor("status", { header: "Status", cell: ({ getValue }) => <RecordStatusBadge status={getValue()} /> }),
-      column.accessor("payloadBytes", { header: "Bytes", meta: { align: "right" }, cell: ({ getValue }) => getValue().toLocaleString("en-US") }),
+      column.accessor("status", { header: "Status", cell: ({ getValue }) => <StatusBadge kind={getValue()} /> }),
+      column.accessor("payloadBytes", { header: "Bytes", meta: { numeric: true }, cell: ({ getValue }) => getValue().toLocaleString("en-US") }),
       column.accessor((record) => record.guards.filter((g) => !g.pass).length, {
         id: "guards",
         header: "Guards",

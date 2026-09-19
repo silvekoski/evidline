@@ -9,7 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { useLens } from "@/hooks/use-lens";
 import { capitalize } from "@/lib/format";
-import { DataTable, expandColumn } from "./data-table";
+import { DataTable, expandColumn } from "@/components/data-table";
 import { InferenceFooter } from "./inference-footer";
 import { useActivateRule } from "./use-activate-rule";
 

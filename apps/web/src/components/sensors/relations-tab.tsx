@@ -6,7 +6,7 @@ import { getEvidence, keys } from "@/api";
 import { EvidenceChip } from "@/components/evidence-chip";
 import { formatNumber } from "@/lib/format";
 import { AliasChip } from "./alias-chip";
-import { DataTable } from "./data-table";
+import { DataTable } from "@/components/data-table";
 import { formatDuration } from "./duration";
 
 type Row = { peer: string; rho: number; lag: number; rhoAtLag: number; direction: string; evidenceId: string; lagEvidenceId: string | null };
@@ -22,14 +22,14 @@ const columns = [
     header: "rho",
     cell: ({ getValue }) => formatNumber(getValue()),
     sortingFn: (a, b) => Math.abs(a.original.rho) - Math.abs(b.original.rho),
-    meta: { align: "right" },
+    meta: { numeric: true },
   }),
-  column.accessor("lag", { header: "Lag", meta: { align: "right" } }),
+  column.accessor("lag", { header: "Lag", meta: { numeric: true } }),
   column.accessor("direction", { header: "Direction", enableSorting: false }),
   column.accessor("rhoAtLag", {
     header: "rho at lag",
     cell: ({ getValue }) => formatNumber(getValue()),
-    meta: { align: "right" },
+    meta: { numeric: true },
   }),
   column.display({
     id: "evidence",
@@ -101,7 +101,7 @@ export function RelationsTab({ detail, report, lens, dt }: { detail: SensorDetai
         <h3 id="top-relations" className="text-xs font-medium text-muted-foreground">
           Relations, strongest first
         </h3>
-        <DataTable table={table} empty={`No relation above the correlation threshold for ${detail.alias}.`} />
+        <DataTable label="Sensor relations" table={table} empty={`No relation above the correlation threshold for ${detail.alias}.`} />
         <p className="text-xs text-muted-foreground">
           rho is the Spearman correlation on the healthy baseline. A positive lag means {detail.alias} leads the peer. Inverse means the two move in opposite directions. rho at lag is the
           cross-correlation at that lag.
