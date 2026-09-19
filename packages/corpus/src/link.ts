@@ -1,7 +1,7 @@
 import { mentionedColumn, type ColumnCandidate } from "./extract-local";
 import { normalizeText } from "./tokens";
 
-export const LINK_THRESHOLD = 0.5;
+export const LINK_THRESHOLD = 0.75;
 export const ALIAS_SCORE = 1;
 export const NAME_SCORE = 0.6;
 

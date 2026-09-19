@@ -1,0 +1,25 @@
+{
+  "workspace": "norrin",
+  "questions": [
+    { "question": "what unit is the reactor pressure stored in", "contains": "kPa" },
+    { "question": "when was the reactor thermocouple replaced", "contains": "January" },
+    { "question": "which valve sticks after the purge line wash", "contains": "PV-2041" },
+    { "question": "how long does the purge valve stick", "contains": "hour" },
+    { "question": "analyzer calibration schedule", "contains": "Monday" },
+    { "question": "why does the stripper level oscillate", "contains": "manual" },
+    { "question": "what happened on 27 February", "contains": "P-302" },
+    { "question": "time zone of the export", "contains": "Helsinki" },
+    { "question": "cooling coil fouling", "contains": "cleaning" },
+    { "question": "separator cooling water source change", "contains": "closed loop" },
+    { "question": "product specification limit for component D", "contains": "0.6" },
+    { "question": "compressor surge", "contains": "recycle" },
+    { "question": "high pressure alarm limit of R-101", "contains": "2895" },
+    { "question": "who to ask about the lab", "contains": "Sari" },
+    { "question": "positioner fault on the A and C feed valve", "contains": "61" },
+    { "question": "historian outage", "contains": "December" },
+    { "question": "gas chromatograph cycle time", "contains": "15 min" },
+    { "question": "stripper bottoms pump trip root cause", "contains": "strainer" },
+    { "question": "recycle flow tag", "contains": "FI-1005" },
+    { "question": "what is xmeas_22", "contains": "cooling water outlet" }
+  ]
+}

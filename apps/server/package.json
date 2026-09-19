@@ -13,7 +13,9 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
     "dev": "tsx watch src/index.ts",
-    "start": "tsx src/index.ts"
+    "start": "tsx src/index.ts",
+    "replay": "tsx src/cli/replay.ts",
+    "golden": "tsx src/cli/golden.ts"
   },
   "dependencies": {
     "@tpm/schemas": "workspace:*",

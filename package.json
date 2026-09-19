@@ -15,7 +15,10 @@
     "test": "vitest run",
     "check": "pnpm typecheck && pnpm lint && pnpm test",
     "canary": "tsx scripts/canary.ts",
-    "build-demo": "tsx scripts/build-demo.ts"
+    "build-demo": "tsx scripts/build-demo.ts",
+    "replay": "pnpm --filter @tpm/server replay",
+    "golden": "pnpm --filter @tpm/server golden",
+    "build-demo-corpus": "tsx scripts/build-demo-corpus.ts"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.0",
