@@ -7,6 +7,7 @@ import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/s
 import { EvidenceSheet } from "@/components/evidence-sheet";
 import { AppBreadcrumb } from "./app-breadcrumb";
 import { AppSidebar } from "./app-sidebar";
+import { ColorPaletteSwitch } from "./color-palette-switch";
 import { CommandPalette, useCommandPalette } from "./command-palette";
 
 const isMac = /Mac|iPhone|iPad/.test(navigator.platform);
@@ -26,6 +27,7 @@ export function AppLayout() {
             <span>Jump to</span>
             <Kbd>{isMac ? "⌘" : "Ctrl"} K</Kbd>
           </Button>
+          <ColorPaletteSwitch />
         </header>
         <div className="flex flex-1 flex-col p-4">
           <Outlet />

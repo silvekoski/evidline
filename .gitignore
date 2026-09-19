@@ -10,3 +10,4 @@ te_process.csv
 *.log
 coverage/
 .env
+.claude/worktrees/
