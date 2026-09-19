@@ -1,0 +1,22 @@
+{
+  "name": "@tpm/core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@tpm/schemas": "workspace:*",
+    "ml-matrix": "^6.15.0",
+    "ml-pca": "^4.1.1",
+    "simple-statistics": "^7.12.0"
+  }
+}

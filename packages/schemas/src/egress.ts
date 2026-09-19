@@ -1,0 +1,173 @@
+import { z } from "zod";
+import { Alias, FaultClass, Role, SignalType } from "./common.js";
+import { InvestigationPlan, StatKey, TraceTest } from "./inference.js";
+import { RuleJson } from "./rule.js";
+
+export const Purpose = z.enum(["name_role", "compile_rule", "explain_diagnosis", "plan_investigation"]);
+export type Purpose = z.infer<typeof Purpose>;
+
+export const ModelMode = z.enum(["off", "local", "cloud"]);
+export type ModelMode = z.infer<typeof ModelMode>;
+
+export const ProviderInfo = z.object({ name: z.string(), model: z.string(), region: z.string().nullable(), host: z.string() });
+export type ProviderInfo = z.infer<typeof ProviderInfo>;
+
+export const ModelSettings = z.object({ mode: ModelMode, provider: ProviderInfo.nullable() });
+export type ModelSettings = z.infer<typeof ModelSettings>;
+
+const num = z.number().finite();
+const count = z.number().int().min(100);
+const shortArray = z.array(num).max(20);
+
+export const PayloadWindow = z.object({ from: z.number().int().nonnegative(), to: z.number().int().nonnegative() }).strict();
+
+export const SummaryQuantiles = z
+  .object({ p1: num, p5: num, p25: num, p50: num, p75: num, p95: num, p99: num })
+  .strict();
+
+const PeerSummary = z.object({ alias: Alias, lag: z.number().int(), rho: num, n: count }).strict();
+
+export const SensorSummary = z
+  .object({
+    alias: Alias,
+    n: count,
+    signalType: SignalType,
+    missingRate: num,
+    quantiles: SummaryQuantiles,
+    mad: num,
+    histogramShares: shortArray,
+    noise: num,
+    acfTime: num,
+    period: num.nullable(),
+    flatShare: num,
+    monotonicShare: num,
+    distinct: z.number().int(),
+    hold: z.number().int(),
+    role: Role,
+    roleConfidence: num,
+    leads: z.array(PeerSummary).max(20),
+    follows: z.array(PeerSummary).max(20),
+  })
+  .strict();
+export type SensorSummary = z.infer<typeof SensorSummary>;
+
+export const NameRolePayload = z.object({ purpose: z.literal("name_role"), dt: num.nullable(), sensor: SensorSummary }).strict();
+
+export const CatalogEntry = z.object({ alias: Alias, signalType: SignalType, role: Role }).strict();
+
+export const CompileRulePayload = z
+  .object({
+    purpose: z.literal("compile_rule"),
+    sentence: z.string().max(500),
+    dt: num.nullable(),
+    n: count,
+    catalog: z.array(CatalogEntry).max(20),
+  })
+  .strict();
+
+const PayloadTraceStep = z
+  .object({
+    index: z.number().int(),
+    test: TraceTest,
+    name: z.string().max(60),
+    n: count,
+    stats: z.record(StatKey, num).refine((o) => Object.keys(o).length <= 20, "at most 20 stats"),
+    result: z.string().max(300),
+    evidenceIds: z.array(z.string().regex(/^ev-[0-9a-f]{8}-\d{5}$/)).min(1).max(20),
+  })
+  .strict();
+
+export const ExplainDiagnosisPayload = z
+  .object({
+    purpose: z.literal("explain_diagnosis"),
+    faultClass: FaultClass,
+    n: count,
+    onset: z.number().int().nullable(),
+    ranked: z.array(z.object({ alias: Alias, contribution: num }).strict()).max(20),
+    excluded: z.array(Alias).max(20),
+    trace: z.array(PayloadTraceStep).max(20),
+  })
+  .strict();
+
+export const PlanInvestigationPayload = z
+  .object({
+    purpose: z.literal("plan_investigation"),
+    question: z.string().max(500),
+    dt: num.nullable(),
+    n: count,
+    inference: z
+      .object({
+        stage: z.string().max(20),
+        claim: z.string().max(300),
+        sensor: Alias.nullable(),
+        onset: z.number().int().nullable(),
+        baseline: PayloadWindow,
+        masked: z.array(PayloadWindow).max(20),
+      })
+      .strict(),
+    catalog: z.array(CatalogEntry).max(20),
+    tools: z.array(z.string().max(40)).max(20),
+  })
+  .strict();
+
+export const EgressPayload = z.discriminatedUnion("purpose", [
+  NameRolePayload,
+  CompileRulePayload,
+  ExplainDiagnosisPayload,
+  PlanInvestigationPayload,
+]);
+export type EgressPayload = z.infer<typeof EgressPayload>;
+
+export const NameRoleResponse = z
+  .object({ name: z.string().max(60), quantity: z.string().max(40), confidence: z.number().min(0).max(1), reason: z.string().max(200) })
+  .strict();
+export type NameRoleResponse = z.infer<typeof NameRoleResponse>;
+export const CompileRuleResponse = z.object({ rule: RuleJson }).strict();
+export type CompileRuleResponse = z.infer<typeof CompileRuleResponse>;
+export const ExplainDiagnosisResponse = z
+  .object({ sentences: z.array(z.object({ text: z.string().max(300), evidenceIds: z.array(z.string()).min(1) }).strict()).min(1).max(12) })
+  .strict();
+export type ExplainDiagnosisResponse = z.infer<typeof ExplainDiagnosisResponse>;
+export const PlanInvestigationResponse = InvestigationPlan;
+export type PlanInvestigationResponse = z.infer<typeof PlanInvestigationResponse>;
+
+export const GuardName = z.enum(["schema", "floor", "size", "rounding", "leak", "names", "record"]);
+export type GuardName = z.infer<typeof GuardName>;
+
+export const GuardResult = z.object({ name: GuardName, pass: z.boolean(), detail: z.string(), hits: z.number().int().optional() });
+export type GuardResult = z.infer<typeof GuardResult>;
+
+export const EgressRecord = z.object({
+  id: z.string(),
+  runId: z.string().nullable(),
+  time: z.string(),
+  purpose: Purpose,
+  mode: ModelMode,
+  provider: ProviderInfo.nullable(),
+  payload: z.string(),
+  payloadBytes: z.number().int(),
+  guards: z.array(GuardResult),
+  templateHash: z.string(),
+  inferenceId: z.string().nullable(),
+  operatorText: z.boolean(),
+  status: z.enum(["sent", "blocked", "off", "error"]),
+  response: z.string().nullable(),
+  validator: z.object({ pass: z.boolean(), errors: z.array(z.string()) }).nullable(),
+  durationMs: z.number().nullable(),
+});
+export type EgressRecord = z.infer<typeof EgressRecord>;
+
+export const EgressTotals = z.object({
+  rawBytes: z.number(),
+  sentBytes: z.number(),
+  calls: z.number().int(),
+  sent: z.number().int(),
+  blocked: z.number().int(),
+  off: z.number().int(),
+  scannerHits: z.number().int(),
+  hosts: z.array(z.string()),
+});
+export type EgressTotals = z.infer<typeof EgressTotals>;
+
+export const TemplateInfo = z.record(Purpose, z.object({ text: z.string(), hash: z.string() }));
+export type TemplateInfo = z.infer<typeof TemplateInfo>;
