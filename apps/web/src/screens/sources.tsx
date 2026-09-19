@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router";
 import type { ColumnDef } from "@tanstack/react-table";
-import { BookOpenIcon, LinkIcon, UploadIcon } from "lucide-react";
+import { BookOpenIcon, CircleXIcon, LinkIcon, LoaderIcon, ScanTextIcon, TriangleAlertIcon, UploadIcon } from "lucide-react";
 import { toast } from "sonner";
 import { SourceKind, SourceStatus, type Source } from "@tpm/schemas";
 import { createUploadLink, getCorpusStats, keys, listSources, uploadSources } from "@/api";
@@ -26,8 +26,13 @@ const columns: ColumnDef<Source>[] = [
     accessorKey: "status",
     header: "Status",
     cell: ({ row }) => (
-      <span title={row.original.error ?? undefined}>
-        {sourceStatusWord[row.original.status]}
+      <span title={row.original.error ?? undefined} className="inline-flex flex-col">
+        <span className="inline-flex items-center gap-1">
+          {(row.original.status === "received" || row.original.status === "processing") && <LoaderIcon aria-hidden="true" className="size-3.5 motion-safe:animate-spin" />}
+          {row.original.status === "failed" && <CircleXIcon aria-hidden="true" className="size-3.5" />}
+          {row.original.status === "needs_ocr" && <ScanTextIcon aria-hidden="true" className="size-3.5" />}
+          {sourceStatusWord[row.original.status]}
+        </span>
         {row.original.error && <span className="block max-w-xs truncate text-xs text-muted-foreground">{row.original.error}</span>}
         {row.original.runId && (
           <Link to={`/runs/${row.original.runId}/sensors`} className="block font-mono text-xs underline-offset-4 hover:underline">
@@ -77,6 +82,10 @@ export function SourcesScreen() {
       toast.success("Upload link copied", { description: `${url} is valid until ${formatTime(made.expiresAt)}` });
     },
   });
+
+  const attention = status === "all" ? (sources.data ?? []).filter((s) => s.status === "failed" || s.status === "needs_ocr") : [];
+  const failed = attention.filter((s) => s.status === "failed").length;
+  const needsOcr = attention.length - failed;
 
   return (
     <>
@@ -135,10 +144,28 @@ export function SourcesScreen() {
         <StatCard label="Sources" value={stats.data?.sources ?? "…"} />
         <StatCard label="Chunks" value={stats.data?.chunks ?? "…"} />
         <StatCard label="Claims" value={stats.data?.claims ?? "…"} hint={stats.data ? `${stats.data.claimsRejected} rejected by the quote check` : undefined} to="/claims" />
-        <StatCard label="Columns" value={stats.data?.columns ?? "…"} />
+        <StatCard label="Columns" value={stats.data?.columns ?? "…"} hint={stats.data?.columns === 0 ? "Run a sensor file to fill the catalog" : undefined} to={stats.data?.columns === 0 ? "/" : undefined} />
         <StatCard label="Jobs" value={stats.data ? `${stats.data.jobsQueued} queued` : "…"} hint={stats.data ? `${stats.data.jobsFailed} failed` : undefined} to="/connectors" />
         <StatCard label="Embedder" value={stats.data?.embedder ?? "none"} hint={stats.data?.dimensions ? `${stats.data.dimensions} dimensions` : undefined} />
       </div>
+      {attention.length > 0 && (
+        <p className="mb-3 flex flex-wrap items-center gap-2 rounded-md border p-2 text-sm" role="status">
+          <TriangleAlertIcon aria-hidden="true" className="size-4" />
+          <span>
+            {attention.length === 1 ? "1 source needs" : `${attention.length} sources need`} attention.
+          </span>
+          {failed > 0 && (
+            <Button size="xs" variant="outline" onClick={() => setStatus("failed")}>
+              {failed} failed
+            </Button>
+          )}
+          {needsOcr > 0 && (
+            <Button size="xs" variant="outline" onClick={() => setStatus("needs_ocr")}>
+              {needsOcr} {needsOcr === 1 ? "needs" : "need"} OCR
+            </Button>
+          )}
+        </p>
+      )}
       <div
         className="rounded-lg border border-dashed"
         onDragOver={(e) => e.preventDefault()}

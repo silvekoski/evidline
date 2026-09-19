@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { CheckIcon, UploadIcon } from "lucide-react";
+import { CheckIcon, LoaderIcon, UploadIcon } from "lucide-react";
 import type { Source } from "@tpm/schemas";
 import { uploadThroughLink } from "@/api";
 import { Button } from "@/components/ui/button";
@@ -30,18 +30,23 @@ export function PublicUploadScreen({ token }: { token: string }) {
           >
             <UploadIcon aria-hidden="true" />
             <p>Drop files here, or</p>
-            <input ref={input} type="file" multiple className="sr-only" aria-label="Choose files" onChange={(e) => { const files = Array.from(e.target.files ?? []); if (files.length) upload.mutate(files); e.target.value = ""; }} />
+            <input ref={input} type="file" multiple className="sr-only" aria-label="Choose files" accept=".pdf,.docx,.pptx,.txt,.md,.vtt,.eml,.csv,.xlsx,audio/*,.m4a,.mp3,.wav,.ogg,.webm" onChange={(e) => { const files = Array.from(e.target.files ?? []); if (files.length) upload.mutate(files); e.target.value = ""; }} />
             <Button size="sm" onClick={() => input.current?.click()} disabled={upload.isPending}>
               Choose files
             </Button>
           </div>
           <VoiceRecorder onRecorded={(file) => upload.mutate([file])} disabled={upload.isPending} />
-          {upload.isError && <p className="text-sm">{upload.error.message}</p>}
+          {upload.isPending && (
+            <p className="flex items-center gap-2 text-sm" role="status">
+              <LoaderIcon aria-hidden="true" className="size-4 motion-safe:animate-spin" /> Sending {upload.variables.length === 1 ? "1 file" : `${upload.variables.length} files`}
+            </p>
+          )}
+          {upload.isError && <p className="text-sm" role="alert">{upload.error.message}</p>}
           {done.length > 0 && (
             <ul className="flex flex-col gap-1 text-sm" aria-label="Received files">
               {done.map((s) => (
                 <li key={s.id} className="flex items-center gap-2">
-                  <CheckIcon aria-hidden="true" className="size-4" /> {s.title}
+                  <CheckIcon aria-hidden="true" className="size-4" /> {s.title} <span className="text-muted-foreground">received</span>
                 </li>
               ))}
             </ul>
