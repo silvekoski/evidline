@@ -3,7 +3,7 @@ import type { EgressPayload, EgressRecord, GuardResult, ModelMode, ProviderInfo,
 import { fallback, fallbackMissingReason } from "./fallback";
 import { issueSummary, payloadGuards, recordGuard } from "./guards";
 import type { LeakIndex } from "./leak";
-import { getProvider } from "./providers/from-env";
+import { getProvider, getReviewers } from "./providers/from-env";
 import { roundPayload } from "./round";
 import { responseSchema, templates } from "./templates";
 
@@ -15,8 +15,9 @@ export type CallResult<T> =
   { ok: true; value: T; recordId: string; source: "model" | "fallback" } | { ok: false; recordId: string | null; reason: string };
 
 export type Gateway = {
-  call<T>(purpose: Purpose, payload: EgressPayload, ctx: CallContext): Promise<CallResult<T>>;
+  call<T>(purpose: Purpose, payload: EgressPayload, ctx: CallContext, reviewer?: string): Promise<CallResult<T>>;
   provider(mode: ModelMode): ProviderInfo | null;
+  reviewers(): ProviderInfo[];
   templates(): TemplateInfo;
 };
 
@@ -27,24 +28,33 @@ export type GatewayOptions = {
   nowIso: () => string;
   newId: () => string;
   resolveProvider?: (mode: ModelMode) => Provider | null;
+  resolveReviewers?: () => Provider[];
 };
 
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
-const noProviderMessage = (mode: ModelMode) => `no provider configured for mode ${mode}`;
+const noProviderMessage = (mode: ModelMode, reviewer?: string) =>
+  reviewer === undefined ? `no provider configured for mode ${mode}` : mode === "cloud" ? `no reviewer ${reviewer}` : "reviewers need mode cloud";
 const infoOf = ({ name, model, region, host }: Provider): ProviderInfo => ({ name, model, region, host });
 
 export function createGateway(opts: GatewayOptions): Gateway {
   const resolve = opts.resolveProvider ?? getProvider;
-  const providerFor = (mode: ModelMode): Provider | null => (mode === "off" ? null : resolve(mode));
+  const resolveReviewers = opts.resolveReviewers ?? getReviewers;
+  const reviewersFor = (mode: ModelMode): Provider[] => (mode === "cloud" ? resolveReviewers() : []);
+  const providerFor = (mode: ModelMode, reviewer?: string): Provider | null => {
+    if (mode === "off") return null;
+    if (reviewer !== undefined) return reviewersFor(mode).find((p) => p.model === reviewer) ?? null;
+    return resolve(mode);
+  };
   return {
     templates: () => templates(),
     provider(mode) {
       const provider = providerFor(mode);
       return provider === null ? null : infoOf(provider);
     },
-    async call<T>(purpose: Purpose, payload: EgressPayload, ctx: CallContext): Promise<CallResult<T>> {
+    reviewers: () => reviewersFor(opts.getMode()).map(infoOf),
+    async call<T>(purpose: Purpose, payload: EgressPayload, ctx: CallContext, reviewer?: string): Promise<CallResult<T>> {
       const mode = opts.getMode();
-      const provider = providerFor(mode);
+      const provider = providerFor(mode, reviewer);
       const text = JSON.stringify(roundPayload(payload));
       const input = { purpose, payload, text, index: opts.leakIndex(ctx.runId) };
       const guards: GuardResult[] = [];
@@ -70,7 +80,7 @@ export function createGateway(opts: GatewayOptions): Gateway {
         inferenceId: ctx.inferenceId,
         operatorText: ctx.operatorText,
         status: failed ? "blocked" : mode === "off" ? "off" : missingProvider ? "error" : "sent",
-        response: !failed && missingProvider ? noProviderMessage(mode) : null,
+        response: !failed && missingProvider ? noProviderMessage(mode, reviewer) : null,
         validator: null,
         durationMs: null,
       };
@@ -89,7 +99,7 @@ export function createGateway(opts: GatewayOptions): Gateway {
           return { ok: false, recordId: id, reason: `fallback failed the ${purpose} response schema: ${issueSummary(parsed.error)}` };
         return { ok: true, value: parsed.data as T, recordId: id, source: "fallback" };
       }
-      if (provider === null) return { ok: false, recordId: id, reason: noProviderMessage(mode) };
+      if (provider === null) return { ok: false, recordId: id, reason: noProviderMessage(mode, reviewer) };
       const started = Date.now();
       let response: string;
       try {
@@ -110,10 +120,17 @@ export function createGateway(opts: GatewayOptions): Gateway {
   };
 }
 
+export function jsonText(content: string): string {
+  const bare = content.replace(/^\s*<think>[\s\S]*?<\/think>\s*/, "").replace(/^\s*```(?:json)?\s*|\s*```\s*$/g, "");
+  const from = bare.indexOf("{");
+  const to = bare.lastIndexOf("}");
+  return from >= 0 && to > from ? bare.slice(from, to + 1) : bare;
+}
+
 function parseJson(text: string, schema: ZodType): { ok: true; value: unknown } | { ok: false; reason: string } {
   let json: unknown;
   try {
-    json = JSON.parse(text);
+    json = JSON.parse(jsonText(text));
   } catch (e) {
     return { ok: false, reason: `not JSON: ${message(e)}` };
   }

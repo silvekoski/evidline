@@ -19,4 +19,4 @@ startSchedules(registry);
 void startSlackSockets(manager);
 const app = createRootApp(manager, { webDist, log: console.log });
 
-serve({ fetch: app.fetch, port: 8787 }, (info) => console.log(`tpm server listens on http://localhost:${info.port}`));
+serve({ fetch: app.fetch, port: Number(process.env.PORT ?? 8787) }, (info) => console.log(`tpm server listens on http://localhost:${info.port}`));

@@ -23,6 +23,6 @@ export const screenForStage: Record<Stage, ScreenSlug> = {
   diagnosis: "diagnosis",
 };
 
-export const screenForPurpose: Partial<Record<Purpose, ScreenSlug>> = { name_role: "sensors", compile_rule: "quality", explain_diagnosis: "diagnosis" };
+export const screenForPurpose: Partial<Record<Purpose, ScreenSlug>> = { name_role: "sensors", compile_rule: "quality", explain_diagnosis: "diagnosis", cross_review: "diagnosis" };
 
 export const screenPath = (runId: string, slug: ScreenSlug, hash?: string) => ({ pathname: `/runs/${runId}/${slug}`, hash: hash ? `#${hash}` : "" });

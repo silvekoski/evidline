@@ -1,4 +1,4 @@
-import { FaultClass, faultLabel, type Evidence, type ProseValidation } from "@tpm/schemas";
+import { FaultClass, faultLabel, type CrossReviewPayload, type CrossReviewResponse, type Evidence, type ProseValidation } from "@tpm/schemas";
 import { aliasToken, escapeRegExp, evidenceIdToken, numberToken, significantDigits } from "./tokens";
 
 const anyLabel = new RegExp(
@@ -9,6 +9,32 @@ const anyLabel = new RegExp(
     .join("|"),
   "gi",
 );
+
+const foreignNumbers = (text: string, values: number[]): string[] =>
+  (text.replace(evidenceIdToken, " ").replace(aliasToken, " ").match(numberToken) ?? []).filter((token) => {
+    const digits = significantDigits(token);
+    const target = Number(Number(token).toPrecision(digits));
+    return !values.some((v) => Number(v.toPrecision(digits)) === target);
+  });
+
+export function validateReview(response: CrossReviewResponse, payload: CrossReviewPayload): { pass: boolean; errors: string[] } {
+  const errors: string[] = [];
+  const aliases = new Set([...payload.ranked.map((r) => r.alias), ...payload.excluded]);
+  const values = [
+    payload.n,
+    ...(payload.onset === null ? [] : [payload.onset]),
+    ...payload.ranked.map((r) => r.contribution),
+    ...payload.trace.flatMap((s) => [s.index, s.n, ...Object.values(s.stats)]),
+  ];
+  const own = faultLabel(response.faultClass).toLowerCase();
+  [response.summary, ...response.concerns].forEach((text, i) => {
+    const at = i === 0 ? "the summary" : `concern ${i}`;
+    for (const a of text.match(aliasToken) ?? []) if (!aliases.has(a)) errors.push(`${at} names the unknown alias ${a}`);
+    for (const token of foreignNumbers(text, values)) errors.push(`${at} has the number ${token} that is not in the payload`);
+    for (const l of text.match(anyLabel) ?? []) if (l.toLowerCase() !== own) errors.push(`${at} names the fault label "${l}" that differs from the reviewer's own class`);
+  });
+  return { pass: errors.length === 0, errors };
+}
 
 export function validateProse(
   sentences: { text: string; evidenceIds: string[] }[],
@@ -24,13 +50,7 @@ export function validateProse(
     for (const id of evidenceIds) if (!byId.has(id)) errors.push(`${at} cites the unknown evidence id ${id}`);
     for (const a of text.match(aliasToken) ?? []) if (!aliases.has(a)) errors.push(`${at} names the unknown alias ${a}`);
     const values = cited.flatMap((e) => [...Object.values(e.stats), e.window.from, e.window.to, e.window.n]);
-    for (const token of text.replace(evidenceIdToken, " ").replace(aliasToken, " ").match(numberToken) ?? []) {
-      const digits = significantDigits(token);
-      const target = Number(Number(token).toPrecision(digits));
-      if (!values.some((v) => Number(v.toPrecision(digits)) === target)) {
-        errors.push(`${at} has the number ${token} that is not in the cited evidence`);
-      }
-    }
+    for (const token of foreignNumbers(text, values)) errors.push(`${at} has the number ${token} that is not in the cited evidence`);
   });
   const labels =
     sentences

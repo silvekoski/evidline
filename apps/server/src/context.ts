@@ -1,6 +1,6 @@
 import { mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { createTextGateway, type Gateway, type TextGateway } from "@tpm/egress";
+import { createTextGateway, type Gateway, type GatewayOptions, type TextGateway } from "@tpm/egress";
 import type { JobType, WorkspaceSlug } from "@tpm/schemas";
 import { refreshCatalog } from "./catalog";
 import { openCorpus, type CorpusDb } from "./corpus-db";
@@ -33,7 +33,12 @@ export type AppContext = {
   close(): void;
 };
 
-export type ContextOptions = Partial<Pick<AppContext, "dataDir" | "webDist" | "log" | "slug" | "registry"> & { dbPath: string; runner: JobRunner }>;
+export type ContextOptions = Partial<
+  Pick<AppContext, "dataDir" | "webDist" | "log" | "slug" | "registry"> & { dbPath: string; runner: JobRunner } & Pick<
+      GatewayOptions,
+      "resolveProvider" | "resolveReviewers"
+    >
+>;
 
 function failInterruptedRuns(db: Db): void {
   const error = "server restarted";
@@ -61,7 +66,7 @@ export function createContext(opts: ContextOptions = {}): AppContext {
   failInterruptedRuns(db);
   const corpus = openCorpus(db.raw, slug);
   const registry = opts.registry ?? openRegistryAt(dataDir, log);
-  const gateway = wireGateway(db);
+  const gateway = wireGateway(db, { resolveProvider: opts.resolveProvider, resolveReviewers: opts.resolveReviewers });
   const textGateway = createTextGateway({ store: corpus.egressLog, getMode: () => getModelMode(db, gateway) });
   const ctx: AppContext = {
     slug,

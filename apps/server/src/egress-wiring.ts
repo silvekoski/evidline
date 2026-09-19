@@ -1,5 +1,5 @@
 import { parse } from "node:path";
-import { buildLeakIndex, createGateway, type EgressStore, type Gateway, type LeakIndex } from "@tpm/egress";
+import { buildLeakIndex, createGateway, type EgressStore, type Gateway, type GatewayOptions, type LeakIndex } from "@tpm/egress";
 import { EgressPayload, InvestigationTool, Stage } from "@tpm/schemas";
 import type { Db } from "./db";
 import { newEgressId } from "./ids";
@@ -62,13 +62,14 @@ export function createSqliteStore(db: Db): EgressStore {
   };
 }
 
-export function wireGateway(db: Db): Gateway {
+export function wireGateway(db: Db, resolvers: Pick<GatewayOptions, "resolveProvider" | "resolveReviewers"> = {}): Gateway {
   const gateway: Gateway = createGateway({
     store: createSqliteStore(db),
     getMode: () => getModelMode(db, gateway),
     leakIndex: createLeakIndexCache(db),
     nowIso: () => new Date().toISOString(),
     newId: newEgressId,
+    ...resolvers,
   });
   return gateway;
 }

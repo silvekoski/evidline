@@ -141,6 +141,7 @@ export const fallbackMissingReason: Record<Purpose, string> = {
   explain_diagnosis: "trace has no steps, model off",
   plan_investigation: "no fixed plan for this stage, model off",
   search: "no fallback for search, model off",
+  cross_review: "no fallback for cross_review, model off",
 };
 
 export function fallback(purpose: Purpose, payload: EgressPayload): unknown | null {
@@ -157,6 +158,7 @@ export function fallback(purpose: Purpose, payload: EgressPayload): unknown | nu
     case "plan_investigation":
       return plan(payload);
     case "search":
+    case "cross_review":
       return null;
   }
 }

@@ -50,12 +50,26 @@ Claim extraction uses the chat provider of mode `cloud`. In mode `off`, a local 
 
 Connectors live in the registry (`data/registry.db`) and serve all workspaces. Teams transcripts come from Microsoft Graph (polling every 10 minutes, or a webhook at `/api/webhooks/graph` when `notificationUrl` is set). Email comes from one shared mailbox through the Graph delta query. Slack uses an internal app in Socket Mode plus a history backfill. A source that no rule maps to a workspace waits in the Unassigned list on the Connectors page. An erasure request removes every segment and claim of one speaker, drops the original files, and rebuilds the chunks. A workspace can set a retention period in days. A daily job then removes each older source with its chunks, vectors, and claims.
 
+## Cross review
+
+In mode `cloud`, the Diagnosis screen can ask a set of open models for a second opinion on one incident. Each reviewer gets the same guarded summary as `explain_diagnosis`, without the engine verdict. It answers with a fault class, a confidence, a summary and concerns. The engine still decides the fault class. A reviewer answer is a hypothesis. A validator hides text that names a number or an alias outside the payload.
+
+| Variable | Meaning |
+| --- | --- |
+| `TPM_REVIEW_KEY` | The API key. Reviews are off without it. |
+| `TPM_REVIEW_URL` | Chat completions URL. Default `https://api.featherless.ai/v1/chat/completions`. |
+| `TPM_REVIEW_MODELS` | Comma separated model ids. Default `Qwen/Qwen3.8-Flash-Next`, `deepseek-ai/DeepSeek-V4.1-Flash`, `zai-org/GLM-5.3-Flash`, `moonshotai/Kimi-K2-Instruct`. |
+| `TPM_REVIEW_REGION` | Optional region label for the record. |
+
+Reviewers run one after another, because Featherless bills concurrency units and rejects calls above the plan with HTTP 429. Reviews run only when the operator asks.
+
 ## Rule 4: nothing leaves
 
 - `packages/egress` is the only package that can send data to a model. `packages/connectors` may open connections to Slack and Microsoft Graph to read sources. The ESLint config blocks `fetch`, sockets, dynamic imports and HTTP modules everywhere else, and blocks all I/O in `packages/core`.
 - Each model call passes seven guards in order: schema whitelist, aggregation floor (n >= 100), size limits, rounding to 3 significant digits, a leak scanner for runs of 3 raw samples, a scanner for source names and file names, and record-then-send.
 - `pnpm canary` runs the full pipeline and every model purpose on a synthetic dataset with a capturing provider and fails on any leak.
 - The Data flow screen shows each payload verbatim, the guard results, the template hash and the response.
+- Every model call names its endpoint host in its record, and the Data flow totals list each host that received data. The primary model uses one host. Reviewers use one more host when `TPM_REVIEW_URL` differs from the primary endpoint.
 
 ## Checks
 

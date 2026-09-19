@@ -3,13 +3,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { EgressRecord, Run } from "@tpm/schemas";
 import { createApp } from "../src/app";
-import { createContext, type AppContext } from "../src/context";
+import { createContext, type AppContext, type ContextOptions } from "../src/context";
 
 export type Fixture = { ctx: AppContext; app: ReturnType<typeof createApp>; dir: string; close(): void };
 
-export function fixture(): Fixture {
+export function fixture(opts: Pick<ContextOptions, "resolveProvider" | "resolveReviewers"> = {}): Fixture {
   const dir = mkdtempSync(join(tmpdir(), "tpm-server-"));
-  const ctx = createContext({ dbPath: join(dir, "tpm.db"), dataDir: join(dir, "data"), webDist: null, log: () => {} });
+  const ctx = createContext({ dbPath: join(dir, "tpm.db"), dataDir: join(dir, "data"), webDist: null, log: () => {}, ...opts });
   return {
     ctx,
     app: createApp(ctx),

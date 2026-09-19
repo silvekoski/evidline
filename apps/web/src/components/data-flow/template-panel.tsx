@@ -24,7 +24,7 @@ export function TemplatePanel({ templates, runHashes }: { templates: TemplateInf
     <Card size="sm">
       <CardHeader>
         <CardTitle>Prompt templates</CardTitle>
-        <CardDescription>Four constant templates with no dataset text. The panel compares each hash with the hash that the active run recorded.</CardDescription>
+        <CardDescription>Five constant templates with no dataset text. The panel compares each hash with the hash that the active run recorded.</CardDescription>
       </CardHeader>
       <CardContent>
         <Accordion type="multiple">

@@ -149,7 +149,7 @@ Solid arrows carry raw data and stay inside the plant. Dotted arrows carry summa
 ### Principles
 
 - The analysis code is pure functions with no network access and no file access. It cannot leak.
-- The model has four purposes and four fixed templates. No template contains dataset text.
+- The model has five purposes and five fixed templates. No template contains dataset text.
 - The same file gives the same inferences. Random seeds are fixed.
 - Model-off mode replaces each model call with a text template. All outputs still work.
 - The backend and the browser both run in the plant. The browser draws charts from raw data, so the web app makes zero third-party requests. Fonts are self-hosted. No analytics, no error tracker.
@@ -252,7 +252,7 @@ A PCA model on the healthy baseline backs the table with two statistics. A high 
 
 The trace is an ordered list of tests: health, drift, isolation, propagation, control loop, verdict. Each step has the test name, the numbers, the result and evidence IDs. The engine writes the trace. The model only rewrites it as prose.
 
-A validator checks the prose before the operator sees it. Each sentence must cite an evidence ID. Each number must exist in the cited evidence. Each alias must exist. The fault class must match the engine. If a check fails, the UI shows the template text. This is our answer to hallucination, and it replaces cross-AI review with a deterministic check.
+A validator checks the prose before the operator sees it. Each sentence must cite an evidence ID. Each number must exist in the cited evidence. Each alias must exist. The fault class must match the engine. If a check fails, the UI shows the template text. This is our answer to hallucination. A deterministic check, not a second model, decides whether the text stands. Section 11 describes the optional cross review, which the same kind of check gates.
 
 ### 5.9 Self-calibration
 
@@ -293,14 +293,14 @@ Each model call writes one record. The Data flow screen lists the records and sh
 | --- | --- |
 | What leaves | The payload, verbatim, with its size in bytes |
 | Which model | Provider, model name, region, endpoint host |
-| Why | One of four purposes: `name_role`, `compile_rule`, `explain_diagnosis`, `plan_investigation` |
+| Why | One of five purposes: `name_role`, `compile_rule`, `explain_diagnosis`, `plan_investigation`, `cross_review` |
 | Proof | Result of each guard, template hash, linked inference ID |
 | What came back | The response, verbatim, and the validator result |
 
 ### Enforcement in code
 
 - The model SDK is a dependency of the egress package only. A lint rule fails the build if another package imports it or calls `fetch`.
-- The backend allows outbound traffic to one host.
+- The backend allows outbound traffic to the primary model host and, when a reviewer endpoint is set, to that host. Each record names its host, and the Data flow totals list each host.
 - A canary test runs the full pipeline on a dataset of unique values. It fails if any of those values appears in a payload.
 - Server logs stay on the plant machine. No raw value goes to a log service.
 
@@ -557,12 +557,12 @@ We use the conversation in a different way. Each pain that Norrin named gets an 
 | --- | --- | --- |
 | AI hallucinates on these problems. | The engine decides. The model rewrites. The validator checks. Model-off mode still works. | 5.8, 6 |
 | Nobody can tell which logs a conclusion comes from. | Each sentence cites evidence IDs. One click opens the chart and the numbers. | 7 |
-| They tried cross-AI review. | A deterministic validator replaces the second model. | 5.8 |
+| They tried cross-AI review. | A deterministic validator checks every model text. A cross review by open models is an optional second opinion on one incident. The reviewers get the guarded summary without the engine verdict. The same validator checks their text. Their answer stays a hypothesis. | 5.8, 6 |
 | A drifting sensor causes false alarms. Opening the machine is very expensive. | Sensor fault against process fault, with a ranked list. The crew recalibrates one sensor and keeps the machine closed. This is the demo story. | 5.7 |
 | Understanding client data is the big cost. Clients want a fixed price. | The sensor report exports as a first data spec in Markdown and JSON (P1). | 8 |
 | Knowledge leaves with the engineers. Calls are not recorded. | Questions, hunches and override reasons stay on the sensor for the next run. | 7 |
 | Client models usually run in the client's Azure environment. | The default provider adapter is Azure OpenAI. | 6 |
-| Nobody knows how secure vibe-coded software is. | Rule 4 is a test, not a promise: lint boundary, canary test, one outbound host. | 6 |
+| Nobody knows how secure vibe-coded software is. | Rule 4 is a test, not a promise: lint boundary, canary test, a named outbound host per call. | 6 |
 | There are too many debug logs to inspect by hand. | P2: the records adapter reads a log file. Error rate and message pattern shares become sensors. | 10 |
 
 ### Roadmap slide: context layer
@@ -600,7 +600,7 @@ Cut order if time runs short: voice hunch, spec export, log file adapter, partia
 4. 1:30. Open the drift output. The value chart stays in range. The deviation chart shows the onset days before any limit.
 5. 2:00. Show two incidents side by side: a dead sensor and a process fault. Click a sentence. The evidence opens.
 6. 2:45. Question one inference. The agent runs a new test. Override a role. The diagnosis runs again. Open the decision log and verify the chain.
-7. 3:30. Open the Data flow screen. Compare raw MB with KB sent. Open a payload. Show scanner hits: 0. Switch the model off. The diagnosis stands. Show one outbound host in the browser network tab.
+7. 3:30. Open the Data flow screen. Compare raw MB with KB sent. Open a payload. Show scanner hits: 0. Switch the model off. The diagnosis stands. Show the outbound hosts in the Data flow totals.
 8. 4:10. Drop the transactions file into the same build. Show the dead field and the cents-for-euros gain fault.
 9. 4:40. Close with the value for Norrin and the roadmap slide.
 

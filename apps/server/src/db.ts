@@ -3,7 +3,7 @@ import { dirname } from "node:path";
 import Database from "better-sqlite3";
 import * as sqliteVec from "sqlite-vec";
 import { bucketMeans, type Grid, type Peer } from "@tpm/core";
-import type { EgressRecord, Evidence, Fingerprint, Inference, RedundancyGroup, Relation, Rule, Run, Stage, ThreadEntry } from "@tpm/schemas";
+import type { EgressRecord, Evidence, Fingerprint, Inference, Purpose, RedundancyGroup, Relation, Rule, Run, Stage, ThreadEntry } from "@tpm/schemas";
 import { dbPath } from "./paths";
 
 export type SensorRecord = {
@@ -207,7 +207,7 @@ export function openDb(path: string = process.env.DB_PATH ?? dbPath) {
       validator: "json",
       durationMs: "real",
     },
-    [["runId"]],
+    [["runId"], ["inferenceId"]],
   );
   const settings = defineTable<SettingRow>(db, prepare, "settings", ["key"], { key: "text", value: "text" });
 
@@ -318,6 +318,8 @@ export function openDb(path: string = process.env.DB_PATH ?? dbPath) {
     egress: {
       save: egress.upsert,
       get: (id: string): EgressRecord | null => egress.one("WHERE id = ?", id),
+      byInference: (inferenceId: string, purpose: Purpose): EgressRecord[] =>
+        egress.many("WHERE inference_id = ? AND purpose = ? ORDER BY time DESC, rowid DESC", inferenceId, purpose),
       list: (runId?: string): EgressRecord[] =>
         runId === undefined ? egress.many("ORDER BY time DESC, rowid DESC") : egress.many("WHERE run_id = ? ORDER BY time DESC, rowid DESC", runId),
       newestOffRunId(): string | null {

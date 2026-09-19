@@ -26,14 +26,21 @@ export function headOf(db: Db, inference: Inference): Inference {
   return head;
 }
 
-export function threadOf(db: Db, inference: Inference): ThreadEntry[] {
+export function chainOf(db: Db, inference: Inference): Inference[] {
   const chain = [inference];
   for (let next = inference.supersedes; next !== null && !chain.some((i) => i.id === next); next = chain.at(-1)!.supersedes) {
     const i = db.inferences.get(next);
     if (!i) break;
     chain.push(i);
   }
-  return chain.reverse().flatMap((i) => db.threads.list(i.id)).sort((a, b) => a.time.localeCompare(b.time));
+  return chain;
+}
+
+export function threadOf(db: Db, inference: Inference): ThreadEntry[] {
+  return chainOf(db, inference)
+    .reverse()
+    .flatMap((i) => db.threads.list(i.id))
+    .sort((a, b) => a.time.localeCompare(b.time));
 }
 
 export function overrideOf(inference: Inference): OverrideValue | null {

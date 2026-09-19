@@ -41,6 +41,7 @@ import {
   LogVerification,
   ModelSettings,
   QualityReport,
+  ReviewReport,
   Run,
   RunEvent,
   RunList,
@@ -108,6 +109,7 @@ export const keys = {
   inference: (id: string) => ["inferences", id] as const,
   inferenceHead: (id: string) => ["inferences", id, "head"] as const,
   thread: (id: string) => ["inferences", id, "thread"] as const,
+  reviews: (id: string) => ["inferences", id, "reviews"] as const,
   log: (runId?: string) => ["log", runId ?? "all"] as const,
   logVerify: ["log", "verify"] as const,
   egress: (runId?: string) => ["egress", runId ?? "all"] as const,
@@ -207,6 +209,8 @@ export const getEvidenceSeries = (id: string) => request(EvidenceSeries, `/evide
 export const getInference = (id: string) => request(Inference, `/inferences/${id}`);
 export const getInferenceHead = (id: string) => request(Inference, `/inferences/${id}/head`);
 export const getThread = (id: string) => request(arrayOf(ThreadEntry), `/inferences/${id}/thread`);
+export const getReviews = (id: string) => request(ReviewReport, `/inferences/${id}/reviews`);
+export const requestReview = (id: string) => request(ReviewReport, `/inferences/${id}/review`, post());
 export const acceptInference = (id: string) => request(ActionResponse, `/inferences/${id}/accept`, post());
 export const questionInference = (id: string, text: string) =>
   request(ActionResponse, `/inferences/${id}/question`, post({ text }));

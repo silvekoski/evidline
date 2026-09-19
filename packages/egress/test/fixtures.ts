@@ -1,4 +1,4 @@
-import type { EgressPayload, EgressRecord, ModelMode, SensorSummary, TraceStep } from "@tpm/schemas";
+import type { CrossReviewPayload, EgressPayload, EgressRecord, ModelMode, SensorSummary, TraceStep } from "@tpm/schemas";
 import { buildLeakIndex, createGateway, type EgressStore, type Gateway, type LeakIndex, type Provider } from "../src/index";
 
 export const evidenceId = (k: number) => `ev-0123abcd-${String(k).padStart(5, "0")}`;
@@ -69,6 +69,15 @@ export const explainPayload: EgressPayload = {
   ],
 };
 
+export const reviewPayload: CrossReviewPayload = {
+  purpose: "cross_review",
+  n: 8000,
+  onset: 12000,
+  ranked: [{ alias: "S05", contribution: 1 }],
+  excluded: ["S05"],
+  trace: [healthStep],
+};
+
 export const planPayload = (stage: string, question = "Is this right?", sensor: string | null = "S03", responsible: string | null = null): EgressPayload => ({
   purpose: "plan_investigation",
   question,
@@ -127,9 +136,10 @@ export const replies: Record<string, string> = {
   explain_diagnosis: JSON.stringify({ sentences: [{ text: "Sensor fault: dead.", evidenceIds: [evidenceId(1)] }] }),
   plan_investigation: JSON.stringify({ calls: [{ tool: "rerun_without", sensor: "S03" }], rationale: "mask the suspect" }),
   search: JSON.stringify({ clauses: [[{ field: "health", value: "dead" }], [{ field: "kind", value: "sensor" }]] }),
+  cross_review: JSON.stringify({ faultClass: "sensor-dead", confidence: 0.8, summary: "S05 held 6400 identical samples against a limit of 40.", concerns: [] }),
 };
 
-export function testGateway(opts: { mode: ModelMode; provider?: Provider | null; index?: LeakIndex }): {
+export function testGateway(opts: { mode: ModelMode; provider?: Provider | null; reviewers?: Provider[]; index?: LeakIndex }): {
   gateway: Gateway;
   store: EgressStore & { records: EgressRecord[] };
 } {
@@ -139,6 +149,7 @@ export function testGateway(opts: { mode: ModelMode; provider?: Provider | null;
     store,
     getMode: () => opts.mode,
     resolveProvider: () => opts.provider ?? null,
+    resolveReviewers: () => opts.reviewers ?? [],
     leakIndex: () => opts.index ?? buildLeakIndex([], []),
     nowIso: () => "2026-09-19T12:00:00Z",
     newId: () => `eg-${String(++counter).padStart(3, "0")}`,

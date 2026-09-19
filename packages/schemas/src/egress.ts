@@ -3,7 +3,7 @@ import { Alias, Domain, FaultClass, HealthClass, InferenceStatus, Role, SignalTy
 import { InvestigationPlan, Stage, StatKey, TraceTest } from "./inference.js";
 import { RuleJson } from "./rule.js";
 
-export const Purpose = z.enum(["name_role", "compile_rule", "explain_diagnosis", "plan_investigation", "search"]);
+export const Purpose = z.enum(["name_role", "compile_rule", "explain_diagnosis", "plan_investigation", "search", "cross_review"]);
 export type Purpose = z.infer<typeof Purpose>;
 
 export const ModelMode = z.enum(["off", "local", "cloud"]);
@@ -12,7 +12,7 @@ export type ModelMode = z.infer<typeof ModelMode>;
 export const ProviderInfo = z.object({ name: z.string(), model: z.string(), region: z.string().nullable(), host: z.string() });
 export type ProviderInfo = z.infer<typeof ProviderInfo>;
 
-export const ModelSettings = z.object({ mode: ModelMode, provider: ProviderInfo.nullable() });
+export const ModelSettings = z.object({ mode: ModelMode, provider: ProviderInfo.nullable(), reviewers: z.array(ProviderInfo) });
 export type ModelSettings = z.infer<typeof ModelSettings>;
 
 const num = z.number().finite();
@@ -77,17 +77,18 @@ const PayloadTraceStep = z
   })
   .strict();
 
-export const ExplainDiagnosisPayload = z
-  .object({
-    purpose: z.literal("explain_diagnosis"),
-    faultClass: FaultClass,
-    n: count,
-    onset: z.number().int().nullable(),
-    ranked: z.array(z.object({ alias: Alias, contribution: num }).strict()).max(20),
-    excluded: z.array(Alias).max(20),
-    trace: z.array(PayloadTraceStep).max(20),
-  })
-  .strict();
+const diagnosisFields = {
+  n: count,
+  onset: z.number().int().nullable(),
+  ranked: z.array(z.object({ alias: Alias, contribution: num }).strict()).max(20),
+  excluded: z.array(Alias).max(20),
+  trace: z.array(PayloadTraceStep).max(20),
+};
+
+export const ExplainDiagnosisPayload = z.object({ purpose: z.literal("explain_diagnosis"), faultClass: FaultClass, ...diagnosisFields }).strict();
+
+export const CrossReviewPayload = z.object({ purpose: z.literal("cross_review"), ...diagnosisFields }).strict();
+export type CrossReviewPayload = z.infer<typeof CrossReviewPayload>;
 
 export const PlanInvestigationPayload = z
   .object({
@@ -119,6 +120,7 @@ export const EgressPayload = z.discriminatedUnion("purpose", [
   ExplainDiagnosisPayload,
   PlanInvestigationPayload,
   SearchPayload,
+  CrossReviewPayload,
 ]);
 export type EgressPayload = z.infer<typeof EgressPayload>;
 
@@ -134,6 +136,15 @@ export const ExplainDiagnosisResponse = z
 export type ExplainDiagnosisResponse = z.infer<typeof ExplainDiagnosisResponse>;
 export const PlanInvestigationResponse = InvestigationPlan;
 export type PlanInvestigationResponse = z.infer<typeof PlanInvestigationResponse>;
+export const CrossReviewResponse = z
+  .object({
+    faultClass: FaultClass,
+    confidence: z.number().min(0).max(1),
+    summary: z.string().max(300),
+    concerns: z.array(z.string().max(200)).max(3),
+  })
+  .strict();
+export type CrossReviewResponse = z.infer<typeof CrossReviewResponse>;
 
 export const SearchFamily = z.enum(["sensor", "process", "data"]);
 export const SearchDrift = z.enum(["drifting", "responsible", "victim", "in-range"]);
@@ -199,3 +210,25 @@ export type EgressTotals = z.infer<typeof EgressTotals>;
 
 export const TemplateInfo = z.record(Purpose, z.object({ text: z.string(), hash: z.string() }));
 export type TemplateInfo = z.infer<typeof TemplateInfo>;
+
+export const ReviewMatch = z.enum(["class", "family", "none"]);
+export type ReviewMatch = z.infer<typeof ReviewMatch>;
+
+export const Review = z.object({
+  egressId: z.string(),
+  inferenceId: z.string(),
+  time: z.string(),
+  model: z.string(),
+  host: z.string(),
+  verdict: CrossReviewResponse.nullable(),
+  match: ReviewMatch.nullable(),
+  validator: z.object({ pass: z.boolean(), errors: z.array(z.string()) }).nullable(),
+  error: z.string().nullable(),
+});
+export type Review = z.infer<typeof Review>;
+
+export const ReviewJob = z.object({ inferenceId: z.string(), model: z.string(), index: z.number().int(), total: z.number().int() });
+export type ReviewJob = z.infer<typeof ReviewJob>;
+
+export const ReviewReport = z.object({ pending: ReviewJob.nullable(), reviews: z.array(Review) });
+export type ReviewReport = z.infer<typeof ReviewReport>;

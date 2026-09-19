@@ -1,7 +1,7 @@
 import type { Evidence } from "@tpm/schemas";
 import { describe, expect, it } from "vitest";
-import { validateProse } from "../src/index";
-import { evidenceId } from "./fixtures";
+import { validateProse, validateReview } from "../src/index";
+import { evidenceId, reviewPayload } from "./fixtures";
 
 const chart = { type: "line" as const, window: { from: 12000, to: 20000, n: 8000 }, series: [] };
 const evidence: Evidence[] = [
@@ -100,6 +100,25 @@ describe("validateProse", () => {
     expect(bias.errors).toEqual([
       'the fault label "Sensor fault: drift (bias)" appears 0 times, expected once',
       'the text names the wrong fault label "Sensor fault: drift"',
+    ]);
+  });
+});
+
+describe("validateReview", () => {
+  const response = { faultClass: "sensor-dead" as const, confidence: 0.8, summary: "S05 held 6400 identical samples against a limit of 40.", concerns: ["Step 0 covers n 8000 only."] };
+
+  it("accepts a review that uses payload aliases, numbers and its own label", () => {
+    const summary = "Sensor fault: dead. S05 held 6400 identical samples against a limit of 40.";
+    expect(validateReview({ ...response, summary }, reviewPayload)).toEqual({ pass: true, errors: [] });
+  });
+
+  it("rejects a foreign alias, a foreign number and a different label", () => {
+    const result = validateReview({ ...response, summary: "S09 held 6500 samples.", concerns: ["Process fault: degradation fits S05 better."] }, reviewPayload);
+    expect(result.pass).toBe(false);
+    expect(result.errors).toEqual([
+      "the summary names the unknown alias S09",
+      "the summary has the number 6500 that is not in the payload",
+      'concern 1 names the fault label "Process fault: degradation" that differs from the reviewer\'s own class',
     ]);
   });
 });

@@ -16,7 +16,7 @@ export const getModelMode = (db: Db, gateway: Gateway): ModelMode =>
 
 export function getModelSettings(db: Db, gateway: Gateway): ModelSettings {
   const mode = getModelMode(db, gateway);
-  return { mode, provider: gateway.provider(mode) };
+  return { mode, provider: gateway.provider(mode), reviewers: gateway.reviewers() };
 }
 
 export function setModelMode(db: Db, gateway: Gateway, mode: ModelMode): ModelSettings {

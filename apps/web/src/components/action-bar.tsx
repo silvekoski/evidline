@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router";
 import { CheckIcon, CircleHelpIcon, PenIcon } from "lucide-react";
@@ -14,6 +14,7 @@ import {
   type ThreadEntry,
 } from "@tpm/schemas";
 import { acceptInference, getSensors, getThread, keys, overrideInference, questionInference } from "@/api";
+import { requestAction, useActionRequest } from "@/hooks/use-action-request";
 import { useLens } from "@/hooks/use-lens";
 import { screenForStage, screenPath } from "@/layout/screens";
 import { Button } from "@/components/ui/button";
@@ -78,7 +79,7 @@ export function ActionBar({ inference, className }: { inference: Inference; clas
           <CheckIcon aria-hidden="true" />
           Accept
         </Button>
-        <QuestionDialog pending={question.isPending} onSubmit={(text) => question.mutateAsync(text)} />
+        <QuestionDialog inferenceId={inference.id} pending={question.isPending} onSubmit={(text) => question.mutateAsync(text)} />
         {canOverride && <OverrideDialog inference={inference} pending={override.isPending} onSubmit={(value, reason) => override.mutateAsync({ value, reason })} />}
       </div>
       {thread.data?.length ? <Thread entries={thread.data} /> : null}
@@ -86,10 +87,17 @@ export function ActionBar({ inference, className }: { inference: Inference; clas
   );
 }
 
-function QuestionDialog({ pending, onSubmit }: { pending: boolean; onSubmit: (text: string) => Promise<unknown> }) {
+function QuestionDialog({ inferenceId, pending, onSubmit }: { inferenceId: string; pending: boolean; onSubmit: (text: string) => Promise<unknown> }) {
   const [open, setOpen] = useState(false);
   const [text, setText] = useState("");
   const lens = useLens();
+  const requested = useActionRequest(inferenceId, "question");
+  useEffect(() => {
+    if (requested?.kind !== "question") return;
+    setText(requested.text.slice(0, 500));
+    setOpen(true);
+    requestAction(null);
+  }, [requested]);
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -138,6 +146,14 @@ function OverrideDialog({
   const [reason, setReason] = useState("");
   const [value, setValue] = useState<OverrideValue | null>(() => initialOverride(inference));
   const lens = useLens();
+  const requested = useActionRequest(inference.id, "override");
+  useEffect(() => {
+    if (requested?.kind !== "override") return;
+    setValue(requested.value);
+    setReason(requested.reason.slice(0, 500));
+    setOpen(true);
+    requestAction(null);
+  }, [requested]);
   const sensors = useQuery({
     queryKey: keys.sensors(inference.runId),
     queryFn: () => getSensors(inference.runId),

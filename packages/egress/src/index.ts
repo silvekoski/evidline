@@ -17,8 +17,17 @@ export {
 } from "./guards";
 export { responseSchema, templates } from "./templates";
 export { fallback, fallbackMissingReason, ruleSentenceForms } from "./fallback";
-export { validateProse } from "./validator";
-export { createGateway, type CallContext, type CallResult, type EgressStore, type Gateway, type GatewayOptions, type Provider } from "./gateway";
+export { validateProse, validateReview } from "./validator";
+export {
+  createGateway,
+  jsonText,
+  type CallContext,
+  type CallResult,
+  type EgressStore,
+  type Gateway,
+  type GatewayOptions,
+  type Provider,
+} from "./gateway";
 export { MAX_NUMERIC_SHARE, MAX_TEXT_CHARS, numericShare, textGuard } from "./text/guard";
 export { HASH_DIMS, createHashEmbedder, hashEmbed } from "./text/hash-embedder";
 export { normalize, type EmbedKind, type Embedder } from "./text/embedder";

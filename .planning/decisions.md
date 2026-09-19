@@ -100,3 +100,15 @@ typescript 5.9, vite 7, @vitejs/plugin-react 5, vitest 4, react 19, react-router
 - The Onset column of the ranked table is an onset ladder: a dot on a track whose scale runs from the earliest to the latest onset among the ranked sensors. Hidden rows past the top 5 still set the scale.
 - `WindowTrack` shows where an incident window sits in the run, on each card (with a name for a screen reader) and next to the Window fact. A short window keeps a 2 px minimum.
 - The PCA meter sits above the ranked table, both capped at 42 rem, so the three bar kinds share one right edge.
+
+## Cross review (2026-09-20)
+
+- PRD section 11 said a deterministic validator replaces cross-AI review. The user asked for a cross review by open Chinese models through Featherless. The validator stays. A review is a fifth purpose, `cross_review`, through the same gateway, guards and record. Nothing a reviewer says changes an inference.
+- The reviewer reviews blind. The payload is the explanation payload without `faultClass` and without the verdict step. The server derives the match (class, family, none) against the head inference. A sighted reviewer agrees too often to carry information.
+- `validateReview` checks the summary and the concerns with the prose rules: aliases from the payload, numbers from the payload at 3 significant digits, and no fault label other than the reviewer's own. The verbatim response stays on the egress record. The GET view blanks the text of a failed review.
+- Reviews are a view over egress records with purpose `cross_review` for the inference chain. No new table. A server-wide job runs the reviewers one after another. POST returns 202 with the job, GET reports `pending` and the rows, and the web polls every 3 s while a job runs.
+- Featherless documents no `response_format`. The openai-compatible provider takes `structured: false` for a reviewer: no response format, `max_tokens` 4096, `chat_template_kwargs.enable_thinking` false, a 120 s timeout and one retry after a 429. The gateway strips a leading think block and code fences before the parse.
+- Reviewers exist in mode `cloud` only. A review call in another mode writes a record with no provider and sends nothing.
+- PRD section 6 said one outbound host. Reviewers add a second host when `TPM_REVIEW_URL` differs from the primary endpoint. The record names the host and the Data flow totals list every host. The PRD sentences on four purposes and on cross-AI review are amended.
+- Reviews never run by themselves: each call bills concurrency units, four sequential calls take minutes, a second host receives data only after an operator action, and no stage waits for a hypothesis.
+- The review row offers "Ask about this" and "Override to {label}". They prefill the Question and Override dialogs through a small action request store. The operator still submits.

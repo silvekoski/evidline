@@ -19,15 +19,15 @@ describe("model settings", () => {
   it("defaults to off with no provider", async () => {
     const res = await f.app.request("/api/settings/model");
     expect(res.status).toBe(200);
-    expect(ModelSettings.parse(await res.json())).toEqual({ mode: "off", provider: null });
+    expect(ModelSettings.parse(await res.json())).toEqual({ mode: "off", provider: null, reviewers: [] });
   });
 
   it("changes the mode with PUT and keeps it", async () => {
     const res = await put(f, { mode: "local" });
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ mode: "local", provider: null });
+    expect(await res.json()).toEqual({ mode: "local", provider: null, reviewers: [] });
     expect(await (await f.app.request("/api/settings/model")).json()).toMatchObject({ mode: "local" });
-    expect(await (await put(f, { mode: "off" })).json()).toEqual({ mode: "off", provider: null });
+    expect(await (await put(f, { mode: "off" })).json()).toEqual({ mode: "off", provider: null, reviewers: [] });
   });
 
   it("rejects an unknown mode", async () => {

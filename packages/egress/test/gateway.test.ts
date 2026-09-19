@@ -1,7 +1,17 @@
 import { Purpose, type EgressPayload } from "@tpm/schemas";
 import { describe, expect, it } from "vitest";
 import { createGateway, buildLeakIndex, templates } from "../src/index";
-import { capturingProvider, compileRulePayload, explainPayload, nameRolePayload, planPayload, replies, searchPayload, testGateway } from "./fixtures";
+import {
+  capturingProvider,
+  compileRulePayload,
+  explainPayload,
+  nameRolePayload,
+  planPayload,
+  replies,
+  reviewPayload,
+  searchPayload,
+  testGateway,
+} from "./fixtures";
 
 const ctx = { runId: "0123abcd", inferenceId: "inf-0123abcd-00001", operatorText: false };
 const payloads: Record<Purpose, EgressPayload> = {
@@ -10,7 +20,10 @@ const payloads: Record<Purpose, EgressPayload> = {
   explain_diagnosis: explainPayload,
   plan_investigation: planPayload("drift", undefined, "S03", "S04"),
   search: searchPayload(),
+  cross_review: reviewPayload,
 };
+
+const reviewer = (model: string, reply: () => string) => ({ ...capturingProvider(reply), model, name: "review", host: "review.local" });
 
 describe("gateway with a mock provider", () => {
   it.each(Purpose.options)("sends the recorded payload string for %s", async (purpose) => {
@@ -116,6 +129,49 @@ describe("gateway with a mock provider", () => {
       if (purpose !== "search") expect(info[purpose].text).toContain("grid samples");
     }
     expect(new Set(Object.values(info).map((t) => t.hash)).size).toBe(Purpose.options.length);
+  });
+
+  it("strips a leading think block and code fences before the parse and keeps the raw response", async () => {
+    const raw = '<think>weigh S05</think>\n```json\n{"faultClass":"sensor-dead","confidence":0.8,"summary":"<think> is a word here","concerns":[]}\n```';
+    const { gateway, store } = testGateway({ mode: "cloud", provider: capturingProvider(() => raw) });
+    const result = await gateway.call<{ summary: string }>("cross_review", reviewPayload, ctx);
+    expect(result.ok && result.value.summary).toBe("<think> is a word here");
+    expect(store.records[0]?.response).toBe(raw);
+  });
+});
+
+describe("gateway with reviewers", () => {
+  it("routes a call to the named reviewer and records that provider", async () => {
+    const a = reviewer("model-a", () => replies.cross_review as string);
+    const b = reviewer("model-b", () => replies.cross_review as string);
+    const { gateway, store } = testGateway({ mode: "cloud", provider: capturingProvider(() => ""), reviewers: [a, b] });
+    expect(gateway.reviewers().map((r) => r.model)).toEqual(["model-a", "model-b"]);
+    const result = await gateway.call("cross_review", reviewPayload, ctx, "model-b");
+    expect(result).toMatchObject({ ok: true, source: "model" });
+    expect(b.calls).toHaveLength(1);
+    expect(a.calls).toHaveLength(0);
+    expect(store.records[0]?.provider).toEqual({ name: "review", model: "model-b", region: null, host: "review.local" });
+  });
+
+  it("writes an error record for an unknown reviewer", async () => {
+    const { gateway, store } = testGateway({ mode: "cloud", reviewers: [reviewer("model-a", () => "")] });
+    const result = await gateway.call("cross_review", reviewPayload, ctx, "model-x");
+    expect(result).toEqual({ ok: false, recordId: "eg-001", reason: "no reviewer model-x" });
+    expect(store.records[0]).toMatchObject({ status: "error", provider: null, response: "no reviewer model-x" });
+  });
+
+  it("has no reviewers outside mode cloud and never sends", async () => {
+    const a = reviewer("model-a", () => replies.cross_review as string);
+    const local = testGateway({ mode: "local", provider: capturingProvider(() => ""), reviewers: [a] });
+    expect(local.gateway.reviewers()).toEqual([]);
+    const result = await local.gateway.call("cross_review", reviewPayload, ctx, "model-a");
+    expect(result).toEqual({ ok: false, recordId: "eg-001", reason: "reviewers need mode cloud" });
+    expect(local.store.records[0]).toMatchObject({ status: "error", provider: null, mode: "local" });
+    const off = testGateway({ mode: "off", reviewers: [a] });
+    const offResult = await off.gateway.call("cross_review", reviewPayload, ctx, "model-a");
+    expect(offResult).toEqual({ ok: false, recordId: "eg-001", reason: "no fallback for cross_review, model off" });
+    expect(off.store.records[0]).toMatchObject({ status: "off", provider: null });
+    expect(a.calls).toHaveLength(0);
   });
 });
 

@@ -12,5 +12,5 @@ const tweakcnPreview = (): Plugin => ({
 export default defineConfig({
   plugins: [react(), tailwindcss(), tweakcnPreview()],
   resolve: { alias: { "@": path.resolve(import.meta.dirname, "./src") } },
-  server: { proxy: { "/api": "http://localhost:8787" } },
+  server: { proxy: { "/api": process.env.TPM_API ?? "http://localhost:8787" } },
 });

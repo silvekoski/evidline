@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import type { ZodType } from "zod";
 import {
   CompileRuleResponse,
+  CrossReviewResponse,
   ExplainDiagnosisResponse,
   FaultClass,
   HealthClass,
@@ -101,6 +102,20 @@ const text: Record<Purpose, string> = {
     ...format,
     "Response schema: { clauses: [ [ { field, value } ] ] }.",
   ].join("\n"),
+  cross_review: [
+    "You give a second opinion on one fault diagnosis from a statistical engine. You do not see the verdict of the engine.",
+    "You get a JSON object: n, onset, ranked sensors with contributions, excluded sensors (masked by the health gate),",
+    "and the trace steps with their numbers. Each step has index, test, name, n, stats, result and evidenceIds.",
+    "A sensor that leaves its peers while the peers agree is a sensor fault. Related sensors that move together are a process fault.",
+    "A time base or logging problem is a data fault. Pick the fault class that the numbers support best.",
+    "Write one summary sentence and at most three concerns about the evidence. Your answer is a hypothesis.",
+    "Use only aliases and numbers that appear in the payload, with at most 3 significant digits.",
+    "Do not invent a cause, a sensor or a number. Do not write an evidence id.",
+    `Fault classes: ${faultLabels}.`,
+    units,
+    "Response schema: { faultClass (one of the fault classes above), confidence (number from 0 to 1),",
+    "summary (string, at most 300 characters), concerns (array of at most 3 strings, each at most 200 characters) }.",
+  ].join("\n"),
 };
 
 const info = Object.fromEntries(
@@ -115,4 +130,5 @@ export const responseSchema: Record<Purpose, ZodType> = {
   explain_diagnosis: ExplainDiagnosisResponse,
   plan_investigation: PlanInvestigationResponse,
   search: SearchResponse,
+  cross_review: CrossReviewResponse,
 };

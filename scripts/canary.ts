@@ -52,6 +52,7 @@ const replies: Record<Purpose, string> = {
   explain_diagnosis: JSON.stringify({ sentences: [{ text: "Sensor fault: dead.", evidenceIds: ["ev-0badcafe-00001"] }] }),
   plan_investigation: JSON.stringify({ calls: [{ tool: "rerun_without", sensor: "S01" }], rationale: "mask the suspect" }),
   search: JSON.stringify({ clauses: [[{ field: "drift", value: "responsible" }]] }),
+  cross_review: JSON.stringify({ faultClass: "sensor-dead", confidence: 0.5, summary: "S01 holds one value.", concerns: [] }),
 };
 
 const grid = makeGrid();
@@ -71,12 +72,14 @@ const provider: Provider = {
     return replies[(JSON.parse(payloadText) as { purpose: Purpose }).purpose];
   },
 };
+const reviewer: Provider = { ...provider, name: "capture-review", model: "capture-review-1", host: "http://capture-review.local" };
 const store = memoryStore();
 let counter = 0;
 const gateway = createGateway({
   store,
   getMode: () => "cloud",
   resolveProvider: () => provider,
+  resolveReviewers: () => [reviewer],
   leakIndex: () => index,
   nowIso: () => new Date().toISOString(),
   newId: () => `eg-${RUN_ID}-${String(++counter).padStart(5, "0")}`,
@@ -130,6 +133,8 @@ const explain: EgressPayload = incident
       excluded: [],
       trace: [{ index: 0, test: "verdict", name: "Verdict", n: N, stats: { maxDeviation: result.drifts[0]!.value.maxDeviation }, result: "No incident.", evidenceIds: [result.drifts[0]!.evidenceIds[0]!] }],
     };
+const { purpose: _purpose, faultClass: _faultClass, trace, ...diagnosis } = explain as Extract<EgressPayload, { purpose: "explain_diagnosis" }>;
+const review: EgressPayload = { purpose: "cross_review", ...diagnosis, trace: trace.filter((s) => s.test !== "verdict") };
 const payloads: EgressPayload[] = [
   ...grid.aliases.map((_, i): EgressPayload => ({ purpose: "name_role", dt: grid.dt, sensor: summary(i) })),
   { purpose: "compile_rule", sentence: "S01 must stay below 20", dt: grid.dt, n: N, catalog },
@@ -144,14 +149,16 @@ const payloads: EgressPayload[] = [
     tools: ["compare_windows", "test_relation", "find_changepoints", "rerun_without", "test_role", "check_rule"],
   },
   { purpose: "search", query: "which sensor causes the drift", domain: "stream" },
+  review,
 ];
 
 for (const payload of payloads) {
-  const outcome = await gateway.call(payload.purpose, payload, ctx);
+  const outcome = await gateway.call(payload.purpose, payload, ctx, payload.purpose === "cross_review" ? reviewer.model : undefined);
   check(outcome.ok, `${payload.purpose} call ok${outcome.ok ? "" : `: ${outcome.reason}`}`);
 }
 check(store.records.length === payloads.length, `${store.records.length} records for ${payloads.length} calls`);
 check(store.records.every((r) => r.status === "sent"), "every record has status sent");
+check(store.records.at(-1)!.provider?.host === reviewer.host, "the cross_review record names the reviewer host");
 check(store.records.every((r) => r.guards.every((g) => g.pass)), "every guard passed");
 const hits = store.records.reduce((s, r) => s + r.guards.reduce((h, g) => h + (g.hits ?? 0), 0), 0);
 check(hits === 0, `scanner hits: ${hits}`);
@@ -180,7 +187,7 @@ const plantedTriple = rounded[0]!.slice(1000, 1003);
 const withTriple = { ...planted, sensor: { ...(planted as { sensor: SensorSummary }).sensor, histogramShares: [...plantedTriple, ...Array(17).fill(0.01)] } } as EgressPayload;
 const tripleOutcome = await gateway.call("name_role", withTriple, ctx);
 check(!tripleOutcome.ok && store.records.at(-1)!.status === "blocked", `a planted raw triple is blocked${tripleOutcome.ok ? "" : `: ${tripleOutcome.reason}`}`);
-const withName = { ...payloads[payloads.length - 3], sentence: `${SOURCE_NAMES[2]} must stay below 20` } as EgressPayload;
+const withName = { ...payloads.find((p) => p.purpose === "compile_rule"), sentence: `${SOURCE_NAMES[2]} must stay below 20` } as EgressPayload;
 const nameOutcome = await gateway.call("compile_rule", withName, ctx);
 check(!nameOutcome.ok && store.records.at(-1)!.status === "blocked", `a planted source name is blocked${nameOutcome.ok ? "" : `: ${nameOutcome.reason}`}`);
 

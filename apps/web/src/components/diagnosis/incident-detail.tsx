@@ -16,6 +16,7 @@ import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle }
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Skeleton } from "@/components/ui/skeleton";
 import { capitalize } from "@/lib/format";
+import { CrossReview } from "./cross-review";
 import { DiagnosisProse } from "./diagnosis-prose";
 import { PcaMeter } from "./pca-meter";
 import { RankedTable } from "./ranked-table";
@@ -124,6 +125,7 @@ export function IncidentDetail({ incident, runId, highlight, label }: Props) {
         )}
         <DiagnosisProse prose={value.prose} />
         <TraceSteps trace={value.trace} />
+        {!gated && <CrossReview incident={incident} />}
         <ActionBar inference={incident} />
       </CardContent>
     </Card>

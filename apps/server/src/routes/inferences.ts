@@ -1,5 +1,6 @@
 import { Hono } from "hono";
-import { OverrideBody, QuestionBody, type ActionResponse, type Inference, type OverrideValue, type PlanInvestigationResponse, type Stage } from "@tpm/schemas";
+import { HTTPException } from "hono/http-exception";
+import { OverrideBody, QuestionBody, type ActionResponse, type DiagnosisInference, type Inference, type OverrideValue, type PlanInvestigationResponse, type Stage } from "@tpm/schemas";
 import type { AppContext } from "../context";
 import { executeTool, type ToolResult } from "../investigation-tools";
 import { appendLog, type LogInput } from "../log";
@@ -7,7 +8,9 @@ import { addThread, changedPairs, clampCall, describeCall, describeOverride, hea
 import { createInference, leadSensor, storedSource, type InferenceDraft } from "../persist";
 import { currentInferences } from "../reports";
 import { badRequest, notFound, parseBody } from "../request";
+import { reviewJob, reviewReport, runReviews } from "../reviews";
 import { startRun } from "../run-service";
+import { getModelMode } from "../settings";
 
 const stagesFor: Record<OverrideValue["kind"], Stage[]> = { role: ["role"], faultClass: ["diagnosis"], baseline: ["baseline"], responsible: ["drift", "diagnosis"] };
 
@@ -22,11 +25,28 @@ export function inferencesRoutes(ctx: AppContext) {
     appendLog(db, { type, actor, runId: inference.runId, inferenceId: inference.id, evidenceIds: [], egressId: null, before: null, after: null, reason: null, ...patch });
   };
   const response = (inference: Inference, rerunId: string | null, changed: ActionResponse["changed"]): ActionResponse => ({ inference, thread: threadOf(db, inference), rerunId, changed });
+  const diagnosisOf = (id: string): DiagnosisInference => {
+    const head = headOf(db, inferenceOf(id));
+    if (head.stage !== "diagnosis") throw badRequest("reviews exist for a diagnosis only");
+    return head;
+  };
 
   return new Hono()
     .get("/:id", (c) => c.json(inferenceOf(c.req.param("id"))))
     .get("/:id/head", (c) => c.json(headOf(db, inferenceOf(c.req.param("id")))))
     .get("/:id/thread", (c) => c.json(threadOf(db, inferenceOf(c.req.param("id")))))
+    .get("/:id/reviews", (c) => c.json(reviewReport(ctx, diagnosisOf(c.req.param("id")))))
+    .post("/:id/review", (c) => {
+      const head = diagnosisOf(c.req.param("id"));
+      if (head.value.ranked.length === 0) throw badRequest("no review for an incident that the health gate decided");
+      const mode = getModelMode(db, ctx.gateway);
+      if (mode !== "cloud") throw badRequest(mode === "off" ? "model off" : "reviewers need mode cloud");
+      if (ctx.gateway.reviewers().length === 0) throw badRequest("no reviewer is set");
+      const running = reviewJob();
+      if (running) throw new HTTPException(409, { message: `a review for ${running.inferenceId} is in flight` });
+      runReviews(ctx, head).catch((e: unknown) => ctx.log(`review of ${head.id} failed: ${e instanceof Error ? e.message : String(e)}`));
+      return c.json(reviewReport(ctx, head), 202);
+    })
     .post("/:id/accept", (c) => {
       const accepted = db.transaction(() => {
         const inference = headOf(db, inferenceOf(c.req.param("id")));

@@ -78,6 +78,20 @@ export function ModelModeCard({ settings, plant }: { settings: ModelSettings; pl
             <dd className="font-mono break-all">{provider.host}</dd>
           </dl>
         )}
+        {mode === "cloud" && (
+          <p className="text-xs text-muted-foreground">
+            Reviewers:{" "}
+            {settings.reviewers.length === 0 ? (
+              "none. Set TPM_REVIEW_KEY in the server environment for a cross review."
+            ) : (
+              <>
+                {settings.reviewers.length} {settings.reviewers.length === 1 ? "model" : "models"} on{" "}
+                <span className="font-mono">{[...new Set(settings.reviewers.map((r) => r.host))].join(", ")}</span>:{" "}
+                <span className="font-mono">{settings.reviewers.map((r) => r.model).join(", ")}</span>
+              </>
+            )}
+          </p>
+        )}
       </CardContent>
     </Card>
   );
