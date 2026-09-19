@@ -1,4 +1,3 @@
-import { roundSig } from "@tpm/egress";
 import type { DiagnosisInference, EgressPayload, RoleInference, SensorSummary } from "@tpm/schemas";
 import type { AppContext } from "./context";
 
@@ -16,7 +15,7 @@ export function sensorSummary(ctx: AppContext, runId: string, alias: string): Se
     return { leads: (r.a === alias ? r.lag : -r.lag) > 0, peer: { alias: r.a === alias ? r.b : r.a, lag: Math.abs(r.lag), rho: r.rhoAtLag, n } };
   }).filter((r) => r.peer.n >= 100);
   return { alias, n: f.n, signalType: f.signalType, missingRate: f.missingRate, quantiles: f.quantiles, mad: f.mad,
-    histogramShares: f.histogram.shares.slice(0, 20).map((v) => roundSig(v, 2)), noise: f.noise, acfTime: f.acfTime, period: f.period,
+    histogramShares: f.histogram.shares.slice(0, 20), noise: f.noise, acfTime: f.acfTime, period: f.period,
     flatShare: f.flatShare, monotonicShare: f.monotonicShare, distinct: f.distinct, hold: f.hold,
     role: role?.value.role ?? "unknown", roleConfidence: role?.confidence ?? 0,
     leads: directed.filter((r) => r.leads).slice(0, 20).map((r) => r.peer), follows: directed.filter((r) => !r.leads).slice(0, 20).map((r) => r.peer) };
