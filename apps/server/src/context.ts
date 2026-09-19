@@ -66,7 +66,10 @@ export function createContext(opts: ContextOptions = {}): AppContext {
   failInterruptedRuns(db);
   const corpus = openCorpus(db.raw, slug);
   const registry = opts.registry ?? openRegistryAt(dataDir, log);
-  const gateway = wireGateway(db, { resolveProvider: opts.resolveProvider, resolveReviewers: opts.resolveReviewers });
+  const gateway = wireGateway(db, {
+    ...(opts.resolveProvider ? { resolveProvider: opts.resolveProvider } : {}),
+    ...(opts.resolveReviewers ? { resolveReviewers: opts.resolveReviewers } : {}),
+  });
   const textGateway = createTextGateway({ store: corpus.egressLog, getMode: () => getModelMode(db, gateway) });
   const ctx: AppContext = {
     slug,
