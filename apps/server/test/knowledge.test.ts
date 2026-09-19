@@ -127,6 +127,25 @@ describe("claims", () => {
     expect(spec.columnsWithoutClaims).toEqual(["PM2_DR3_STM_VLV_POS"]);
   });
 
+  it("turns a typed answer into a note source with a stated claim linked to the column", async () => {
+    const column = f.ctx.corpus.columns.byName("xmeas_7")!;
+    const res = await f.app.request(`/api/columns/${column.id}/answer`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ speaker: "Anna Data", text: "xmeas_7 is the reactor pressure in kPa gauge, logged every 3 minutes." }) });
+    expect(res.status).toBe(201);
+    const claim = (await res.json()) as Claim;
+    expect(claim).toMatchObject({ provenance: "person", status: "stated", speaker: "Anna Data", sourceKind: "note", sourceTitle: "Answer about xmeas_7" });
+    expect(claim.links).toEqual([expect.objectContaining({ column: "xmeas_7", score: 1, confirmed: true })]);
+    const source = f.ctx.corpus.sources.get(claim.sourceId)!;
+    expect(source).toMatchObject({ kind: "note", status: "processed", segments: 1, chunks: 2, claims: 1 });
+    await drain();
+    expect(f.ctx.corpus.sources.get(claim.sourceId)!.embeddedChunks).toBe(2);
+    const questions = (await (await f.app.request("/api/open-questions")).json()) as OpenQuestion[];
+    expect(questions.find((q) => q.column.name === "xmeas_7")).toMatchObject({ contact: "Anna Data", hypothesisClaims: 1 });
+    const patched = await f.app.request(`/api/claims/${claim.id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ status: "confirmed" }) });
+    expect(patched.status).toBe(200);
+    expect(((await (await f.app.request("/api/open-questions")).json()) as OpenQuestion[]).map((q) => q.column.name)).not.toContain("xmeas_7");
+    expect((await f.app.request(`/api/columns/${column.id}/answer`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ speaker: "", text: "x" }) })).status).toBe(400);
+  });
+
   it("transcribes an uploaded voice note into speaker turns and claims", async () => {
     f.ctx.textGateway = {
       ...f.ctx.textGateway,

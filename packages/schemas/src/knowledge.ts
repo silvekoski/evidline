@@ -21,7 +21,7 @@ export type CreateWorkspaceBody = z.infer<typeof CreateWorkspaceBody>;
 export const ConnectorKind = z.enum(["slack", "teams", "email", "upload"]);
 export type ConnectorKind = z.infer<typeof ConnectorKind>;
 
-export const SourceKind = z.enum(["teams_call", "slack_thread", "email", "file", "voice_note"]);
+export const SourceKind = z.enum(["teams_call", "slack_thread", "email", "file", "voice_note", "note"]);
 export type SourceKind = z.infer<typeof SourceKind>;
 
 export const SourceStatus = z.enum(["received", "processing", "processed", "failed", "needs_ocr", "sensor_data"]);
@@ -162,6 +162,8 @@ export const OpenQuestion = z.object({
 });
 export type OpenQuestion = z.infer<typeof OpenQuestion>;
 export const OpenQuestionList = z.array(OpenQuestion);
+export const AnswerBody = z.object({ speaker: z.string().trim().min(1).max(120), text: z.string().trim().min(3).max(4000) });
+export type AnswerBody = z.infer<typeof AnswerBody>;
 
 export const SpecSentence = z.object({ column: z.string(), text: z.string(), claimIds: z.array(z.number().int()).min(1) });
 export const DataSpec = z.object({ workspace: WorkspaceSlug, generatedAt: z.string(), sentences: z.array(SpecSentence), columnsWithoutClaims: z.array(z.string()) });

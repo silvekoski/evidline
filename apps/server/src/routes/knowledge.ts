@@ -3,11 +3,11 @@ import { join } from "node:path";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { openPdf, parseCsv } from "@tpm/corpus";
-import { CorpusSearchBody, CreateConnectorBody, CreateUploadLinkBody, PatchClaimBody, PatchClaimLinkBody, SourceKind, SourceStatus, type ColumnKnowledge, type Source } from "@tpm/schemas";
+import { AnswerBody, CorpusSearchBody, CreateConnectorBody, CreateUploadLinkBody, PatchClaimBody, PatchClaimLinkBody, SourceKind, SourceStatus, type ColumnKnowledge, type Source } from "@tpm/schemas";
 import { z } from "zod";
 import type { AppContext } from "../context";
 import { scheduleSync, transcriptGaps } from "../connector-service";
-import { confirmLink, corpusStats, dataSpec, erasePerson, ingestFile, linkOne, openQuestions, search } from "../corpus-service";
+import { answerQuestion, confirmLink, corpusStats, dataSpec, erasePerson, ingestFile, linkOne, openQuestions, search } from "../corpus-service";
 import { badRequest, notFound, parseBody } from "../request";
 
 export const MAX_UPLOAD_BYTES = 200 * 1024 * 1024;
@@ -140,6 +140,11 @@ export function knowledgeRoutes(ctx: AppContext) {
       return c.json(corpus.claims.get(link.claimId));
     })
     .get("/open-questions", (c) => c.json(openQuestions(ctx)))
+    .post("/columns/:id/answer", async (c) => {
+      const column = corpus.columns.get(numericId(c.req.param("id")));
+      if (!column) throw notFound(`column ${c.req.param("id")}`);
+      return c.json(answerQuestion(ctx, column, await parseBody(c, AnswerBody)), 201);
+    })
     .post("/spec", (c) => c.json(dataSpec(ctx)))
     .post("/aliases/import", async (c) => {
       const { csv, tagColumn, phraseColumns } = await parseBody(c, AliasImportBody);

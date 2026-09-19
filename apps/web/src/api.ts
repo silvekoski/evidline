@@ -172,6 +172,7 @@ export const setClaimStatus = (id: number, status: ClaimStatus) => request(Claim
 export const setLinkConfirmed = (id: number, confirmed: boolean) => request(Claim, `/claim-links/${id}`, patch({ confirmed }));
 export const addClaimLink = (claimId: number, columnId: number) => request(Claim, `/claims/${claimId}/links`, post({ columnId }));
 export const listOpenQuestions = () => request(OpenQuestionList, "/open-questions");
+export const answerQuestion = (columnId: number, body: { speaker: string; text: string }) => request(Claim, `/columns/${columnId}/answer`, post(body));
 export const buildSpec = () => request(DataSpec, "/spec", post());
 export const listConnectors = () => request(ConnectorList, "/connectors");
 export const createConnector = (body: CreateConnectorBody) => request(Connector, "/connectors", post(body));

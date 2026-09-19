@@ -1,15 +1,17 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router";
-import { CircleHelpIcon, CopyIcon } from "lucide-react";
+import { CircleHelpIcon, CopyIcon, MessageSquareReplyIcon } from "lucide-react";
 import { toast } from "sonner";
+import { cn } from "cn";
 import type { OpenQuestion } from "@tpm/schemas";
 import { keys, listOpenQuestions } from "@/api";
 import { ConfidenceBar } from "@/components/confidence-bar";
 import { EmptyState } from "@/components/empty-state";
+import { AnswerForm } from "@/components/knowledge/answer-form";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 const emailText = (contact: string | null, questions: OpenQuestion[]): string =>
   [
@@ -29,12 +31,13 @@ async function copy(text: string, label: string): Promise<void> {
 
 export function OpenQuestionsScreen() {
   const questions = useQuery({ queryKey: keys.openQuestions, queryFn: listOpenQuestions, refetchInterval: 10000 });
+  const [open, setOpen] = useState<number | null>(null);
   const groups = new Map<string | null, OpenQuestion[]>();
   for (const q of questions.data ?? []) groups.set(q.contact, [...(groups.get(q.contact) ?? []), q]);
 
   return (
     <>
-      <PageHeader title="Open questions" description="Columns with a confidence under 0.5 and no confirmed claim. Send the list to the customer contact; each answer becomes a new source.">
+      <PageHeader title="Open questions" description="Columns with a confidence under 0.5 and no confirmed claim. Type an answer you got, or send the list to the customer contact. Each answer becomes a source.">
         {questions.data && questions.data.length > 0 && (
           <Button size="sm" onClick={() => copy(emailText(null, questions.data), "Email text")}>
             <CopyIcon aria-hidden="true" /> Copy all as email
@@ -59,35 +62,37 @@ export function OpenQuestionsScreen() {
                   <CopyIcon aria-hidden="true" /> Copy as email
                 </Button>
               </div>
-              <Table aria-label={`Questions for ${contact ?? "no contact"}`}>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead scope="col" className="h-8">Column</TableHead>
-                    <TableHead scope="col" className="h-8">Hypothesis</TableHead>
-                    <TableHead scope="col" className="h-8">Confidence</TableHead>
-                    <TableHead scope="col" className="h-8">Question</TableHead>
-                    <TableHead scope="col" className="h-8 text-right">Unconfirmed claims</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {list.map((q) => (
-                    <TableRow key={q.column.id}>
-                      <TableCell className="py-1 font-mono">
-                        <Link to={`/runs/${q.column.runId}/sensors#${q.column.alias}`} className="underline-offset-4 hover:underline">
-                          {q.column.name}
-                        </Link>
-                        <span className="block text-xs text-muted-foreground">{q.column.alias}</span>
-                      </TableCell>
-                      <TableCell className="py-1">{q.column.hypothesis ?? <span className="text-muted-foreground">none</span>}</TableCell>
-                      <TableCell className="py-1">
+              <ol className="flex flex-col gap-1" aria-label={`Questions for ${contact ?? "no contact"}`}>
+                {list.map((q) => {
+                  const isOpen = open === q.column.id;
+                  return (
+                    <li key={q.column.id} className={cn("rounded-md border", isOpen && "border-foreground")}>
+                      <div className="grid items-center gap-x-4 gap-y-1 p-2 text-sm sm:grid-cols-[10rem_minmax(0,1fr)_8rem_7rem_auto]">
+                        <div className="font-mono">
+                          <Link to={`/runs/${q.column.runId}/sensors#${q.column.alias}`} className="underline-offset-4 hover:underline">
+                            {q.column.name}
+                          </Link>
+                          <span className="block text-xs text-muted-foreground">{q.column.alias}</span>
+                        </div>
+                        <div>
+                          <span className="block">{q.column.hypothesis ?? <span className="text-muted-foreground">No hypothesis</span>}</span>
+                          <span className="block text-xs text-muted-foreground">Unit and logging interval unknown</span>
+                        </div>
                         <ConfidenceBar value={q.column.confidence} />
-                      </TableCell>
-                      <TableCell className="py-1 whitespace-normal">{q.question}</TableCell>
-                      <TableCell className="py-1 text-right font-mono tabular-nums">{q.hypothesisClaims}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                        <span className="font-mono text-xs tabular-nums text-muted-foreground">{q.hypothesisClaims} unconfirmed</span>
+                        <Button size="sm" variant={isOpen ? "default" : "outline"} aria-expanded={isOpen} aria-controls={`answer-${q.column.id}`} onClick={() => setOpen(isOpen ? null : q.column.id)}>
+                          <MessageSquareReplyIcon aria-hidden="true" /> Answer
+                        </Button>
+                      </div>
+                      {isOpen && (
+                        <div id={`answer-${q.column.id}`} className="border-t p-2">
+                          <AnswerForm question={q} onDone={() => setOpen(null)} />
+                        </div>
+                      )}
+                    </li>
+                  );
+                })}
+              </ol>
             </section>
           ))}
         </div>

@@ -1,5 +1,5 @@
 import type { ComponentProps } from "react";
-import { BotIcon, CheckIcon, CircleDashedIcon, CircleXIcon, DatabaseIcon, FileIcon, MailIcon, MessageSquareIcon, MessageSquareTextIcon, MicIcon, PhoneIcon, ScanTextIcon, UserIcon } from "lucide-react";
+import { BotIcon, CheckIcon, CircleDashedIcon, CircleXIcon, DatabaseIcon, FileIcon, MailIcon, MessageSquareIcon, MessageSquareTextIcon, MicIcon, NotebookPenIcon, PhoneIcon, ScanTextIcon, UserIcon } from "lucide-react";
 import { cn } from "cn";
 import type { ClaimStatus, Provenance, SourceKind, SourceStatus } from "@tpm/schemas";
 import { Badge } from "@/components/ui/badge";
@@ -25,6 +25,7 @@ const sourceKind: Record<SourceKind, Style> = {
   email: { icon: MailIcon, word: "Email", variant: "outline" },
   file: { icon: FileIcon, word: "File", variant: "outline" },
   voice_note: { icon: MicIcon, word: "Voice note", variant: "outline" },
+  note: { icon: NotebookPenIcon, word: "Answer", variant: "outline" },
 };
 
 const ocr: Style = { icon: ScanTextIcon, word: "OCR", variant: "outline", className: "border-dashed" };

@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { extname, join, relative } from "node:path";
 import { chunkSegments, extractClaimsLocally, fuseRanks, isAudioName, linkClaim, normalizeFile, openPdf, paragraphSegments, verifyQuote, wordsToTurns, type Normalized, type SegmentDraft } from "@tpm/corpus";
-import type { CatalogColumn, Claim, CorpusStats, DataSpec, ExtractedClaim, OpenQuestion, SearchHit, Source, SourceKind } from "@tpm/schemas";
+import type { AnswerBody, CatalogColumn, Claim, CorpusStats, DataSpec, ExtractedClaim, OpenQuestion, SearchHit, Source, SourceKind } from "@tpm/schemas";
 import type { AppContext } from "./context";
 import { columnCandidates, enqueueEmbeds } from "./catalog";
 import type { JobHandler } from "./jobs";
@@ -432,6 +432,38 @@ export function openQuestions(ctx: AppContext): OpenQuestion[] {
       return { column, question: `What does the column ${column.name} measure, in which unit, and how often is it logged?${hint}`, contact, hypothesisClaims: claims.length };
     })
     .sort((a, b) => a.column.confidence - b.column.confidence);
+}
+
+export function answerQuestion(ctx: AppContext, column: CatalogColumn, answer: AnswerBody): Claim {
+  const now = new Date().toISOString();
+  const locator = { kind: "file" as const, page: null, sheet: null, row: null, charStart: 0, charEnd: answer.text.length };
+  const claimId = ctx.corpus.transaction(() => {
+    const source = ctx.corpus.sources.insert({
+      connectorId: null,
+      kind: "note",
+      externalId: `answer-${column.id}-${now}`,
+      title: `Answer about ${column.name}`,
+      occurredAt: now,
+      contentHash: sha256(`${answer.speaker}\n${answer.text}`),
+      blobPath: null,
+      externalUrl: null,
+      mediaType: "text/plain",
+      bytes: Buffer.byteLength(answer.text),
+      status: "processed",
+      error: null,
+      runId: null,
+      parentSourceId: null,
+    });
+    ctx.corpus.segments.replace(source.id, [{ text: answer.text, speaker: answer.speaker, block: 0, locator }]);
+    const chunkId = ctx.corpus.chunks.insert({ sourceId: source.id, kind: "passage", text: answer.text, locator, tokens: Math.ceil(answer.text.length / 4), segmentFrom: 0, segmentTo: 0 });
+    const claimId = ctx.corpus.claims.insert({ chunkId, sourceId: source.id, statement: answer.text, quote: answer.text, speaker: answer.speaker, occurredAt: now, provenance: "person", status: "stated", locator, namedColumn: column.name });
+    const claimChunkId = ctx.corpus.chunks.insert({ sourceId: source.id, kind: "claim", text: answer.text, locator, tokens: Math.ceil(answer.text.length / 4), segmentFrom: 0, segmentTo: 0, claimId });
+    const [link] = ctx.corpus.links.replace(claimId, [{ columnId: column.id, score: 1 }]);
+    ctx.corpus.links.setConfirmed(link!.id, true);
+    enqueueEmbeds(ctx, [chunkId, claimChunkId]);
+    return claimId;
+  });
+  return ctx.corpus.claims.get(claimId)!;
 }
 
 export function dataSpec(ctx: AppContext): DataSpec {
