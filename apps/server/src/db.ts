@@ -1,6 +1,7 @@
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import Database from "better-sqlite3";
+import * as sqliteVec from "sqlite-vec";
 import { bucketMeans, type Grid, type Peer } from "@tpm/core";
 import type { EgressRecord, Evidence, Fingerprint, Inference, RedundancyGroup, Relation, Rule, Run, Stage, ThreadEntry } from "@tpm/schemas";
 import { dbPath } from "./paths";
@@ -91,6 +92,7 @@ function siblingSets(aliases: string[], membership: Float64Array): string[][] {
 export function openDb(path: string = process.env.DB_PATH ?? dbPath) {
   if (path !== ":memory:") mkdirSync(dirname(path), { recursive: true });
   const db = new Database(path);
+  sqliteVec.load(db);
   db.pragma("journal_mode = WAL");
   const statements = new Map<string, Database.Statement>();
   const prepare = (sql: string): Database.Statement => {

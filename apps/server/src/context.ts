@@ -1,20 +1,39 @@
+import { mkdirSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { createTextGateway, type Gateway, type TextGateway } from "@tpm/egress";
+import type { JobType, WorkspaceSlug } from "@tpm/schemas";
+import { refreshCatalog } from "./catalog";
+import { openCorpus, type CorpusDb } from "./corpus-db";
 import { openDb, type Db } from "./db";
 import { wireGateway } from "./egress-wiring";
+import { createJobRunner, type EnqueueOptions, type JobRunner } from "./jobs";
 import { appendLog } from "./log";
 import * as paths from "./paths";
+import { openRegistry, type Registry } from "./registry";
+import { loadSecretKey, secretBox } from "./secrets";
+import { getModelMode } from "./settings";
 import { createHub, type RunHub } from "./sse";
-import type { Gateway } from "@tpm/egress";
+
+export type JobQueue = { enqueue(type: JobType, payload: Record<string, unknown>, opts?: EnqueueOptions): number | null; runPending(): Promise<number> };
 
 export type AppContext = {
+  slug: WorkspaceSlug;
+  dir: string;
+  blobDir: string;
   db: Db;
+  corpus: CorpusDb;
   hub: RunHub;
   gateway: Gateway;
+  textGateway: TextGateway;
+  registry: Registry;
+  jobs: JobQueue;
   dataDir: string;
   webDist: string | null;
   log: (line: string) => void;
+  close(): void;
 };
 
-export type ContextOptions = Partial<Pick<AppContext, "dataDir" | "webDist" | "log"> & { dbPath: string }>;
+export type ContextOptions = Partial<Pick<AppContext, "dataDir" | "webDist" | "log" | "slug" | "registry"> & { dbPath: string; runner: JobRunner }>;
 
 function failInterruptedRuns(db: Db): void {
   const error = "server restarted";
@@ -26,15 +45,48 @@ function failInterruptedRuns(db: Db): void {
   }
 }
 
+export function openRegistryAt(dataDir: string, log: (line: string) => void): Registry {
+  return openRegistry(join(dataDir, "registry.db"), secretBox(loadSecretKey(join(dataDir, "secret.key"), log)));
+}
+
 export function createContext(opts: ContextOptions = {}): AppContext {
-  const db = openDb(opts.dbPath);
+  const dataDir = opts.dataDir ?? paths.dataDir;
+  const log = opts.log ?? console.log;
+  const slug = opts.slug ?? "norrin";
+  const dbPath = opts.dbPath ?? paths.dbPath;
+  const dir = dbPath === ":memory:" ? join(dataDir, "workspaces", slug) : dirname(dbPath);
+  const blobDir = join(dir, "blobs");
+  mkdirSync(blobDir, { recursive: true });
+  const db = openDb(dbPath);
   failInterruptedRuns(db);
-  return {
+  const corpus = openCorpus(db.raw, slug);
+  const registry = opts.registry ?? openRegistryAt(dataDir, log);
+  const gateway = wireGateway(db);
+  const textGateway = createTextGateway({ store: corpus.egressLog, getMode: () => getModelMode(db, gateway) });
+  const ctx: AppContext = {
+    slug,
+    dir,
+    blobDir,
     db,
+    corpus,
     hub: createHub(db.runs.get),
-    gateway: wireGateway(db),
-    dataDir: opts.dataDir ?? paths.dataDir,
+    gateway,
+    textGateway,
+    registry,
+    jobs: null as unknown as JobQueue,
+    dataDir,
     webDist: opts.webDist === undefined ? paths.webDist : opts.webDist,
-    log: opts.log ?? console.log,
+    log,
+    close() {
+      db.close();
+      if (!opts.registry) registry.close();
+    },
   };
+  const runner = opts.runner ?? createJobRunner({ registry, resolve: () => ctx, log });
+  ctx.jobs = { enqueue: (type, payload, o) => runner.enqueue(slug, type, payload, o), runPending: runner.runPending };
+  if (corpus.columns.count() === 0) {
+    const newest = db.runs.list().find((r) => r.status === "done");
+    if (newest) refreshCatalog(ctx, newest.id);
+  }
+  return ctx;
 }

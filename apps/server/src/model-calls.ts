@@ -1,5 +1,6 @@
 import { fallback, validateProse } from "@tpm/egress";
 import { faultLabel, type DiagnosisInference, type ExplainDiagnosisResponse, type Inference, type InferenceStatus, type NameRoleResponse, type RoleInference } from "@tpm/schemas";
+import { refreshCatalog } from "./catalog";
 import type { AppContext } from "./context";
 import { appendLog } from "./log";
 import { createInference, type InferenceDraft } from "./persist";
@@ -57,6 +58,7 @@ export async function runModelCalls(ctx: AppContext, runId: string): Promise<boo
       }
     }));
     for (const inference of inferences) if (inference.stage === "diagnosis") await explain(ctx, inference);
+    refreshCatalog(ctx, runId);
   } finally {
     inFlight.delete(runId);
   }

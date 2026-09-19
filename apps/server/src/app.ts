@@ -1,6 +1,3 @@
-import { existsSync } from "node:fs";
-import { relative } from "node:path";
-import { serveStatic } from "@hono/node-server/serve-static";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import type { AppContext } from "./context";
@@ -21,10 +18,5 @@ export function createApp(ctx: AppContext) {
   app.notFound((c) => c.json({ error: `${c.req.method} ${c.req.path} not found` }, 404));
   app.route("/api", apiRoutes(ctx));
   app.all("/api/*", (c) => c.notFound());
-  if (ctx.webDist !== null && existsSync(ctx.webDist)) {
-    const root = relative(process.cwd(), ctx.webDist);
-    app.use("*", serveStatic({ root }));
-    app.get("*", serveStatic({ root, path: "index.html" }));
-  }
   return app;
 }
