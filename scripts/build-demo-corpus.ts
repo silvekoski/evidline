@@ -517,4 +517,218 @@ write(
   ]),
 );
 
+write(
+  "Control narrative R-101 rev 4.md",
+  [
+    "# Control narrative, reactor line R-101, revision 4",
+    "",
+    "Saimaa Kemia Oy, Vuoksenranta. Approved 2025-11-03 by process control lead H. Aaltonen.",
+    "",
+    "## 1. Reactor pressure control",
+    "",
+    "PIC-1011 reads PI-1011 (xmeas_7) and writes to PV-2041 (xmv_6). Setpoint 2705 kPa gauge. The loop is PI with a 40 second integral time. A pressure above 2800 kPa opens the purge valve to at least 60 percent through a high select. The loop also has a feedforward from the reactor feed rate FI-1006 (xmeas_6).",
+    "",
+    "## 2. Reactor level control",
+    "",
+    "LIC-1012 reads LI-1012 (xmeas_8) and writes to FV-1001 (xmv_1), the D feed valve. Setpoint 75 percent. This is a slow loop with a 12 minute integral time. When the reactor level falls below 55 percent, the E feed FV-1002 (xmv_2) is cut back by a ratio block.",
+    "",
+    "## 3. Reactor temperature control",
+    "",
+    "TIC-1013 reads TI-1013 (xmeas_9) and writes to FV-1010 (xmv_10), the cooling water valve. Setpoint 120.4 degrees C. The cooling water outlet temperature TI-1021 (xmeas_21) is a monitored variable only. It is not in any loop, which is why the fouling trend shows up there first.",
+    "",
+    "## 4. Separator and compressor",
+    "",
+    "LIC-2012 reads LI-2012 (xmeas_12) and writes to FV-2007 (xmv_7). Compressor K-201 runs at fixed speed. The anti-surge controller writes to FV-2005 (xmv_5) from a computed flow margin. The recycle valve never closes below 12 percent. The condenser cooling water valve FV-2011 (xmv_11) holds the separator temperature TI-2011 (xmeas_11) at 80 degrees C.",
+    "",
+    "## 5. Stripper",
+    "",
+    "LIC-3012 reads LI-3012 (xmeas_15) and writes to FV-3008 (xmv_8), the liquid product valve. The steam valve FV-3009 (xmv_9) follows a ratio to the stripper feed. Operators may put FV-3009 in manual for a steam trap test. In manual the level loop alone cannot hold the level and a 40 minute oscillation follows.",
+    "",
+    "## 6. Composition control",
+    "",
+    "The product analyzer AI-4037 (xmeas_37 to xmeas_41) feeds a supervisory controller that trims the A feed FV-1003 (xmv_3) every 15 minutes. The purge analyzer AI-2029 has no closed loop. The feed analyzer AI-1023 is for monitoring only.",
+    "",
+  ].join("\n"),
+);
+
+write(
+  "PID legend and tag numbering.md",
+  [
+    "# P&ID legend and tag numbering, Vuoksenranta",
+    "",
+    "Document VRK-STD-004, revision B, 2019-06-14.",
+    "",
+    "A tag has two letters, a dash, and four digits. The first letter is the measured variable and the second the function.",
+    "",
+    "| Letters | Meaning |",
+    "| --- | --- |",
+    "| FI | Flow indication |",
+    "| FV | Flow control valve |",
+    "| PI | Pressure indication |",
+    "| PV | Pressure control valve |",
+    "| LI | Level indication |",
+    "| TI | Temperature indication |",
+    "| AI | Analyzer indication |",
+    "| JI | Power indication |",
+    "",
+    "The first digit of the number is the area: 1 reactor, 2 separator and compressor, 3 stripper, 4 product handling. The other three digits are the loop number in the area.",
+    "",
+    "Equipment: R-101 reactor, E-202 condenser, V-201 separator, K-201 recycle compressor, T-301 stripper, P-302 stripper bottoms pump.",
+    "",
+    "Units in the DCS: pressure in kPa gauge, temperature in degrees Celsius, level in percent of range, gas flow in kscmh (thousand standard cubic meters per hour), liquid flow in m3/h or kg/h as marked on the tag list, valve position in percent open.",
+    "",
+  ].join("\n"),
+);
+
+write(
+  "2026-03-31 Production report March 2026.md",
+  [
+    "# Production report, reactor line R-101, March 2026",
+    "",
+    "Prepared by Timo Heikkinen, production planning. Distribution: plant management, Norrin project.",
+    "",
+    "## Summary",
+    "",
+    "Production of G and H was 96.2 percent of plan. Three events cost production time: the analyzer column change on 9 March (no loss, quality hold only), the closed loop cooling change on 1 March (four hours at reduced rate), and a feed limitation from the A supply on 22 to 24 March.",
+    "",
+    "## Quality",
+    "",
+    "Product component D (AI-4037, xmeas_37) stayed below 0.6 mol percent except for one hour on 27 February that fell in the February report. The March average was 0.42 mol percent.",
+    "",
+    "## Events with an effect on the data",
+    "",
+    "- 2026-03-01 08:00 to 12:00: reduced rate at 70 percent while the cooling water source changed. All flows (xmeas_1 to xmeas_6, xmeas_10) lower. xmeas_22 shifted down about 4 degrees C and stayed there.",
+    "- 2026-03-09 08:00 to 08:45: purge GC calibration with column change. xmeas_29 to xmeas_36 held.",
+    "- 2026-03-22 to 2026-03-24: A feed limited to 80 percent by the supplier. FI-1001 (xmeas_1) and FV-1003 (xmv_3) low, A in reactor feed (xmeas_23) about 3 mol percent lower than normal.",
+    "- No purge valve sticking after 3 March. PV-2041 (xmv_6) behaved after the stem lubrication change.",
+    "",
+    "## Outlook",
+    "",
+    "Cooling coil cleaning on 20 April, planned 36 hours. Expect FV-1010 (xmv_10) to drop from about 88 to 40 percent and TI-1021 (xmeas_21) to drop about 8 degrees C after the restart.",
+    "",
+  ].join("\n"),
+);
+
+write(
+  "2026-01-22 RE P-302 trip yesterday.eml",
+  eml(
+    "d00d1e-03",
+    ["Mikko Virtanen", "mikko.virtanen@saimaakemia.example"],
+    "Jarkko Rantanen <jarkko.rantanen@saimaakemia.example>, corpus+norrin@norrin.example",
+    "RE: P-302 trip yesterday",
+    "Thu, 22 Jan 2026 07:55:12 +0200",
+    [
+      "Morning,",
+      "",
+      "Yes, the trip at 10:14 yesterday was P-302 on high bearing temperature. The pump was down for 40 minutes. In the data you see FI-3017 (xmeas_17) go to zero, LI-3012 (xmeas_15) climb to 82 percent, and the steam valve FV-3009 pulled back by the operator.",
+      "",
+      "Not related to the strainer this time, the bearing was simply hot after the seal work in December. We greased it and it has been fine since.",
+      "",
+      "Mikko",
+      "",
+      "> Was that P-302 again yesterday around ten? The stripper level chart looks like the January event.",
+      "> Jarkko",
+    ].join("\r\n"),
+    "d00d1e-02",
+  ),
+);
+
+write(
+  "2026-02-03 Historian question missing values.eml",
+  eml(
+    "beef01-01",
+    ["Anna Lehtinen", "anna.lehtinen@norrin.example"],
+    "Jarkko Rantanen <jarkko.rantanen@saimaakemia.example>",
+    "Historian question: missing values in xmeas_10",
+    "Tue, 03 Feb 2026 10:12:00 +0200",
+    [
+      "Hi Jarkko,",
+      "",
+      "We see about 2 percent empty cells in xmeas_10, the purge rate, spread over the whole period, and almost none in the other flows. Is that a known thing?",
+      "",
+      "Anna",
+    ].join("\r\n"),
+  ),
+);
+
+write(
+  "2026-02-03 RE Historian question missing values.eml",
+  eml(
+    "beef01-02",
+    ["Jarkko Rantanen", "jarkko.rantanen@saimaakemia.example"],
+    "Anna Lehtinen <anna.lehtinen@norrin.example>, corpus+norrin@norrin.example",
+    "RE: Historian question: missing values in xmeas_10",
+    "Tue, 03 Feb 2026 13:40:27 +0200",
+    [
+      "Hi Anna,",
+      "",
+      "Yes. FI-2001 (xmeas_10) is a thermal mass flow meter on the purge line and it drops out for a few seconds when the purge valve moves fast. The DCS marks those samples as bad quality and the export leaves the cell empty. It is not a process event. If you need a filled series, hold the last value, that is what the operators see anyway.",
+      "",
+      "The same meter also has the small zero offset from the loop check, 0.02 kscmh at no flow.",
+      "",
+      "Jarkko",
+    ].join("\r\n"),
+    "beef01-01",
+  ),
+);
+
+write(
+  "Turvallisuustiedote 2026-02 R-101.md",
+  [
+    "# Turvallisuustiedote, reaktorilinja R-101, helmikuu 2026",
+    "",
+    "Saimaa Kemia Oy, Vuoksenrannan tehdas. Laatija: käyttöpäällikkö R. Hakala.",
+    "",
+    "## Painehälytykset tammikuussa",
+    "",
+    "Reaktorin paine PI-1011 (xmeas_7) ylitti hälytysrajan 2895 kPa kaksi kertaa tammikuussa, molemmat 13. tammikuuta poistoventtiilin PV-2041 (xmv_6) jumituttua pesun jälkeen. Lukitusraja 3000 kPa ei ylittynyt. Kompressorin teho JI-2020 (xmeas_20) nousi samalla 352 kilowattiin.",
+    "",
+    "## Toimenpiteet",
+    "",
+    "Poistoventtiilin karan voitelu lisätään viikoittaiseen pesuohjelmaan. Uusi asennoitin on tilattu. Operaattorit tarkistavat venttiilin asennon manuaalisesti pesun jälkeen kunnes asennoitin on vaihdettu.",
+    "",
+    "## Muistutus",
+    "",
+    "Strippauskolonnin höyryventtiili FV-3009 (xmv_9) palautetaan automaatille heti höyrylukkotestin jälkeen. Manuaalilla pinta LI-3012 (xmeas_15) alkaa heilua noin 40 minuutin jaksolla.",
+    "",
+  ].join("\n"),
+);
+
+write(
+  "Operator training R-101 module 3 notes.txt",
+  [
+    "OPERATOR TRAINING, R-101, MODULE 3: READING THE TRENDS",
+    "Trainer notes, H. Aaltonen, 2025-09",
+    "",
+    "Slide 1. The three reactor loops. Pressure PIC-1011 to purge valve PV-2041. Level LIC-1012 to D feed FV-1001. Temperature TIC-1013 to cooling water FV-1010.",
+    "",
+    "Slide 2. What a sticking purge valve looks like. The valve position xmv_6 goes flat. Pressure xmeas_7 drifts up a few kPa. Compressor power xmeas_20 climbs 5 to 15 kW. Purge rate xmeas_10 falls. Fix: tap the positioner, or switch to manual and stroke the valve.",
+    "",
+    "Slide 3. What coil fouling looks like. Over weeks, the cooling water valve xmv_10 opens more and more for the same temperature. The outlet temperature xmeas_21 climbs. When the valve is near 90 percent, call maintenance for the coil cleaning.",
+    "",
+    "Slide 4. What a P-302 trip looks like. Underflow xmeas_17 goes to zero in one sample. Stripper level xmeas_15 climbs fast. Close the steam valve FV-3009 to 20 percent, restart the pump, then return the steam valve to auto.",
+    "",
+    "Slide 5. Analyzer holds are not faults. A flat composition trace for 20 minutes on Monday or Thursday morning is a calibration. A flat trace at any other time for more than 30 minutes is an analyzer fault, call the lab.",
+    "",
+    "Slide 6. Units. Pressures in kPa gauge, not bar. 100 kPa is one bar. Temperatures in degrees C. Levels in percent.",
+    "",
+  ].join("\n"),
+);
+
+write(
+  "instrument-calibration-log-2025-2026.csv",
+  [
+    "date,tag,model_name,instrument,as_found_error,as_left_error,unit,technician,note",
+    "2025-11-04,PI-1011,xmeas_7,Rosemount 3051,-3.1,0.4,kPa,T. Koskinen,annual",
+    "2025-11-04,PI-2013,xmeas_13,Rosemount 3051,-1.8,0.2,kPa,T. Koskinen,annual",
+    "2025-11-05,TI-1013,xmeas_9,type K thermocouple,-1.6,-1.6,degC,T. Koskinen,left as found; replacement ordered",
+    "2025-11-05,TI-1021,xmeas_21,Pt100,0.3,0.1,degC,T. Koskinen,annual",
+    "2025-11-06,LI-1012,xmeas_8,displacer,1.2,0.3,%,P. Salo,annual",
+    "2025-11-06,LI-3012,xmeas_15,dp cell,-0.8,0.2,%,P. Salo,annual",
+    "2026-01-14,TI-1013,xmeas_9,type K thermocouple,-2.1,0.1,degC,T. Koskinen,element replaced",
+    "2026-01-30,FI-2001,xmeas_10,thermal mass,0.02,0.02,kscmh,T. Koskinen,zero offset at no flow left as found",
+    "2026-03-09,AI-2029,xmeas_29,GC,n/a,n/a,mol%,S. Nieminen,column replaced",
+  ].join("\n") + "\n",
+);
+
 console.log(`\n${out}`);
