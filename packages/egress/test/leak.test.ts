@@ -73,13 +73,19 @@ describe("leak index", () => {
     expect(scanForLeaks("values 0 1 2", small).valueHits).toBe(1);
   });
 
-  it("counts a run only when the numbers are adjacent and not all equal", () => {
+  it("counts a run inside one JSON value and skips a flat run", () => {
     const small = buildLeakIndex([{ alias: "S01", values: Float64Array.from([0, 1, 0, 0, 0, 5, 5, 5, 22.2, 22.2, 22.2]) }], []);
     expect(scanForLeaks('{"p95":0,"p99":1,"mad":0}', small).valueHits).toBe(0);
     expect(scanForLeaks('{"quantiles":{"p1":22.2,"p5":22.2,"p50":22.2},"shares":[0,0,0,1]}', small).valueHits).toBe(0);
     expect(scanForLeaks("[5,5,5]", small).valueHits).toBe(0);
-    expect(scanForLeaks("0 then 1 then 0", small).valueHits).toBe(0);
-    expect(scanForLeaks("[0,1,0]", small).valueHits).toBe(1);
-    expect(scanForLeaks("0, 1, 0 and 0, 0, 5", small).valueHits).toBe(2);
+    expect(scanForLeaks('{"a":[0,1,0],"b":{"x":0,"y":0,"z":5}}', small).valueHits).toBe(1);
+    expect(scanForLeaks('{"note":"0 then 1 then 0"}', small).valueHits).toBe(1);
+    expect(scanForLeaks('{"note":"0, 1, 0 and 0, 0, 5"}', small).valueHits).toBe(3);
+  });
+
+  it("finds a forbidden name in its JSON-escaped form", () => {
+    const quoted = buildLeakIndex([], ['Temp "A"', "path\\to"]);
+    expect(scanForLeaks(JSON.stringify({ question: 'is temp "a" broken?' }), quoted).nameHits).toBe(1);
+    expect(scanForLeaks(JSON.stringify({ question: "see path\\to now" }), quoted).nameHits).toBe(1);
   });
 });

@@ -35,8 +35,11 @@ const text: Record<Purpose, string> = {
   compile_rule: [
     "You compile one operator sentence into one monitoring rule.",
     "You get a JSON object: sentence, dt, n, and a catalog of sensors with alias, signal type and role.",
-    "Use only aliases from the catalog. Convert minutes, hours and days to samples with dt and round up to a whole sample.",
-    "When dt is null, read a duration as samples. maxRate is sensor units per sample.",
+    "Use only aliases from the catalog.",
+    "A duration in the sentence converts to samples: samples = ceil(duration in milliseconds / dt).",
+    "Worked example: dt = 180000 and a duration of 10 minutes = 600000 ms give ceil(600000 / 180000) = 4 samples.",
+    "One minute is 60000 ms, one hour is 3600000 ms, one day is 86400000 ms.",
+    "When dt is null, read a duration as samples. maxRate is sensor units per sample: divide a rate per hour by the samples per hour.",
     units,
     "Response schema: { rule }. Every rule has type, sensor (alias) and source (the sentence verbatim).",
     "Types: range with min and/or max. flatline with maxDuration (samples, positive integer).",

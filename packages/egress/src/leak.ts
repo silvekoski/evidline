@@ -67,7 +67,7 @@ export function scanValues(payloadText: string, index: LeakIndex): { hits: numbe
   const values = tokens.map((m) => Number(m[0]));
   const joined = tokens.map((m, i) => {
     const previous = tokens[i - 1];
-    return previous !== undefined && !/[A-Za-z]/.test(payloadText.slice(previous.index + previous[0].length, m.index));
+    return previous !== undefined && !payloadText.slice(previous.index + previous[0].length, m.index).includes('"');
   });
   const found: string[] = [];
   for (let i = 2; i < values.length; i++) {
@@ -86,7 +86,7 @@ export function scanNames(payloadText: string, index: LeakIndex): { hits: number
   const found: string[] = [];
   let hits = 0;
   for (const name of index.names) {
-    const pattern = new RegExp(`(?<!\\w)${escapeRegExp(name)}(?!\\w)`, "gi");
+    const pattern = new RegExp(`(?<!\\w)${escapeRegExp(JSON.stringify(name).slice(1, -1))}(?!\\w)`, "gi");
     const count = payloadText.match(pattern)?.length ?? 0;
     if (count > 0) {
       hits += count;

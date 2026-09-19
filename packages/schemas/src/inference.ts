@@ -53,6 +53,7 @@ export const DriftValue = z.object({
   pValue: z.number(),
   severity: z.number(),
   maxDeviation: z.number(),
+  drifting: z.boolean(),
   inRange: z.boolean(),
   responsible: Alias.nullable(),
   detectionDelay: z.number().int().nullable(),

@@ -31,4 +31,5 @@ export {
 } from "./gateway";
 export { createAzureProvider, type AzureConfig } from "./providers/azure";
 export { createOllamaProvider, type OllamaConfig } from "./providers/ollama";
+export { createOpenAiProvider, type OpenAiConfig } from "./providers/openai";
 export { getProvider } from "./providers/from-env";

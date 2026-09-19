@@ -45,3 +45,8 @@ typescript 5.9, vite 7, @vitejs/plugin-react 5, vitest 4, react 19, react-router
 - The second domain uses a seeded synthetic web shop file from `scripts/build-demo-records.ts`. No dataset download: the disk is full and a download is a third-party request.
 - Model-off fallbacks per purpose are in the build spec. `name_role` has no fallback: the hypothesis stays null.
 - Injected demo faults start after 60% of the rows so the baseline cannot hide them.
+
+## Model endpoint (2026-09-19)
+
+- Norrin gave an OpenAI-compatible endpoint (vLLM, Mistral Large 3, EU hosting on DataCrunch). Mode `cloud` uses it through the `openai` provider. The key lives in `.env` (git-ignored); the server loads it with `process.loadEnvFile`.
+- The endpoint supports strict JSON schema output. A live call takes about 1 s.

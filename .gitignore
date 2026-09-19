@@ -9,3 +9,4 @@ te_process.csv
 .DS_Store
 *.log
 coverage/
+.env

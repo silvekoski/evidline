@@ -1,0 +1,612 @@
+import type {
+  ChartSeries,
+  DiagnosisValue,
+  FaultClass,
+  Fingerprint,
+  HealthValue,
+  Overrides,
+  RankedSensor,
+  Relation,
+  Role,
+  Thresholds,
+  Window,
+} from "@tpm/schemas";
+import { faultLabel, healthToFault } from "@tpm/schemas";
+import type { DriftResult } from "./drift";
+import { fitPca, pcaStatistics, type PcaModel, type PcaStatistics } from "./pca";
+import type { RelationGraph } from "./relations";
+import type { RoleResult } from "./roles";
+import { blockMedians, dominantPeriod, mannKendall, median, spearman, theilSen } from "./stats";
+import { buildTrace, listing, sig, type Cited } from "./trace";
+import { window, type EvidenceInput, type EvidenceSink, type Grid, type Masks } from "./types";
+
+type StageResult<V> = { value: V; claim: string; confidence: number; evidenceIds: string[] };
+type HealthResult = StageResult<HealthValue> & { mask: Uint8Array };
+
+export type FaultContext = {
+  grid: Grid;
+  masks: Masks;
+  fps: Fingerprint[];
+  baseline: Window;
+  health: HealthResult[];
+  graph: RelationGraph;
+  roles: RoleResult[];
+  drifts: DriftResult[];
+  thresholds: Thresholds;
+  changepoints: Map<string, number[]>;
+};
+
+export type Incident = StageResult<DiagnosisValue>;
+
+type Shared = { cited: Cited; index: number | null; share: number };
+
+type Prepared = FaultContext & {
+  sink: EvidenceSink;
+  overrides: Overrides;
+  n: number;
+  healthOf: Map<string, HealthResult>;
+  roleOf: Map<string, Role>;
+  acfOf: Map<string, number>;
+  excluded: string[];
+  drifting: Map<string, DriftResult>;
+  drivers: string[];
+  victims: Map<string, string[]>;
+  pairs: Set<string>;
+  pca: PcaModel | null;
+  shared: Shared;
+};
+
+type Group = { drivers: string[]; onset: number | null };
+
+type Loop = { actuator: string; controlled: string; downstream: string[]; shifted: string[] };
+
+type Kind = {
+  faultClass: FaultClass;
+  blocks: number;
+  slopePer1000: number;
+  mkZ: number;
+  pValue: number;
+  jump: number;
+  span: number;
+  period: number;
+};
+
+const MIN_WINDOW = 100;
+
+export function separateFaults(ctx: FaultContext, sink: EvidenceSink, overrides: Overrides = {}): Incident[] {
+  const p = prepare(ctx, sink, overrides);
+  return [...healthIncidents(p), ...driverGroups(p).map((g) => diagnose(p, g))];
+}
+
+function add(sink: EvidenceSink, e: EvidenceInput, derived?: Record<string, Float64Array>): Cited {
+  return { id: sink.add(e, derived), stats: e.stats };
+}
+
+function series(alias: string, style: ChartSeries["style"], key = alias): ChartSeries {
+  return { key, label: alias, source: { sensor: alias }, style };
+}
+
+function clamp01(x: number): number {
+  return Math.min(1, Math.max(0, x));
+}
+
+function ratio(a: number, b: number): number {
+  return b === 0 ? 1 : a / b;
+}
+
+function pairKey(a: string, b: string): string {
+  return a < b ? `${a}|${b}` : `${b}|${a}`;
+}
+
+function directed(r: Relation): boolean {
+  return r.lag !== 0 && Math.abs(r.rhoAtLag) > Math.abs(r.rho) + 0.02;
+}
+
+function leads(p: Prepared, a: string): string[] {
+  return p.graph.relations
+    .filter((r) => directed(r) && ((r.a === a && r.lag > 0) || (r.b === a && r.lag < 0)))
+    .map((r) => (r.a === a ? r.b : r.a));
+}
+
+function prepare(ctx: FaultContext, sink: EvidenceSink, overrides: Overrides): Prepared {
+  const healthOf = new Map(ctx.health.map((h) => [h.value.sensor, h]));
+  const roleOf = new Map(ctx.roles.map((r) => [r.value.sensor, overrides.roles?.[r.value.sensor] ?? r.value.role]));
+  const acfOf = new Map(ctx.grid.aliases.map((a, i) => [a, ctx.fps[i]?.acfTime ?? 0]));
+  const excluded = [
+    ...new Set([...(overrides.masked ?? []), ...ctx.health.filter((h) => h.value.health !== "healthy").map((h) => h.value.sensor)]),
+  ].sort();
+  const drifting = new Map(ctx.drifts.filter((d) => d.value.drifting && !excluded.includes(d.value.sensor)).map((d) => [d.value.sensor, d]));
+  const victimOf = (alias: string): string | null => {
+    const override = overrides.responsible?.[alias];
+    const source = override === undefined ? drifting.get(alias)!.victimOf : override === alias ? null : override;
+    return source !== null && drifting.has(source) ? source : null;
+  };
+  const drivers = [...drifting.keys()].filter((a) => victimOf(a) === null);
+  const victims = new Map<string, string[]>();
+  for (const a of drifting.keys()) {
+    const driver = victimOf(a);
+    if (driver !== null) victims.set(driver, [...(victims.get(driver) ?? []), a]);
+  }
+  const pcaSensors = ctx.grid.aliases.filter((a, i) => ctx.fps[i]?.signalType !== "constant" && !excluded.includes(a));
+  return {
+    ...ctx,
+    sink,
+    overrides,
+    n: ctx.grid.n,
+    healthOf,
+    roleOf,
+    acfOf,
+    excluded,
+    drifting,
+    drivers,
+    victims,
+    pairs: new Set(ctx.graph.relations.map((r) => pairKey(r.a, r.b))),
+    pca: fitPca(ctx.grid, ctx.baseline, pcaSensors),
+    shared: sharedChangepoint(ctx, sink),
+  };
+}
+
+function sharedChangepoint(ctx: FaultContext, sink: EvidenceSink): Shared {
+  const { grid, fps, changepoints } = ctx;
+  const { n } = grid;
+  const tolerance = Math.max(2, Math.floor(0.001 * n));
+  const counted = grid.aliases.filter((_, i) => fps[i]?.signalType !== "constant");
+  const boundaries = grid.episodes.flatMap((e) => [e.from, e.to]);
+  const points = counted.flatMap((alias) =>
+    (changepoints.get(alias) ?? [])
+      .filter((c) => boundaries.every((b) => Math.abs(c - b) > tolerance))
+      .map((c) => ({ c, alias })),
+  );
+  let index: number | null = null;
+  let sharing: string[] = [];
+  for (const { c } of points) {
+    const near = new Set(points.filter((q) => Math.abs(q.c - c) <= tolerance).map((q) => q.alias));
+    if (near.size > sharing.length) {
+      index = c;
+      sharing = [...near].sort();
+    }
+  }
+  const share = ratio(sharing.length, counted.length);
+  const whole = window(0, n);
+  const cited = add(sink, {
+    kind: "changepoint",
+    sensors: sharing,
+    window: whole,
+    method: "shared-changepoint",
+    stats: { n, sensors: counted.length, sharing: sharing.length, share, ...(index === null ? {} : { index }) },
+    verdict:
+      index === null
+        ? "No sensor has a change point away from an episode boundary."
+        : `${sharing.length} of ${counted.length} sensors share a change point at sample ${index}.`,
+    chart: {
+      type: "line",
+      window: whole,
+      series: sharing.slice(0, 5).map((a) => series(a, "thin")),
+      ...(index === null ? {} : { marks: [{ at: index, label: "shared change point", kind: "changepoint" as const }] }),
+    },
+  });
+  return { cited, index, share };
+}
+
+function healthClassOf(p: Prepared, alias: string): string {
+  const health = p.healthOf.get(alias)?.value.health;
+  return health && health !== "healthy" ? health : "masked by the operator";
+}
+
+function healthIncidents(p: Prepared): Incident[] {
+  const { n, grid } = p;
+  return p.health
+    .filter((h) => h.value.health !== "healthy")
+    .sort((a, b) => a.value.sensor.localeCompare(b.value.sensor))
+    .map((h) => {
+      const { sensor, masked } = h.value;
+      const cls = h.value.health as Exclude<HealthValue["health"], "healthy">;
+      const onset = masked[0]?.from ?? null;
+      const w = window(Math.max(0, Math.min(onset ?? 0, n - MIN_WINDOW)), n);
+      const check = h.value.checks.find((c) => c.check === cls);
+      const statistic = check?.statistic ?? 0;
+      const threshold = check?.threshold ?? 0;
+      const mask = p.masks[grid.aliases.indexOf(sensor)];
+      let maskedSamples = 0;
+      if (mask) for (let t = w.from; t < w.to; t++) maskedSamples += mask[t]!;
+      const maskedShare = ratio(maskedSamples, w.n);
+      const ev = add(p.sink, {
+        kind: "health",
+        sensors: [sensor],
+        window: w,
+        method: cls,
+        stats: { n: w.n, statistic, threshold, ratio: ratio(statistic, threshold), maskedShare, maskedWindows: masked.length },
+        verdict: `${sensor} failed the ${cls} check: statistic ${sig(statistic)} against threshold ${sig(threshold)}.`,
+        chart: { type: "line", window: w, series: [series(sensor, "solid", "value")], masks: masked },
+      });
+      const upstream = h.evidenceIds.map((id) => ({ id, stats: {} }));
+      const faultClass = p.overrides.faultClass?.[sensor] ?? healthToFault(cls);
+      const skipped = { n: w.n, cited: [ev], keys: [], result: `Not run: ${sensor} is excluded by the health gate.` };
+      const trace = buildTrace({
+        health: {
+          name: "Health gate",
+          n: w.n,
+          cited: [ev, ...upstream],
+          keys: ["statistic", "threshold", "ratio", "maskedShare"],
+          result: `The health gate excluded ${sensor} (${cls}): statistic ${sig(statistic)} against threshold ${sig(threshold)}; masked share of the window ${sig(maskedShare)}.`,
+        },
+        drift: { name: "Drift", ...skipped },
+        isolation: { name: "Isolation", ...skipped },
+        propagation: { name: "Propagation", ...skipped },
+        "control-loop": { name: "Control loop", ...skipped },
+        verdict: {
+          name: "Verdict",
+          n: w.n,
+          cited: [ev, ...upstream],
+          keys: ["statistic", "threshold"],
+          result: `${faultLabel(faultClass)} on ${sensor} from sample ${w.from}. No process diagnosis uses this sensor.`,
+        },
+      });
+      return {
+        value: { faultClass, window: w, onset, ranked: [], excluded: [sensor], trace, prose: null, pca: null },
+        claim: `${faultLabel(faultClass)} on ${sensor} from sample ${w.from}. No process diagnosis uses this sensor.`,
+        confidence: 1,
+        evidenceIds: [...new Set(trace.flatMap((s) => s.evidenceIds))],
+      };
+    });
+}
+
+function onsetForGrouping(p: Prepared, alias: string): number {
+  return p.drifting.get(alias)?.value.onset ?? p.baseline.to;
+}
+
+function driverGroups(p: Prepared): Group[] {
+  const { drivers, n } = p;
+  const parent = drivers.map((_, i) => i);
+  const find = (i: number): number => {
+    const q = parent[i]!;
+    if (q === i) return i;
+    const root = find(q);
+    parent[i] = root;
+    return root;
+  };
+  for (let i = 0; i < drivers.length; i++) {
+    for (let j = i + 1; j < drivers.length; j++) {
+      const a = drivers[i]!;
+      const b = drivers[j]!;
+      if (!p.pairs.has(pairKey(a, b))) continue;
+      const slack = Math.max(2 * Math.max(p.acfOf.get(a)!, p.acfOf.get(b)!), 0.01 * n);
+      if (Math.abs(onsetForGrouping(p, a) - onsetForGrouping(p, b)) <= slack) parent[find(i)] = find(j);
+    }
+  }
+  const members = new Map<number, string[]>();
+  drivers.forEach((a, i) => members.set(find(i), [...(members.get(find(i)) ?? []), a]));
+  return [...members.values()]
+    .map((group) => {
+      const onsets = group.map((a) => p.drifting.get(a)!.value.onset).filter((o): o is number => o !== null);
+      return { drivers: group.sort(), onset: onsets.length > 0 ? Math.min(...onsets) : null };
+    })
+    .sort((x, y) => (x.onset ?? n) - (y.onset ?? n) || x.drivers[0]!.localeCompare(y.drivers[0]!));
+}
+
+function rank(p: Prepared, members: string[], pca: PcaStatistics | null): RankedSensor[] {
+  const raw = members.map((a) => pca?.contributions.get(a) ?? 0);
+  const total = raw.reduce((s, v) => s + v, 0);
+  return members
+    .map((sensor, i) => ({
+      sensor,
+      contribution: total > 0 ? raw[i]! / total : 1 / members.length,
+      onset: p.drifting.get(sensor)?.value.onset ?? null,
+    }))
+    .sort((x, y) => y.contribution - x.contribution || (x.onset ?? p.n) - (y.onset ?? p.n) || x.sensor.localeCompare(y.sensor));
+}
+
+function findLoop(p: Prepared, drivers: string[]): Loop | null {
+  for (const actuator of drivers) {
+    if (p.roleOf.get(actuator) !== "actuator") continue;
+    for (const controlled of leads(p, actuator)) {
+      if (p.roleOf.get(controlled) !== "controlled" || p.drifting.has(controlled)) continue;
+      const downstream = [...new Set([...leads(p, actuator), ...leads(p, controlled)])]
+        .filter((a) => a !== actuator && a !== controlled && !p.excluded.includes(a))
+        .sort();
+      return { actuator, controlled, downstream, shifted: downstream.filter((a) => p.drifting.has(a)) };
+    }
+  }
+  return null;
+}
+
+function processKind(p: Prepared, deviation: Float64Array, lead: string, from: number): Kind {
+  const { n } = p;
+  const block = Math.max(1, Math.floor(n / 200));
+  const { centers, medians } = blockMedians(Float64Array.from(deviation, (v) => Math.abs(v)), block, from, n);
+  const fit = theilSen(Float64Array.from(medians), Float64Array.from(centers));
+  const mk = mannKendall(Float64Array.from(medians));
+  const span = Math.max(2, Math.ceil(2 * p.acfOf.get(lead)!));
+  const before = median(deviation.subarray(Math.max(0, from - span), from));
+  const after = median(deviation.subarray(from, Math.min(n, from + span)));
+  const jump = Math.abs(after - before);
+  const period = dominantPeriod(deviation.subarray(from, n), 0.5) ?? 0;
+  const faultClass: FaultClass =
+    medians.length >= 4 && mk.p < 0.01 && fit.slope > 0
+      ? "process-slow-degradation"
+      : jump > 2
+        ? "process-step"
+        : period > 0
+          ? "process-oscillation"
+          : "process-degradation";
+  return { faultClass, blocks: medians.length, slopePer1000: 1000 * fit.slope, mkZ: mk.z, pValue: mk.p, jump, span, period };
+}
+
+function maxDeviationOf(p: Prepared, alias: string): number {
+  return p.drifts.find((d) => d.value.sensor === alias)?.value.maxDeviation ?? 0;
+}
+
+function diagnose(p: Prepared, group: Group): Incident {
+  const { grid, n, thresholds } = p;
+  const onset = group.onset;
+  const from = Math.max(0, Math.min(onset ?? p.baseline.to, n - MIN_WINDOW));
+  const w = window(from, n);
+  const victims = [...new Set(group.drivers.flatMap((d) => p.victims.get(d) ?? []))].sort();
+  const pca = p.pca ? pcaStatistics(p.pca, grid, w) : null;
+  const ranked = rank(p, [...group.drivers, ...victims], pca);
+  const lead = ranked.find((r) => group.drivers.includes(r.sensor))!.sensor;
+  const drift = p.drifting.get(lead)!;
+  const model = drift.model;
+  const single = group.drivers.length === 1;
+
+  const level = model ? spearman(model.deviation.subarray(from, n), model.expected.subarray(from, n)) : { rho: 0, n: 0 };
+  const peers = (p.graph.peers.get(lead) ?? []).map((q) => q.alias);
+  const peerDrivers = peers.filter((a) => p.drivers.includes(a)).length;
+  const redundancy = p.graph.groups.find((g) => g.sensors.includes(lead)) ?? null;
+  const groupOthers = redundancy ? redundancy.sensors.filter((a) => a !== lead) : [];
+  const groupDrivers = groupOthers.filter((a) => p.drivers.includes(a)).length;
+  const loop = findLoop(p, group.drivers);
+  const kind = model ? processKind(p, model.deviation, lead, from) : null;
+
+  const onsets = new Map(ranked.filter((r) => r.onset !== null).map((r) => [r.sensor, r.onset!]));
+  let edges = 0;
+  let agree = 0;
+  for (const r of p.graph.relations) {
+    const oa = onsets.get(r.a);
+    const ob = onsets.get(r.b);
+    if (!directed(r) || oa === undefined || ob === undefined) continue;
+    edges++;
+    if (ob === oa || Math.sign(ob - oa) === Math.sign(r.lag)) agree++;
+  }
+  const onsetValues = [...onsets.values()];
+  const onsetSpan = onsetValues.length > 0 ? Math.max(...onsetValues) - Math.min(...onsetValues) : 0;
+
+  const pcaEv = add(p.sink, {
+    kind: "structure",
+    sensors: ranked.map((r) => r.sensor),
+    window: w,
+    method: "pca",
+    stats: {
+      n: pca?.n ?? w.n,
+      sensors: p.pca?.sensors.length ?? 0,
+      components: p.pca?.components ?? 0,
+      excluded: p.excluded.length,
+      ...(pca && p.pca ? { t2: pca.t2, t2Limit: p.pca.t2Limit, spe: pca.spe, speLimit: p.pca.speLimit } : {}),
+      ...Object.fromEntries(ranked.map((r) => [`contrib_${r.sensor}`, r.contribution])),
+    },
+    verdict:
+      pca && p.pca
+        ? pca.spe > p.pca.speLimit
+          ? `SPE ${sig(pca.spe)} exceeds ${sig(p.pca.speLimit)}: the relations broke.`
+          : pca.t2 > p.pca.t2Limit
+            ? `T2 ${sig(pca.t2)} exceeds ${sig(p.pca.t2Limit)} with SPE inside its limit: the process moved inside its relations.`
+            : `T2 ${sig(pca.t2)} and SPE ${sig(pca.spe)} stay inside their limits.`
+        : "No PCA model: fewer than two healthy non-constant sensors.",
+    chart: { type: "bar", window: w, series: [], bars: ranked.map((r) => ({ label: r.sensor, value: r.contribution })) },
+  });
+  const onsetEv = add(p.sink, {
+    kind: "lag",
+    sensors: ranked.map((r) => r.sensor),
+    window: w,
+    method: "onset-order",
+    stats: {
+      n: w.n,
+      sensors: ranked.length,
+      drivers: group.drivers.length,
+      victims: victims.length,
+      onsetSpan,
+      edges,
+      agree,
+      lagAgreement: ratio(agree, edges),
+      ...Object.fromEntries([...onsets].map(([a, o]) => [`onset_${a}`, o])),
+    },
+    verdict: `${agree} of ${edges} lead-lag edges agree with the onset order; onsets span ${onsetSpan} samples.`,
+    chart: {
+      type: "line",
+      window: w,
+      series: ranked.slice(0, 6).map((r, i) => series(r.sensor, i === 0 ? "solid" : "thin")),
+      marks: [...onsets].map(([a, o]) => ({ at: o, label: `${a} onset`, kind: "onset" as const })),
+    },
+  });
+  const isoEv = add(
+    p.sink,
+    {
+      kind: "residual",
+      sensors: [lead, ...peers],
+      window: w,
+      method: "spearman",
+      stats: {
+        n: w.n,
+        pairs: level.n,
+        levelRho: Math.abs(level.rho),
+        maxDeviation: drift.value.maxDeviation,
+        deviationLimit: thresholds.deviationLimit,
+        peers: peers.length,
+        peerDrivers,
+        groupSize: redundancy ? redundancy.sensors.length : 0,
+        groupDrivers,
+        loop: loop ? 1 : 0,
+        controlledDeviation: loop ? maxDeviationOf(p, loop.controlled) : 0,
+        actuatorDeviation: loop ? maxDeviationOf(p, loop.actuator) : 0,
+        downstream: loop ? loop.downstream.length : 0,
+        downstreamShifted: loop ? loop.shifted.length : 0,
+      },
+      verdict: model
+        ? `${lead} deviates up to ${sig(drift.value.maxDeviation)} from its ${peers.length} peers; |rho| between deviation and level ${sig(Math.abs(level.rho))}.`
+        : `${lead} drifts against its own baseline distribution; no peer model.`,
+      chart: {
+        type: "line",
+        window: w,
+        series: [
+          series(lead, "solid", "value"),
+          ...(model ? [{ key: "expected", label: "expected from peers", source: { derived: "expected" }, style: "dashed" as const }] : []),
+          ...peers.slice(0, 5).map((a) => series(a, "thin")),
+        ],
+        ...(model ? { secondary: [{ key: "deviation", label: "deviation", source: { derived: "deviation" }, style: "solid" as const }] } : {}),
+        threshold: thresholds.deviationLimit,
+        ...(onset === null ? {} : { marks: [{ at: onset, label: "onset", kind: "onset" as const }] }),
+      },
+    },
+    model ? { expected: model.expected, deviation: model.deviation } : undefined,
+  );
+  const kindEv =
+    model && kind
+      ? add(
+          p.sink,
+          {
+            kind: "trend",
+            sensors: [lead],
+            window: w,
+            method: "theil-sen",
+            stats: { n: w.n, blocks: kind.blocks, slopePer1000: kind.slopePer1000, mkZ: kind.mkZ, pValue: kind.pValue, jump: kind.jump, span: kind.span, period: kind.period },
+            verdict: `|deviation| of ${lead} trends ${sig(kind.slopePer1000)} per 1000 samples over ${kind.blocks} blocks (p ${sig(kind.pValue)}); jump at onset ${sig(kind.jump)}; period ${kind.period}.`,
+            chart: {
+              type: "line",
+              window: w,
+              series: [{ key: "deviation", label: "deviation", source: { derived: "deviation" }, style: "solid" }],
+              ...(onset === null ? {} : { marks: [{ at: onset, label: "onset", kind: "onset" as const }] }),
+            },
+          },
+          { deviation: model.deviation },
+        )
+      : null;
+
+  const slack = Math.max(2 * p.acfOf.get(lead)!, 0.01 * n);
+  const shared = p.shared;
+  let row: { faultClass: FaultClass; reason: string; cited: Cited[]; keys: string[]; redundancy: boolean };
+  if (shared.index !== null && shared.share >= 0.8 && onset !== null && Math.abs(onset - shared.index) <= slack) {
+    row = {
+      faultClass: "data-logging",
+      reason: `A share of ${sig(shared.share)} of the sensors changes at sample ${shared.index}.`,
+      cited: [shared.cited],
+      keys: ["share", "index", "sharing"],
+      redundancy: false,
+    };
+  } else if (single && redundancy && groupDrivers === 0) {
+    row = {
+      faultClass: "sensor-drift",
+      reason: `${lead} leaves its redundancy group of ${redundancy.sensors.length}; the other members agree.`,
+      cited: [isoEv, { id: redundancy.evidenceId, stats: {} }],
+      keys: ["maxDeviation", "groupSize", "groupDrivers"],
+      redundancy: true,
+    };
+  } else if (single && !loop) {
+    const gain = model !== null && Math.abs(level.rho) > 0.5;
+    row = {
+      faultClass: model ? (gain ? "sensor-drift-gain" : "sensor-drift-bias") : "sensor-drift",
+      reason: model
+        ? `${lead} leaves its ${peers.length} peers while they stay consistent; the deviation ${gain ? "scales with" : "does not depend on"} the level (|rho| ${sig(Math.abs(level.rho))}).`
+        : `${lead} leaves its baseline distribution and has no peers.`,
+      cited: [isoEv, pcaEv],
+      keys: ["levelRho", "maxDeviation", "peers", "peerDrivers", "spe", "speLimit"],
+      redundancy: false,
+    };
+  } else if (loop) {
+    const hidden = loop.shifted.length > 0;
+    row = {
+      faultClass: hidden ? "sensor-drift-hidden" : "process-degradation",
+      reason: `${loop.controlled} holds while ${loop.actuator} trends; ${loop.shifted.length} of ${loop.downstream.length} downstream sensors ${hidden ? "shift" : "hold"}.`,
+      cited: [isoEv, pcaEv],
+      keys: ["controlledDeviation", "actuatorDeviation", "downstream", "downstreamShifted", "t2", "t2Limit"],
+      redundancy: false,
+    };
+  } else {
+    row = {
+      faultClass: kind?.faultClass ?? "process-degradation",
+      reason: `${group.drivers.length} related sensors move together and ${agree} of ${edges} lead-lag edges follow the learned lags.`,
+      cited: [onsetEv, ...(kindEv ? [kindEv] : []), pcaEv],
+      keys: ["drivers", "lagAgreement", "slopePer1000", "pValue", "jump", "period", "t2", "t2Limit"],
+      redundancy: false,
+    };
+  }
+  const overrideKey = ranked.map((r) => r.sensor).find((a) => p.overrides.faultClass?.[a] !== undefined);
+  const faultClass = overrideKey === undefined ? row.faultClass : p.overrides.faultClass![overrideKey]!;
+  const confidence = row.redundancy
+    ? 0.9
+    : pca && p.pca
+      ? clamp01(Math.abs(ratio(pca.spe, p.pca.speLimit) - ratio(pca.t2, p.pca.t2Limit)))
+      : 0.5;
+
+  const excludedNames = p.excluded.map((a) => `${a} (${healthClassOf(p, a)})`);
+  const excludedIds = p.excluded.flatMap((a) => p.healthOf.get(a)?.evidenceIds ?? []).map((id) => ({ id, stats: {} }));
+  const trace = buildTrace({
+    health: {
+      name: "Health gate",
+      n: w.n,
+      cited: [pcaEv, ...excludedIds],
+      keys: ["excluded", "sensors"],
+      result:
+        p.excluded.length > 0
+          ? `The health gate excluded ${listing(excludedNames)}; ${p.pca?.sensors.length ?? 0} sensors stay in the PCA model.`
+          : `The health gate excluded no sensor; ${p.pca?.sensors.length ?? 0} sensors form the PCA model.`,
+    },
+    drift: {
+      name: "Drift",
+      n: w.n,
+      cited: [onsetEv, shared.cited, ...drift.evidenceIds.map((id) => ({ id, stats: {} }))],
+      keys: ["drivers", "victims", "onsetSpan", "sharing", "share", "index"],
+      result: `${listing(group.drivers, 5)} drift${onset === null ? "" : ` from sample ${onset}`}; ${victims.length} sensors follow; ${shared.cited.stats.sharing} of ${shared.cited.stats.sensors} sensors share a change point${shared.index === null ? "" : ` at sample ${shared.index}`}.`,
+    },
+    isolation: {
+      name: "Isolation",
+      n: w.n,
+      cited: [isoEv],
+      keys: ["maxDeviation", "levelRho", "peers", "peerDrivers", "groupSize", "groupDrivers", "pairs"],
+      result: model
+        ? `${lead} deviates up to ${sig(drift.value.maxDeviation)} against ${peers.length} peers; ${peerDrivers} peers drift; redundancy group of ${redundancy ? redundancy.sensors.length : 0} with ${groupDrivers} other drifting members; |rho| between deviation and level ${sig(Math.abs(level.rho))}.`
+        : `${lead} has no peer model; ${peerDrivers} of ${peers.length} peers drift; redundancy group of ${redundancy ? redundancy.sensors.length : 0}.`,
+    },
+    propagation: {
+      name: "Propagation",
+      n: w.n,
+      cited: [onsetEv, ...(kindEv ? [kindEv] : []), pcaEv],
+      keys: ["drivers", "edges", "agree", "lagAgreement", "spe", "speLimit", "t2", "t2Limit", "slopePer1000", "pValue", "jump", "period"],
+      result:
+        `${group.drivers.length} related sensors move together; ${agree} of ${edges} lead-lag edges follow the learned lags` +
+        (pca && p.pca ? `; SPE ${sig(pca.spe)} against ${sig(p.pca.speLimit)}, T2 ${sig(pca.t2)} against ${sig(p.pca.t2Limit)}` : "") +
+        (kind ? `; |deviation| trend ${sig(kind.slopePer1000)} per 1000 samples (p ${sig(kind.pValue)}), jump ${sig(kind.jump)}, period ${kind.period}.` : "."),
+    },
+    "control-loop": {
+      name: "Control loop",
+      n: w.n,
+      cited: [isoEv],
+      keys: ["loop", "controlledDeviation", "actuatorDeviation", "downstream", "downstreamShifted"],
+      result: loop
+        ? `${loop.controlled} (controlled) holds at deviation ${sig(maxDeviationOf(p, loop.controlled))} while ${loop.actuator} (actuator) trends to ${sig(maxDeviationOf(p, loop.actuator))}; ${loop.shifted.length} of ${loop.downstream.length} downstream sensors shift.`
+        : "No control loop: no drifting actuator leads a controlled variable that holds.",
+    },
+    verdict: {
+      name: "Verdict",
+      n: w.n,
+      cited: [...row.cited, pcaEv],
+      keys: row.keys,
+      result: `${faultLabel(faultClass)}. ${row.reason}${overrideKey === undefined ? "" : " The operator set the fault class."}`,
+    },
+  });
+  const others = ranked.length - 1;
+  return {
+    value: {
+      faultClass,
+      window: w,
+      onset,
+      ranked,
+      excluded: p.excluded,
+      trace,
+      prose: null,
+      pca: pca && p.pca ? { t2: pca.t2, t2Limit: p.pca.t2Limit, spe: pca.spe, speLimit: p.pca.speLimit } : null,
+    },
+    claim: `${faultLabel(faultClass)} on ${ranked[0]!.sensor}${others > 0 ? ` and ${others} more` : ""}${onset === null ? "" : ` from sample ${onset}`}; ${p.excluded.length} sensors excluded by the health gate.`,
+    confidence,
+    evidenceIds: [...new Set(trace.flatMap((s) => s.evidenceIds))],
+  };
+}
