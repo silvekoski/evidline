@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "react-router";
 import { TrendingUpIcon } from "lucide-react";
@@ -33,6 +33,12 @@ export function DriftScreen() {
   const selected = sorted.find((d) => d.id === target || d.value.sensor === target) ?? sorted[0];
   const visible = filter === "drifting" ? drifting : sorted;
   const aliases = new Set(sorted.map((d) => d.value.sensor));
+  const detail = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (hash === "" || !detail.current) return;
+    detail.current.scrollIntoView({ block: "start" });
+    detail.current.focus({ preventScroll: true });
+  }, [selected?.id]);
 
   return (
     <>
@@ -71,18 +77,20 @@ export function DriftScreen() {
         <EmptyState icon={TrendingUpIcon} title="No drift output" description="The drift detector wrote no inference for this run." />
       ) : (
         <div className="grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
-          <ScrollArea className="order-2 xl:order-1 xl:sticky xl:top-16 xl:h-[calc(100dvh-9rem)] xl:self-start">
-            {visible.length === 0 ? (
-              <EmptyState icon={TrendingUpIcon} title="No drift found" description={`Every ${lens.sensor} stays within what its peers predict.`} />
-            ) : (
-              <div className="grid grid-cols-[repeat(auto-fill,minmax(13rem,1fr))] gap-3 xl:pr-3">
-                {visible.map((d) => (
-                  <DriftCard key={d.id} inference={d} selected={d.id === selected?.id} label={label} />
-                ))}
-              </div>
-            )}
-          </ScrollArea>
-          <div className="order-1 xl:order-2">
+          <div className="order-2 xl:order-1 xl:sticky xl:top-16 xl:self-start">
+            <ScrollArea className="xl:h-[calc(100dvh-9rem)]">
+              {visible.length === 0 ? (
+                <EmptyState icon={TrendingUpIcon} title="No drift found" description={`Every ${lens.sensor} stays within what its peers predict.`} />
+              ) : (
+                <div className="grid grid-cols-[repeat(auto-fill,minmax(13rem,1fr))] gap-3 xl:pr-3">
+                  {visible.map((d) => (
+                    <DriftCard key={d.id} inference={d} selected={d.id === selected?.id} label={label} />
+                  ))}
+                </div>
+              )}
+            </ScrollArea>
+          </div>
+          <div ref={detail} tabIndex={-1} className="order-1 scroll-mt-16 outline-none xl:order-2">
             {selected && <DriftDetail inference={selected} runId={runId} aliases={aliases} label={label} dt={run.data?.timeBase.dt ?? null} />}
           </div>
         </div>

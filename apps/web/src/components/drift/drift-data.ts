@@ -1,6 +1,5 @@
-import { useQueries, useQuery } from "@tanstack/react-query";
-import type { ChartSpec, DriftInference, DriftValue, Evidence, EvidenceSeries } from "@tpm/schemas";
-import { getEvidence, getEvidenceSeries, keys } from "@/api";
+import type { ChartSpec, DriftInference, DriftValue, EvidenceSeries } from "@tpm/schemas";
+import { useEvidenceOfKind, type LineEvidence } from "@/hooks/use-evidence-of-kind";
 
 export function inRangeLine(value: DriftValue): string {
   const drift = value.drifting ? "drift found" : "no drift";
@@ -12,23 +11,8 @@ export const deviationKey = (value: DriftValue) => (value.method === "distributi
 export const deviationLimit = (spec: ChartSpec | undefined): number | null =>
   spec?.threshold ?? null;
 
-export type Residual = { evidence: Evidence | undefined; series: EvidenceSeries | undefined; error: Error | null };
-
-export function useResidual(inference: DriftInference): Residual {
-  const wanted = inference.value.method === "distribution" ? "distribution" : "residual";
-  const evidence = useQueries({
-    queries: inference.evidenceIds.map((id) => ({ queryKey: keys.evidence(id), queryFn: () => getEvidence(id), staleTime: Infinity })),
-  });
-  const residual = evidence.map((q) => q.data).find((e) => e?.kind === wanted && e.chart.type === "line");
-  const series = useQuery({
-    queryKey: keys.evidenceSeries(residual?.id ?? ""),
-    queryFn: () => getEvidenceSeries(residual?.id ?? ""),
-    enabled: residual !== undefined,
-    staleTime: Infinity,
-  });
-  const settled = evidence.every((q) => !q.isPending);
-  const error = series.error ?? evidence.find((q) => q.error)?.error ?? (settled && !residual ? new Error("No residual evidence on this inference.") : null);
-  return { evidence: residual, series: series.data, error };
+export function useResidual(inference: DriftInference): LineEvidence {
+  return useEvidenceOfKind(inference.evidenceIds, inference.value.method === "distribution" ? "distribution" : "residual");
 }
 
 export function pickSeries(data: EvidenceSeries, spec: ChartSpec, name: string): (number | null)[] | null {

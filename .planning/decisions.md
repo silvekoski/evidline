@@ -76,3 +76,24 @@ typescript 5.9, vite 7, @vitejs/plugin-react 5, vitest 4, react 19, react-router
 - Derived evidence series are stored at most 4,096 points with a stride, and expanded on read. A stream run now costs about 12 MB in `data/tpm.db`; before it cost about 30 MB. There is no delete route: remove `data/tpm.db*` to start clean.
 - Histogram shares stay at 3 significant digits. On the records demo one `name_role` payload of 132 collides with a run of three rounded raw samples and the leak guard blocks it. That is the guard at work, not a leak. The stream demo has 0 hits.
 - The Norrin endpoint (OpenAI-compatible, Mistral Large 3) works in mode `cloud`: 55 calls sent for the stream demo, 0 blocked, model prose validated for all 3 incidents, hypothesis names on all 52 sensors.
+
+## Palette search (2026-09-19, night)
+
+- The command palette gets a query language instead of a substring filter: a list of clauses over fixed facets (health, role, stage, fault class, drift role, confidence, alias, text). The browser compiles known words itself, so search is instant and works with the model off.
+- The model gets the same job as `compile_rule`: it compiles operator text into that filter through the gateway, as purpose `search`. It never sees the sensor list and never picks a result. The client applies the filter to real data, and the palette shows the filter as words with a link to the egress record.
+- The palette calls the model only when the local result is empty and the text holds words outside the list. Every keystroke does not become an egress record.
+- The template holds a worked example for AND against OR. Without it, Mistral Large 3 put `kind sensor` inside each clause, which matched every sensor.
+- Web unit tests live in `apps/web/test` as a vitest project. The web typecheck covers `src` only.
+
+
+## Diagnosis screen (2026-09-19, night)
+
+- The Diagnosis screen follows the Drift layout: small incident cards on the left, one detail on the right, selected by the hash. The first incident in sort order is selected when the hash is empty.
+- A card renders with no fetch. Its contribution strip is CSS only: a white block for the lead, gray blocks for ranks 2 to 5, a dim tail for the rest, and a hatch for an incident that the health gate decided.
+- The detail renders one proof chart inline through `EvidenceChart`: the residual evidence that the isolation step cites, or the health evidence for a gated incident. The thin peer lines stay out of the inline chart because peers on other scales flatten the lead. The chip next to the caption opens the full chart.
+- The PCA statistics are a CSS meter, not a recharts chart: two bars on a linear scale of 0 to 4 times the limit, a dotted limit line, a white fill above the limit and a dark fill inside it. A ratio above 4 shows a double chevron and the multiple.
+- The ranked table keeps the engine order and never sorts. It shows the top 5 with a Show all button. A highlighted alias past row 5 opens the table.
+- A hash alias resolves in this order: incident id, lead sensor, the health incident that owns the excluded alias, any incident that mentions the alias.
+- `useEvidenceOfKind(ids, kind)` in `hooks` is the shared picker for an inline line chart. It picks in id order and stops at the first pending query, so the choice does not flip. `useResidual` on the Drift screen delegates to it.
+- Radix `ScrollArea` sets `position: relative` inline, so `xl:sticky` on it never applied and `top-16` pushed the list down by 56 px on both screens. The sticky classes now sit on a wrapper div.
+- On a hash selection the screen scrolls the detail into view and moves focus to it. Below xl the detail sits above the list, so a card tap would otherwise change nothing on screen.
