@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { Alias, Window } from "./common.js";
-import { ModelMode } from "./egress.js";
+import { ModelMode, SearchQuery } from "./egress.js";
 import { Evidence } from "./evidence.js";
 import {
   BaselineInference,
@@ -54,6 +54,10 @@ export type CompileRuleResult = z.infer<typeof CompileRuleResult>;
 export const ActivateRuleResponse = Rule;
 
 export const ModelModeBody = z.object({ mode: ModelMode });
+
+export const SearchBody = z.object({ text: z.string().min(1).max(200) });
+export const SearchResult = z.object({ query: SearchQuery, egressId: z.string().nullable() });
+export type SearchResult = z.infer<typeof SearchResult>;
 
 export const EvidenceQuery = z.object({ window: Window.optional(), sensors: z.array(Alias).optional() });
 

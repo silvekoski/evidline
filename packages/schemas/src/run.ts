@@ -46,7 +46,7 @@ export const Run = z.object({
   bucket: z.number().int(),
   timeBase: TimeBase,
   commitHash: z.string(),
-  templateHashes: z.record(Purpose, z.string()),
+  templateHashes: z.partialRecord(Purpose, z.string()),
   stages: z.array(StageProgress),
   error: z.string().nullable(),
   parentRunId: z.string().nullable(),

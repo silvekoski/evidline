@@ -51,6 +51,7 @@ const replies: Record<Purpose, string> = {
   compile_rule: JSON.stringify({ rule: { type: "range", sensor: "S01", source: "S01 must stay below 20", max: 20 } }),
   explain_diagnosis: JSON.stringify({ sentences: [{ text: "Sensor fault: dead.", evidenceIds: ["ev-0badcafe-00001"] }] }),
   plan_investigation: JSON.stringify({ calls: [{ tool: "rerun_without", sensor: "S01" }], rationale: "mask the suspect" }),
+  search: JSON.stringify({ clauses: [[{ field: "drift", value: "responsible" }]] }),
 };
 
 const grid = makeGrid();
@@ -142,6 +143,7 @@ const payloads: EgressPayload[] = [
     catalog,
     tools: ["compare_windows", "test_relation", "find_changepoints", "rerun_without", "test_role", "check_rule"],
   },
+  { purpose: "search", query: "which sensor causes the drift", domain: "stream" },
 ];
 
 for (const payload of payloads) {

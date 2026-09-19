@@ -2,7 +2,7 @@ import { statSync } from "node:fs";
 import { isAbsolute, relative, resolve } from "node:path";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
-import { CreateRunBody, type DriftReport, type IncidentReport, type Run } from "@tpm/schemas";
+import { CreateRunBody, SearchBody, type DriftReport, type IncidentReport, type Run, type SearchResponse, type SearchResult } from "@tpm/schemas";
 import type { AppContext } from "../context";
 import { runModelCalls } from "../model-calls";
 import { driftReport, incidentReport, qualityReport, sensorDetail, sensorReport } from "../reports";
@@ -40,6 +40,14 @@ export function runsRoutes(ctx: AppContext) {
     .get("/:id/incidents", (c) => {
       const run = runOf(c.req.param("id"));
       return c.json({ runId: run.id, incidents: incidentReport(ctx.db, run) } satisfies IncidentReport);
+    })
+    .post("/:id/search", async (c) => {
+      const run = runOf(c.req.param("id"));
+      const { text } = await parseBody(c, SearchBody);
+      const payload = { purpose: "search" as const, query: text, domain: run.domain };
+      const result = await ctx.gateway.call<SearchResponse>("search", payload, { runId: run.id, inferenceId: null, operatorText: true });
+      if (!result.ok) throw new HTTPException(422, { message: result.reason });
+      return c.json({ query: result.value, egressId: result.recordId } satisfies SearchResult);
     })
     .post("/:id/model-calls", async (c) => {
       const run = runOf(c.req.param("id"));

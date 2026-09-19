@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { EgressRecord, EgressTotals, TemplateInfo } from "@tpm/schemas";
+import { EgressRecord, EgressTotals, Purpose, TemplateInfo } from "@tpm/schemas";
 import { egressRecord, fixture, run, type Fixture } from "./fixture";
 
 describe("egress routes", () => {
@@ -44,9 +44,9 @@ describe("egress routes", () => {
     expect(await missing.json()).toEqual({ error: "egress record not found" });
   });
 
-  it("serves the four templates with hashes", async () => {
+  it("serves every template with a hash", async () => {
     const info = TemplateInfo.parse(await (await f.app.request("/api/egress/templates")).json());
-    expect(Object.keys(info).sort()).toEqual(["compile_rule", "explain_diagnosis", "name_role", "plan_investigation"]);
+    expect(Object.keys(info).sort()).toEqual([...Purpose.options].sort());
     expect(info.name_role.hash).toMatch(/^[0-9a-f]{64}$/);
   });
 });

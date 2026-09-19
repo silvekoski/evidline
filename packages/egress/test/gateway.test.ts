@@ -1,7 +1,7 @@
 import { Purpose, type EgressPayload } from "@tpm/schemas";
 import { describe, expect, it } from "vitest";
 import { createGateway, buildLeakIndex, templates } from "../src/index";
-import { capturingProvider, compileRulePayload, explainPayload, nameRolePayload, planPayload, replies, testGateway } from "./fixtures";
+import { capturingProvider, compileRulePayload, explainPayload, nameRolePayload, planPayload, replies, searchPayload, testGateway } from "./fixtures";
 
 const ctx = { runId: "0123abcd", inferenceId: "inf-0123abcd-00001", operatorText: false };
 const payloads: Record<Purpose, EgressPayload> = {
@@ -9,6 +9,7 @@ const payloads: Record<Purpose, EgressPayload> = {
   compile_rule: compileRulePayload("S03 must stay below 20"),
   explain_diagnosis: explainPayload,
   plan_investigation: planPayload("drift", undefined, "S03", "S04"),
+  search: searchPayload(),
 };
 
 describe("gateway with a mock provider", () => {
@@ -111,10 +112,10 @@ describe("gateway with a mock provider", () => {
     for (const purpose of Purpose.options) {
       expect(info[purpose].hash).toMatch(/^[0-9a-f]{64}$/);
       expect(info[purpose].text).toBe(templates[purpose]);
-      expect(info[purpose].text).toContain("grid samples");
-      expect(info[purpose].text).toContain("dt");
+      expect(info[purpose].text).toContain("Reply with one JSON object");
+      if (purpose !== "search") expect(info[purpose].text).toContain("grid samples");
     }
-    expect(new Set(Object.values(info).map((t) => t.hash)).size).toBe(4);
+    expect(new Set(Object.values(info).map((t) => t.hash)).size).toBe(Purpose.options.length);
   });
 });
 
@@ -129,7 +130,9 @@ describe("gateway in mode off", () => {
     expect(plan.ok && plan.value.calls.map((c) => c.tool)).toEqual(["find_changepoints", "rerun_without"]);
     const name = await gateway.call("name_role", payloads.name_role, ctx);
     expect(name).toEqual({ ok: false, recordId: "eg-004", reason: "no fallback for name_role, model off" });
-    expect(store.records).toHaveLength(4);
+    const search = await gateway.call("search", payloads.search, ctx);
+    expect(search).toEqual({ ok: false, recordId: "eg-005", reason: "no fallback for search, model off" });
+    expect(store.records).toHaveLength(5);
     for (const record of store.records) {
       expect(record).toMatchObject({ status: "off", mode: "off", provider: null, response: null });
       expect(record.guards.every((g) => g.pass)).toBe(true);

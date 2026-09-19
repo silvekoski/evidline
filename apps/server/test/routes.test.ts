@@ -14,6 +14,7 @@ import {
   Rule,
   Run,
   RunList,
+  SearchResult,
   SensorDetail,
   SensorReport,
   ThreadEntry,
@@ -261,6 +262,29 @@ describe("api routes on a synthetic plant", () => {
     expect(Rule.parse(await activated.json()).active).toBe(true);
     const quality = await get(f, `/api/runs/${run.id}/quality`, QualityReport);
     expect(quality.rules.find((r) => r.id === compiled.rule.id)?.active).toBe(true);
+  });
+
+  it("compiles a search query through the gateway and reports the model off", async () => {
+    const off = await json(f, `/api/runs/${run.id}/search`, { text: "sensors that stopped reporting" });
+    expect(off.status).toBe(422);
+    expect(((await off.json()) as { error: string }).error).toBe("no fallback for search, model off");
+    expect((await json(f, `/api/runs/${run.id}/search`, { text: "" })).status).toBe(400);
+    const call = f.ctx.gateway.call;
+    const seen: unknown[] = [];
+    f.ctx.gateway.call = async <T>(purpose: string, payload: unknown, context: unknown) => {
+      seen.push(purpose, payload, context);
+      return { ok: true as const, value: { clauses: [[{ field: "health", value: "dead" }, { field: "health", value: "dropout" }]] } as T, recordId: "eg-fake", source: "model" as const };
+    };
+    try {
+      const res = await json(f, `/api/runs/${run.id}/search`, { text: "sensors that stopped reporting" });
+      expect(res.status).toBe(200);
+      const result = SearchResult.parse(await res.json());
+      expect(result.query.clauses[0]).toHaveLength(2);
+      expect(result.egressId).toBe("eg-fake");
+      expect(seen).toEqual(["search", { purpose: "search", query: "sensors that stopped reporting", domain: "stream" }, { runId: run.id, inferenceId: null, operatorText: true }]);
+    } finally {
+      f.ctx.gateway.call = call;
+    }
   });
 
   it("keeps the log chain valid", async () => {

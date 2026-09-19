@@ -1,9 +1,9 @@
 import { z } from "zod";
-import { Alias, FaultClass, Role, SignalType } from "./common.js";
-import { InvestigationPlan, StatKey, TraceTest } from "./inference.js";
+import { Alias, Domain, FaultClass, HealthClass, InferenceStatus, Role, SignalType } from "./common.js";
+import { InvestigationPlan, Stage, StatKey, TraceTest } from "./inference.js";
 import { RuleJson } from "./rule.js";
 
-export const Purpose = z.enum(["name_role", "compile_rule", "explain_diagnosis", "plan_investigation"]);
+export const Purpose = z.enum(["name_role", "compile_rule", "explain_diagnosis", "plan_investigation", "search"]);
 export type Purpose = z.infer<typeof Purpose>;
 
 export const ModelMode = z.enum(["off", "local", "cloud"]);
@@ -111,11 +111,14 @@ export const PlanInvestigationPayload = z
   })
   .strict();
 
+export const SearchPayload = z.object({ purpose: z.literal("search"), query: z.string().min(1).max(200), domain: Domain }).strict();
+
 export const EgressPayload = z.discriminatedUnion("purpose", [
   NameRolePayload,
   CompileRulePayload,
   ExplainDiagnosisPayload,
   PlanInvestigationPayload,
+  SearchPayload,
 ]);
 export type EgressPayload = z.infer<typeof EgressPayload>;
 
@@ -131,6 +134,30 @@ export const ExplainDiagnosisResponse = z
 export type ExplainDiagnosisResponse = z.infer<typeof ExplainDiagnosisResponse>;
 export const PlanInvestigationResponse = InvestigationPlan;
 export type PlanInvestigationResponse = z.infer<typeof PlanInvestigationResponse>;
+
+export const SearchFamily = z.enum(["sensor", "process", "data"]);
+export const SearchDrift = z.enum(["drifting", "responsible", "victim", "in-range"]);
+export const SearchConfidence = z.enum(["low", "high"]);
+const facet = <F extends string, V extends z.ZodType>(field: F, value: V) => z.object({ field: z.literal(field), value }).strict();
+export const SearchFacet = z.discriminatedUnion("field", [
+  facet("kind", z.enum(["sensor", "inference"])),
+  facet("sensor", Alias),
+  facet("role", Role),
+  facet("signalType", SignalType),
+  facet("health", z.union([z.literal("healthy"), HealthClass])),
+  facet("stage", Stage),
+  facet("family", SearchFamily),
+  facet("faultClass", FaultClass),
+  facet("status", InferenceStatus),
+  facet("drift", SearchDrift),
+  facet("confidence", SearchConfidence),
+  facet("text", z.string().min(1).max(40)),
+]);
+export type SearchFacet = z.infer<typeof SearchFacet>;
+export const SearchQuery = z.object({ clauses: z.array(z.array(SearchFacet).min(1).max(8)).max(8) }).strict();
+export type SearchQuery = z.infer<typeof SearchQuery>;
+export const SearchResponse = SearchQuery;
+export type SearchResponse = z.infer<typeof SearchResponse>;
 
 export const GuardName = z.enum(["schema", "floor", "size", "rounding", "leak", "names", "record"]);
 export type GuardName = z.infer<typeof GuardName>;

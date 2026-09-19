@@ -90,6 +90,8 @@ export const planPayload = (stage: string, question = "Is this right?", sensor: 
   tools: ["compare_windows", "test_relation", "find_changepoints", "rerun_without", "test_role", "check_rule"],
 });
 
+export const searchPayload = (query = "dead sensors", domain: "stream" | "records" = "stream"): EgressPayload => ({ purpose: "search", query, domain });
+
 export function memoryStore(): EgressStore & { records: EgressRecord[] } {
   const records: EgressRecord[] = [];
   return {
@@ -124,6 +126,7 @@ export const replies: Record<string, string> = {
   compile_rule: JSON.stringify({ rule: { type: "range", sensor: "S03", source: "S03 must stay below 20", max: 20 } }),
   explain_diagnosis: JSON.stringify({ sentences: [{ text: "Sensor fault: dead.", evidenceIds: [evidenceId(1)] }] }),
   plan_investigation: JSON.stringify({ calls: [{ tool: "rerun_without", sensor: "S03" }], rationale: "mask the suspect" }),
+  search: JSON.stringify({ clauses: [[{ field: "health", value: "dead" }], [{ field: "kind", value: "sensor" }]] }),
 };
 
 export function testGateway(opts: { mode: ModelMode; provider?: Provider | null; index?: LeakIndex }): {
