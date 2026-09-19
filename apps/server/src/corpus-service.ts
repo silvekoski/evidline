@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { extname, join, relative } from "node:path";
 import { chunkSegments, extractClaimsLocally, fuseRanks, isAudioName, linkClaim, normalizeFile, openPdf, paragraphSegments, verifyQuote, wordsToTurns, type Normalized, type SegmentDraft } from "@tpm/corpus";
-import type { AnswerBody, CatalogColumn, Claim, CorpusStats, DataSpec, ExtractedClaim, OpenQuestion, SearchHit, Source, SourceKind } from "@tpm/schemas";
+import type { AnswerBody, CatalogColumn, Chunk, Claim, CorpusStats, DataSpec, ExtractedClaim, OpenQuestion, SearchHit, Source, SourceKind } from "@tpm/schemas";
 import type { AppContext } from "./context";
 import { columnCandidates, enqueueEmbeds } from "./catalog";
 import type { JobHandler } from "./jobs";
