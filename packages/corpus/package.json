@@ -1,0 +1,32 @@
+{
+  "name": "@tpm/corpus",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@tpm/schemas": "workspace:*",
+    "csv-parse": "^7.0.2",
+    "html-to-text": "^10.0.1",
+    "jszip": "^3.10.1",
+    "mailparser": "^3.9.28",
+    "mammoth": "^1.12.3",
+    "unpdf": "^1.8.1",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/html-to-text": "^9.0.4",
+    "@types/mailparser": "^3.4.6",
+    "@tpm/egress": "workspace:*"
+  }
+}
