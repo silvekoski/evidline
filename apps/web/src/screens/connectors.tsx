@@ -8,6 +8,7 @@ import { WorkspaceSettings } from "@/components/knowledge/workspace-settings";
 import { connectorGaps } from "@/api";
 import { ConfirmAction } from "@/components/confirm-action";
 import { EmptyState } from "@/components/empty-state";
+import { ConnectorFields, connectorFields, defaultValues, isComplete, toConfig, type ConnectorValues } from "@/components/knowledge/connector-form";
 import { JobSummary } from "@/components/knowledge/job-summary";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
@@ -17,30 +18,22 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Textarea } from "@/components/ui/textarea";
 import { formatTime } from "@/lib/format";
-
-const configHints: Record<ConnectorKind, { hint: string; example: string; secret: string }> = {
-  upload: { hint: "No config. Signed upload links come from the Sources page.", example: "{}", secret: "none" },
-  teams: { hint: "Entra app with application permissions. Organizers are the Norrin users that host customer calls.", example: '{"tenantId": "…", "clientId": "…", "organizers": ["anna@norrin.example"]}', secret: "client secret" },
-  slack: { hint: "Internal Slack app in Socket Mode. Map each channel id to a workspace slug.", example: '{"appToken": "xapp-…", "channels": {"C0123": "acme"}}', secret: "bot token (xoxb-…)" },
-  email: { hint: "Shared mailbox read through Graph with Mail.Read. The plus address maps a mail to a workspace.", example: '{"tenantId": "…", "clientId": "…", "mailbox": "corpus@norrin.example"}', secret: "client secret" },
-};
 
 function NewConnector({ onCreated }: { onCreated: () => void }) {
   const [open, setOpen] = useState(false);
   const [kind, setKind] = useState<ConnectorKind>("teams");
   const [name, setName] = useState("");
-  const [config, setConfig] = useState("{}");
+  const [values, setValues] = useState<ConnectorValues>(() => defaultValues("teams"));
   const [secret, setSecret] = useState("");
-  const [error, setError] = useState<string | null>(null);
   const create = useMutation({
-    mutationFn: () => createConnector({ kind, name, workspace: null, config: JSON.parse(config) as Record<string, unknown>, secret: secret || null }),
+    mutationFn: () => createConnector({ kind, name, workspace: null, config: toConfig(kind, values), secret: secret || null }),
     onSuccess: () => {
       setOpen(false);
       onCreated();
     },
   });
+  const spec = connectorFields[kind];
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -48,27 +41,27 @@ function NewConnector({ onCreated }: { onCreated: () => void }) {
           <PlugIcon aria-hidden="true" /> Add connector
         </Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="max-h-[90svh] overflow-y-auto">
         <form
           className="flex flex-col gap-4"
           onSubmit={(e) => {
             e.preventDefault();
-            try {
-              JSON.parse(config);
-              setError(null);
-              create.mutate();
-            } catch {
-              setError("The config must be valid JSON.");
-            }
+            create.mutate();
           }}
         >
           <DialogHeader>
             <DialogTitle>Add connector</DialogTitle>
-            <DialogDescription>{configHints[kind].hint}</DialogDescription>
+            <DialogDescription>{spec.hint}</DialogDescription>
           </DialogHeader>
-          <div className="grid gap-2">
+          <div className="grid gap-1.5">
             <Label htmlFor="c-kind">Kind</Label>
-            <Select value={kind} onValueChange={(v) => setKind(v as ConnectorKind)}>
+            <Select
+              value={kind}
+              onValueChange={(v) => {
+                setKind(v as ConnectorKind);
+                setValues(defaultValues(v as ConnectorKind));
+              }}
+            >
               <SelectTrigger id="c-kind">
                 <SelectValue />
               </SelectTrigger>
@@ -81,22 +74,21 @@ function NewConnector({ onCreated }: { onCreated: () => void }) {
               </SelectContent>
             </Select>
           </div>
-          <div className="grid gap-2">
+          <div className="grid gap-1.5">
             <Label htmlFor="c-name">Name</Label>
             <Input id="c-name" value={name} required onChange={(e) => setName(e.target.value)} />
           </div>
-          <div className="grid gap-2">
-            <Label htmlFor="c-config">Config (JSON)</Label>
-            <Textarea id="c-config" value={config} rows={4} placeholder={configHints[kind].example} onChange={(e) => setConfig(e.target.value)} className="font-mono text-xs" />
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="c-secret">Secret ({configHints[kind].secret})</Label>
-            <Input id="c-secret" type="password" value={secret} autoComplete="off" onChange={(e) => setSecret(e.target.value)} />
-            <p className="text-xs text-muted-foreground">Stored with AES-256-GCM. The browser never gets it back.</p>
-          </div>
-          {error && <p className="text-sm">{error}</p>}
+          <ConnectorFields kind={kind} values={values} onChange={setValues} />
+          {spec.secret && (
+            <div className="grid gap-1.5">
+              <Label htmlFor="c-secret">Secret ({spec.secret})</Label>
+              <Input id="c-secret" type="password" value={secret} autoComplete="off" onChange={(e) => setSecret(e.target.value)} />
+              <p className="text-xs text-muted-foreground">Stored with AES-256-GCM. The browser never gets it back.</p>
+            </div>
+          )}
+          {create.isError && <p className="text-sm" role="alert">{create.error.message}</p>}
           <DialogFooter>
-            <Button type="submit" disabled={create.isPending || name.trim() === ""}>
+            <Button type="submit" disabled={create.isPending || name.trim() === "" || !isComplete(kind, values)}>
               Add
             </Button>
           </DialogFooter>
