@@ -66,7 +66,7 @@ export function OpenQuestionsScreen() {
                 {list.map((q) => {
                   const isOpen = open === q.column.id;
                   return (
-                    <li key={q.column.id} className={cn("rounded-md border", isOpen && "border-foreground")}>
+                    <li key={q.column.id} id={`q-${q.column.id}`} className={cn("scroll-mt-4 rounded-md border", isOpen && "border-foreground")}>
                       <div className="grid items-center gap-x-4 gap-y-1 p-2 text-sm sm:grid-cols-[10rem_minmax(0,1fr)_8rem_7rem_auto]">
                         <div className="font-mono">
                           <Link to={`/runs/${q.column.runId}/sensors#${q.column.alias}`} className="underline-offset-4 hover:underline">

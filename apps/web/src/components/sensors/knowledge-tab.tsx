@@ -16,17 +16,25 @@ export function KnowledgeTab({ sourceName }: { sourceName: string }) {
       </p>
     );
   const { column, claims, aliases } = knowledge.data;
+  const confirmed = claims.filter((c) => c.status === "confirmed");
+  const review = claims.filter((c) => c.status !== "confirmed");
   const open = column.confidence < 0.5 && column.confirmedClaims === 0;
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-2 text-sm">
-        <span>Hypothesis: {column.hypothesis ?? <span className="text-muted-foreground">none</span>}</span>
-        <ConfidenceBar value={column.confidence} />
+        {confirmed.length > 0 ? (
+          <span className="italic text-muted-foreground">Model hypothesis: {column.hypothesis ?? "none"}, replaced by the confirmed claims below</span>
+        ) : (
+          <>
+            <span>Hypothesis: {column.hypothesis ?? <span className="text-muted-foreground">none</span>}</span>
+            <ConfidenceBar value={column.confidence} />
+          </>
+        )}
         <span className="text-muted-foreground">
           {column.claims} claims, {column.confirmedClaims} confirmed
         </span>
         {open && (
-          <Link to="/open-questions" className="underline-offset-4 hover:underline">
+          <Link to={`/open-questions#q-${column.id}`} className="underline-offset-4 hover:underline">
             Open question for the customer
           </Link>
         )}
@@ -41,10 +49,26 @@ export function KnowledgeTab({ sourceName }: { sourceName: string }) {
           ))}
         </p>
       )}
-      {claims.length === 0 ? (
-        <p className="text-muted-foreground">No claim links to this column yet. Upload a call transcript, an email, or a document that mentions it.</p>
-      ) : (
-        claims.map((claim) => <ClaimCard key={claim.id} claim={claim} />)
+      {claims.length === 0 && <p className="text-muted-foreground">No claim links to this column yet. Upload a call transcript, an email, or a document that mentions it.</p>}
+      {confirmed.length > 0 && (
+        <section aria-labelledby={`known-${column.id}`} className="flex flex-col gap-2">
+          <h3 id={`known-${column.id}`} className="text-sm font-medium">
+            What we know <span className="font-normal text-muted-foreground">({confirmed.length} confirmed)</span>
+          </h3>
+          {confirmed.map((claim) => (
+            <ClaimCard key={claim.id} claim={claim} />
+          ))}
+        </section>
+      )}
+      {review.length > 0 && (
+        <section aria-labelledby={`review-${column.id}`} className="flex flex-col gap-2">
+          <h3 id={`review-${column.id}`} className="text-sm font-medium">
+            To review <span className="font-normal text-muted-foreground">({review.length})</span>
+          </h3>
+          {review.map((claim) => (
+            <ClaimCard key={claim.id} claim={claim} />
+          ))}
+        </section>
       )}
     </div>
   );
