@@ -214,6 +214,7 @@ export type CreateConnectorBody = z.infer<typeof CreateConnectorBody>;
 export const JobType = z.enum(["normalize", "chunk", "embed", "extract", "link", "run-sensor-file", "connector-sync", "renew-subscriptions", "retention", "reembed"]);
 export type JobType = z.infer<typeof JobType>;
 export const JobStatus = z.enum(["queued", "running", "done", "failed"]);
+export type JobStatus = z.infer<typeof JobStatus>;
 export const Job = z.object({
   id: z.number().int(),
   workspace: WorkspaceSlug.nullable(),
@@ -228,6 +229,9 @@ export const Job = z.object({
 });
 export type Job = z.infer<typeof Job>;
 export const JobList = z.array(Job);
+export const JobTypeCount = z.object({ type: JobType, queued: z.number().int(), running: z.number().int(), done: z.number().int(), failed: z.number().int() });
+export const JobSummary = z.object({ types: z.array(JobTypeCount), failed: z.array(Job) });
+export type JobSummary = z.infer<typeof JobSummary>;
 
 export const UploadLink = z.object({ token: z.string(), workspace: WorkspaceSlug, expiresAt: z.string(), url: z.string() });
 export type UploadLink = z.infer<typeof UploadLink>;

@@ -127,6 +127,18 @@ describe("claims", () => {
     expect(spec.columnsWithoutClaims).toEqual(["PM2_DR3_STM_VLV_POS"]);
   });
 
+  it("summarizes jobs by type and lists the failed ones", async () => {
+    await upload({ "notes.md": notes });
+    await drain();
+    f.ctx.registry.raw.prepare("UPDATE job SET status = 'failed', last_error = 'boom' WHERE type = 'link' AND id = (SELECT MIN(id) FROM job WHERE type = 'link')").run();
+    const res = await f.app.request("/api/jobs/summary");
+    expect(res.status).toBe(200);
+    const summary = (await res.json()) as { types: { type: string; done: number; queued: number; failed: number }[]; failed: { type: string; lastError: string | null }[] };
+    expect(summary.types.find((t) => t.type === "normalize")).toMatchObject({ done: 1, queued: 0, failed: 0 });
+    expect(summary.types.find((t) => t.type === "link")).toMatchObject({ failed: 1 });
+    expect(summary.failed).toEqual([expect.objectContaining({ type: "link", lastError: "boom" })]);
+  });
+
   it("turns a typed answer into a note source with a stated claim linked to the column", async () => {
     const column = f.ctx.corpus.columns.byName("xmeas_7")!;
     const res = await f.app.request(`/api/columns/${column.id}/answer`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ speaker: "Anna Data", text: "xmeas_7 is the reactor pressure in kPa gauge, logged every 3 minutes." }) });

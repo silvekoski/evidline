@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import Database from "better-sqlite3";
-import type { Connector, ConnectorKind, CreateConnectorBody, CreateWorkspaceBody, Job, JobType, PatchWorkspaceBody, UnassignedSource, Workspace, WorkspaceSlug } from "@tpm/schemas";
+import type { Connector, ConnectorKind, CreateConnectorBody, CreateWorkspaceBody, Job, JobStatus, JobSummary, JobType, PatchWorkspaceBody, UnassignedSource, Workspace, WorkspaceSlug } from "@tpm/schemas";
 import type { SecretBox } from "./secrets";
 
 const schema = `
@@ -145,6 +145,16 @@ export function openRegistry(path: string, secrets: SecretBox) {
       },
       list: (workspace?: WorkspaceSlug, limit: number = 200): Job[] =>
         (workspace === undefined ? all("SELECT * FROM job ORDER BY id DESC LIMIT ?", limit) : all("SELECT * FROM job WHERE workspace = ? ORDER BY id DESC LIMIT ?", workspace, limit)).map(jobOf),
+      summary(workspace: WorkspaceSlug): JobSummary {
+        const byType = new Map<JobType, { type: JobType; queued: number; running: number; done: number; failed: number }>();
+        for (const r of all("SELECT type, status, COUNT(*) AS n FROM job WHERE workspace = ? GROUP BY type, status ORDER BY type", workspace)) {
+          const type = r.type as JobType;
+          const row = byType.get(type) ?? { type, queued: 0, running: 0, done: 0, failed: 0 };
+          row[r.status as JobStatus] += r.n as number;
+          byType.set(type, row);
+        }
+        return { types: [...byType.values()], failed: all("SELECT * FROM job WHERE workspace = ? AND status = 'failed' ORDER BY id DESC LIMIT 50", workspace).map(jobOf) };
+      },
       counts(workspace: WorkspaceSlug): { queued: number; failed: number } {
         const r = one("SELECT SUM(status IN ('queued', 'running')) AS queued, SUM(status = 'failed') AS failed FROM job WHERE workspace = ?", workspace);
         return { queued: (r?.queued as number | null) ?? 0, failed: (r?.failed as number | null) ?? 0 };

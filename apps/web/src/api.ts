@@ -10,6 +10,7 @@ import {
   CorpusStats,
   DataSpec,
   JobList,
+  JobSummary,
   OpenQuestionList,
   SearchHitList,
   SourceDetail,
@@ -127,6 +128,7 @@ export const keys = {
   spec: ["spec"] as const,
   connectors: ["connectors"] as const,
   jobs: ["jobs"] as const,
+  jobSummary: ["jobs", "summary"] as const,
   textEgress: ["egress-log"] as const,
   unassigned: ["unassigned"] as const,
   connectorGaps: (id: number) => ["connectors", id, "gaps"] as const,
@@ -183,6 +185,7 @@ export const importAliases = (csv: string) => request({ parse: (x) => x as { add
 export const erasePerson = (person: string) =>
   request({ parse: (x) => x as { segments: number; claims: number; sourcesRemoved: number; sourcesRebuilt: number; blobsRemoved: number; unassignedRemoved: number } }, "/erasure", post({ person }));
 export const listJobs = () => request(JobList, "/jobs");
+export const getJobSummary = () => request(JobSummary, "/jobs/summary");
 export const retryJobs = () => request({ parse: (x) => x as { retried: number } }, "/jobs/retry", post());
 export const listTextEgress = () => request(TextEgressList, "/egress-log");
 

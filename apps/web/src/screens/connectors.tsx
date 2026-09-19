@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { PlugIcon, RefreshCwIcon, Trash2Icon } from "lucide-react";
-import { ConnectorKind, type Connector, type Job } from "@tpm/schemas";
-import { assignUnassigned, createConnector, deleteConnector, keys, listConnectors, listJobs, listTextEgress, listUnassigned, listWorkspaces, retryJobs, syncConnector } from "@/api";
+import { ConnectorKind, type Connector } from "@tpm/schemas";
+import { assignUnassigned, createConnector, deleteConnector, keys, listConnectors, listTextEgress, listUnassigned, listWorkspaces, syncConnector } from "@/api";
 import { SourceKindBadge } from "@/components/knowledge/badges";
 import { WorkspaceSettings } from "@/components/knowledge/workspace-settings";
 import { connectorGaps } from "@/api";
 import { EmptyState } from "@/components/empty-state";
+import { JobSummary } from "@/components/knowledge/job-summary";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -213,16 +214,11 @@ function UnassignedList() {
   );
 }
 
-const jobLabel = (job: Job): string => `${job.type} ${JSON.stringify(job.payload).slice(0, 60)}`;
-
 export function ConnectorsScreen() {
   const queryClient = useQueryClient();
   const connectors = useQuery({ queryKey: keys.connectors, queryFn: listConnectors, refetchInterval: 10000 });
-  const jobs = useQuery({ queryKey: keys.jobs, queryFn: listJobs, refetchInterval: 5000 });
   const egress = useQuery({ queryKey: keys.textEgress, queryFn: listTextEgress, refetchInterval: 10000 });
-  const retry = useMutation({ mutationFn: retryJobs, onSuccess: () => void queryClient.invalidateQueries({ queryKey: keys.jobs }) });
   const refresh = () => void queryClient.invalidateQueries({ queryKey: keys.connectors });
-  const failed = (jobs.data ?? []).filter((j) => j.status === "failed").length;
 
   return (
     <>
@@ -244,40 +240,7 @@ export function ConnectorsScreen() {
         </div>
       )}
       <UnassignedList />
-      <section className="mt-6" aria-labelledby="jobs-title">
-        <div className="mb-2 flex items-center justify-between">
-          <h2 id="jobs-title" className="text-sm font-medium">
-            Jobs <span className="text-muted-foreground">({(jobs.data ?? []).filter((j) => j.status === "queued" || j.status === "running").length} queued, {failed} failed)</span>
-          </h2>
-          {failed > 0 && (
-            <Button size="xs" variant="outline" onClick={() => retry.mutate()}>
-              Retry failed
-            </Button>
-          )}
-        </div>
-        <Table aria-label="Jobs">
-          <TableHeader>
-            <TableRow>
-              <TableHead scope="col" className="h-8">Job</TableHead>
-              <TableHead scope="col" className="h-8">Status</TableHead>
-              <TableHead scope="col" className="h-8 text-right">Tries</TableHead>
-              <TableHead scope="col" className="h-8">Run after</TableHead>
-              <TableHead scope="col" className="h-8">Error</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {(jobs.data ?? []).slice(0, 30).map((job) => (
-              <TableRow key={job.id}>
-                <TableCell className="py-1 font-mono text-xs">{jobLabel(job)}</TableCell>
-                <TableCell className="py-1">{job.status}</TableCell>
-                <TableCell className="py-1 text-right font-mono">{job.attempts}</TableCell>
-                <TableCell className="py-1 text-xs">{formatTime(job.runAfter)}</TableCell>
-                <TableCell className="max-w-xs truncate py-1 text-xs text-muted-foreground" title={job.lastError ?? undefined}>{job.lastError}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </section>
+      <JobSummary />
       <section className="mt-6" aria-labelledby="egress-title">
         <h2 id="egress-title" className="mb-2 text-sm font-medium">
           External calls of the corpus <span className="text-muted-foreground">(the log holds a hash, never the text)</span>

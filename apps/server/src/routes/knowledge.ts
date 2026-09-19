@@ -179,6 +179,7 @@ export function knowledgeRoutes(ctx: AppContext) {
     })
     .get("/egress-log", (c) => c.json(corpus.egressLog.list()))
     .get("/jobs", (c) => c.json(registry.jobs.list(ctx.slug)))
+    .get("/jobs/summary", (c) => c.json(registry.jobs.summary(ctx.slug)))
     .post("/jobs/retry", (c) => c.json({ retried: registry.jobs.retryFailed(ctx.slug) }))
     .post("/jobs/run", async (c) => c.json({ ran: await ctx.jobs.runPending() }))
     .get("/connectors", (c) => c.json(registry.connectors.list(ctx.slug)))
