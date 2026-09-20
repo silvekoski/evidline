@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import type { Source } from "@tpm/adapters";
 import { Purpose, stageNames, type Overrides, type Run, type StageName, type StageProgress } from "@tpm/schemas";
+import { sendRunAlert } from "./alerts";
 import type { AppContext } from "./context";
 import { newRunId } from "./ids";
 import { appendLog } from "./log";
@@ -61,7 +62,7 @@ export function startRun(ctx: AppContext, input: RunInput): { run: Run; done: Pr
 }
 
 async function execute(ctx: AppContext, initial: Run, input: RunInput): Promise<Run> {
-  const { db, hub } = ctx;
+  const { db, hub, log: logLine } = ctx;
   let run = initial;
   const save = (patch: Partial<Run>): void => {
     run = { ...run, ...patch };
@@ -83,7 +84,9 @@ async function execute(ctx: AppContext, initial: Run, input: RunInput): Promise<
     log(run.parentRunId === null ? "run-started" : "rerun", { name: run.name, parentRunId: run.parentRunId, overrides: input.overrides ?? {} });
     const job = { runId: run.id, overrides: input.overrides ?? {}, source: "path" in input ? { path: input.path } : input.source };
     const output = await runPipelineJob(job, (event) => stage(event.name, { status: event.status, ms: event.ms, counts: event.counts }));
-    run = persistRun(db, run, output).run;
+    const persisted = persistRun(db, run, output);
+    run = persisted.run;
+    void sendRunAlert(run, persisted.inferences, logLine);
     refreshCatalog(ctx, run.id);
     stage("Model calls", { status: "running" });
     const started = Date.now();
