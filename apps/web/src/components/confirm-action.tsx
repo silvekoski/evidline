@@ -11,12 +11,32 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
-export function ConfirmAction({ title, description, action, onConfirm, disabled = false, children }: { title: string; description: string; action: string; onConfirm: () => void; disabled?: boolean; children: ReactNode }) {
+export function ConfirmAction({
+  title,
+  description,
+  action,
+  onConfirm,
+  disabled = false,
+  open,
+  onOpenChange,
+  children,
+}: {
+  title: string;
+  description: string;
+  action: string;
+  onConfirm: () => void;
+  disabled?: boolean;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  children?: ReactNode;
+}) {
   return (
-    <AlertDialog>
-      <AlertDialogTrigger asChild disabled={disabled}>
-        {children}
-      </AlertDialogTrigger>
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
+      {children && (
+        <AlertDialogTrigger asChild disabled={disabled}>
+          {children}
+        </AlertDialogTrigger>
+      )}
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>

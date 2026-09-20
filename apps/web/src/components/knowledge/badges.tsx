@@ -1,7 +1,7 @@
 import type { ComponentProps } from "react";
-import { BotIcon, CheckIcon, CircleDashedIcon, CircleXIcon, DatabaseIcon, FileIcon, MailIcon, MessageSquareIcon, MessageSquareTextIcon, MicIcon, NotebookPenIcon, PhoneIcon, ScanTextIcon, UserIcon } from "lucide-react";
+import { BotIcon, CheckIcon, CircleDashedIcon, CircleXIcon, DatabaseIcon, FileAudioIcon, FileIcon, FileSpreadsheetIcon, FileTextIcon, MailIcon, MessageSquareIcon, MessageSquareTextIcon, MicIcon, NotebookPenIcon, PhoneIcon, PresentationIcon, ScanTextIcon, UserIcon } from "lucide-react";
 import { cn } from "cn";
-import type { ClaimStatus, Provenance, SourceKind, SourceStatus } from "@tpm/schemas";
+import type { ClaimStatus, Provenance, Source, SourceKind, SourceStatus } from "@tpm/schemas";
 import { Badge } from "@/components/ui/badge";
 
 type Style = { icon: typeof CheckIcon; word: string; variant: ComponentProps<typeof Badge>["variant"]; className?: string };
@@ -53,3 +53,13 @@ export const ProvenanceBadge = ({ value, className }: { value: Provenance; class
 export const ClaimStatusBadge = ({ value, className }: { value: ClaimStatus; className?: string }) => <Styled style={claimStatus[value]} className={className} />;
 export const SourceKindBadge = ({ value, className }: { value: SourceKind; className?: string }) => <Styled style={sourceKind[value]} className={className} />;
 export const OcrBadge = ({ className }: { className?: string }) => <Styled style={ocr} className={className} />;
+const fileIcons: [RegExp, typeof FileIcon][] = [
+  [/\.(csv|xlsx)$/i, FileSpreadsheetIcon],
+  [/\.(pptx)$/i, PresentationIcon],
+  [/\.(txt|md|docx|vtt|pdf)$/i, FileTextIcon],
+  [/\.(m4a|mp3|wav|ogg|webm)$/i, FileAudioIcon],
+];
+
+export const sourceIcon = (source: Pick<Source, "kind" | "title" | "mediaType">) =>
+  source.kind === "file" ? (source.mediaType.startsWith("audio/") ? FileAudioIcon : (fileIcons.find(([re]) => re.test(source.title))?.[1] ?? FileIcon)) : sourceKind[source.kind].icon;
+export const sourceKindWord = (value: SourceKind) => sourceKind[value].word;

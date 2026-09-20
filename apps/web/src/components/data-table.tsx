@@ -168,7 +168,7 @@ function TableView<T>({ table, label, renderExpanded, rowProps, empty = "No rows
         </TableBody>
       </Table>
       {pagination && (
-        <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+        <div className="flex flex-wrap items-center justify-between gap-2 px-2 py-1.5 text-xs text-muted-foreground">
           <p aria-live="polite">Rows {first} to {last} of {total}</p>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()}>
