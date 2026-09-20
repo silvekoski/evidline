@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ExplainDiagnosisPayload, Fingerprint, Inference, RoleValue, RuleJson } from "../src/index";
+import { ExplainDiagnosisPayload, Fingerprint, Inference, RoleValue, RuleJson, recordMetric } from "../src/index";
 
 const fp = {
   n: 1000,
@@ -47,6 +47,14 @@ describe("schemas", () => {
       value: { sensor: "S01", role: "unknown", scores: {}, hypothesisName: null, hypothesisConfidence: null },
     });
     expect(r.success).toBe(false);
+  });
+
+  it("reads the record metric from a source name without the column", () => {
+    expect(recordMetric("rows.count")).toBe("count");
+    expect(recordMetric("UnitPrice.median[Country=UK]")).toBe("median");
+    expect(recordMetric("Country.share[UK]")).toBe("share");
+    expect(recordMetric("reactor_pressure")).toBeNull();
+    expect(recordMetric("median.temperature")).toBeNull();
   });
 
   it("rejects a range rule without bounds", () => {

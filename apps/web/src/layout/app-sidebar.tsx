@@ -43,6 +43,41 @@ export function currentScreen(pathname: string): ScreenSlug | null {
   return screens.some((s) => s.slug === slug) ? (slug as ScreenSlug) : null;
 }
 
+function ScreenMenuItem({
+  slug,
+  label,
+  icon: Icon,
+  selectedRunId,
+  pathname,
+  badge,
+}: {
+  slug: ScreenSlug;
+  label: string;
+  icon: (typeof screens)[number]["icon"];
+  selectedRunId: string;
+  pathname: string;
+  badge?: number;
+}) {
+  return (
+    <SidebarMenuItem>
+      {selectedRunId ? (
+        <SidebarMenuButton asChild isActive={pathname === `/runs/${selectedRunId}/${slug}`} tooltip={label}>
+          <NavLink to={`/runs/${selectedRunId}/${slug}`}>
+            <Icon aria-hidden="true" />
+            <span>{label}</span>
+          </NavLink>
+        </SidebarMenuButton>
+      ) : (
+        <SidebarMenuButton disabled aria-disabled="true" tooltip={label}>
+          <Icon aria-hidden="true" />
+          <span>{label}</span>
+        </SidebarMenuButton>
+      )}
+      {badge ? <SidebarMenuBadge aria-label={`${badge} sensor${badge === 1 ? "" : "s"} disagree on name`}>{badge}</SidebarMenuBadge> : null}
+    </SidebarMenuItem>
+  );
+}
+
 export function AppSidebar() {
   const runId = useActiveRunId();
   const lens = useLens();
@@ -113,28 +148,31 @@ export function AppSidebar() {
           <SidebarGroupLabel>{selectedRunId ? `Run ${selectedRunId}` : "Select a run"}</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {screens.map(({ slug, label, icon: Icon }) => (
-                <SidebarMenuItem key={slug}>
-                  {selectedRunId ? (
-                    <SidebarMenuButton asChild isActive={pathname === `/runs/${selectedRunId}/${slug}`} tooltip={label(lens)}>
-                      <NavLink to={`/runs/${selectedRunId}/${slug}`}>
-                        <Icon aria-hidden="true" />
-                        <span>{label(lens)}</span>
-                      </NavLink>
-                    </SidebarMenuButton>
-                  ) : (
-                    <SidebarMenuButton disabled aria-disabled="true" tooltip={label(lens)}>
-                      <Icon aria-hidden="true" />
-                      <span>{label(lens)}</span>
-                    </SidebarMenuButton>
-                  )}
-                  {slug === "sensors" && nameDisagreements > 0 ? (
-                    <SidebarMenuBadge aria-label={`${nameDisagreements} sensor${nameDisagreements === 1 ? "" : "s"} disagree on name`}>
-                      {nameDisagreements}
-                    </SidebarMenuBadge>
-                  ) : null}
-                </SidebarMenuItem>
-              ))}
+              {screens
+                .filter((screen) => screen.group === "run")
+                .map(({ slug, label, icon }) => (
+                  <ScreenMenuItem
+                    key={slug}
+                    slug={slug}
+                    label={label(lens)}
+                    icon={icon}
+                    selectedRunId={selectedRunId}
+                    pathname={pathname}
+                    badge={slug === "sensors" ? nameDisagreements : undefined}
+                  />
+                ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+        <SidebarGroup>
+          <SidebarGroupLabel>System</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {screens
+                .filter((screen) => screen.group === "system")
+                .map(({ slug, label, icon }) => (
+                  <ScreenMenuItem key={slug} slug={slug} label={label(lens)} icon={icon} selectedRunId={selectedRunId} pathname={pathname} />
+                ))}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

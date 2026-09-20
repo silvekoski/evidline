@@ -1,7 +1,12 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, type ComponentProps, type ReactNode } from "react";
+import { useQuery } from "@tanstack/react-query";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { cn } from "cn";
 import type { Segment, Source } from "@tpm/schemas";
-import { sourceBlobUrl } from "@/api";
+import { getSourceBlobText, keys, sourceBlobUrl } from "@/api";
+import { EmptyState } from "@/components/empty-state";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useScrollTarget } from "@/hooks/use-scroll-target";
 import { formatTime } from "@/lib/format";
@@ -158,6 +163,56 @@ export function ReadingView({ source, segments, target, label }: { source: Sourc
           );
         })}
       </ol>
+    </article>
+  );
+}
+
+const markdownComponents = {
+  h1: (p: ComponentProps<"h1">) => <h1 className="mt-6 mb-2 text-lg font-semibold first:mt-0" {...p} />,
+  h2: (p: ComponentProps<"h2">) => <h2 className="mt-6 mb-2 text-base font-semibold first:mt-0" {...p} />,
+  h3: (p: ComponentProps<"h3">) => <h3 className="mt-4 mb-2 text-sm font-semibold first:mt-0" {...p} />,
+  p: (p: ComponentProps<"p">) => <p className="mb-3 leading-relaxed last:mb-0" {...p} />,
+  ul: (p: ComponentProps<"ul">) => <ul className="mb-3 list-disc pl-5" {...p} />,
+  ol: (p: ComponentProps<"ol">) => <ol className="mb-3 list-decimal pl-5" {...p} />,
+  li: (p: ComponentProps<"li">) => <li className="mb-1" {...p} />,
+  a: (p: ComponentProps<"a">) => <a className="underline underline-offset-2 hover:text-foreground" target="_blank" rel="noreferrer" {...p} />,
+  code: (p: ComponentProps<"code">) => <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs" {...p} />,
+  pre: (p: ComponentProps<"pre">) => <pre className="mb-3 overflow-x-auto rounded-md border bg-muted/40 p-3 font-mono text-xs" {...p} />,
+  blockquote: (p: ComponentProps<"blockquote">) => <blockquote className="mb-3 border-l-2 pl-3 text-muted-foreground italic" {...p} />,
+  hr: () => <hr className="my-4 border-border" />,
+  table: (p: ComponentProps<"table">) => <Table className="mb-3" {...p} />,
+  thead: (p: ComponentProps<"thead">) => <TableHeader {...p} />,
+  tbody: (p: ComponentProps<"tbody">) => <TableBody {...p} />,
+  tr: (p: ComponentProps<"tr">) => <TableRow {...p} />,
+  th: (p: ComponentProps<"th">) => <TableHead {...p} />,
+  td: (p: ComponentProps<"td">) => <TableCell {...p} />,
+};
+
+const TEXT_MEDIA_TYPES = new Set(["text/plain", "text/csv", "message/rfc822"]);
+
+export function OriginalView({ source }: { source: Source }) {
+  const blob = useQuery({ queryKey: keys.sourceBlobText(source.id), queryFn: () => getSourceBlobText(source.id), enabled: source.mediaType === "text/markdown" || TEXT_MEDIA_TYPES.has(source.mediaType) });
+  if (source.mediaType !== "text/markdown" && !TEXT_MEDIA_TYPES.has(source.mediaType)) {
+    return (
+      <div className="p-6">
+        <EmptyState title="No inline preview for this file type">
+          <a href={sourceBlobUrl(source.id)} target="_blank" rel="noreferrer" className="underline underline-offset-2">
+            Open the original file in a new tab
+          </a>
+        </EmptyState>
+      </div>
+    );
+  }
+  if (blob.isPending) return <Skeleton className="m-6 h-64" />;
+  if (blob.isError)
+    return (
+      <div className="p-6">
+        <EmptyState title="Could not load the original" description={blob.error.message} />
+      </div>
+    );
+  return (
+    <article className="mx-auto max-w-3xl p-6 text-sm">
+      {source.mediaType === "text/markdown" ? <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>{blob.data}</ReactMarkdown> : <pre className="font-mono text-xs whitespace-pre-wrap">{blob.data}</pre>}
     </article>
   );
 }

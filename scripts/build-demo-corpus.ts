@@ -138,6 +138,30 @@ function assemble(objects: (string | Buffer)[], catalog: number): Buffer {
   return Buffer.concat(parts);
 }
 
+// A slide deck: one paragraph per line, the first line of each slide is its title.
+async function pptx(slides: string[][]): Promise<Buffer> {
+  const zip = new JSZip();
+  zip.file("[Content_Types].xml", "<Types/>");
+  slides.forEach((paragraphs, i) => {
+    const body = paragraphs.map((p) => `<a:p><a:r><a:t>${p.replace(/&/g, "&amp;").replace(/</g, "&lt;")}</a:t></a:r></a:p>`).join("");
+    zip.file(`ppt/slides/slide${i + 1}.xml`, `<p:sld><p:cSld><p:spTree><p:sp><p:txBody>${body}</p:txBody></p:sp></p:spTree></p:cSld></p:sld>`);
+  });
+  return zip.generateAsync({ type: "nodebuffer" });
+}
+
+// A Word document: a heading starts a new block, the rest of the block is body text.
+async function docx(blocks: { heading?: string; text: string }[]): Promise<Buffer> {
+  const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+  const zip = new JSZip();
+  zip.file("[Content_Types].xml", `<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>`);
+  zip.file("_rels/.rels", `<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`);
+  const paragraphs = blocks
+    .map((b) => (b.heading ? `<w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr><w:r><w:t>${esc(b.heading)}</w:t></w:r></w:p>` : "") + `<w:p><w:r><w:t>${esc(b.text)}</w:t></w:r></w:p>`)
+    .join("");
+  zip.file("word/document.xml", `<?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${paragraphs}</w:body></w:document>`);
+  return zip.generateAsync({ type: "nodebuffer" });
+}
+
 // Calls. Teams transcripts: greetings, a late joiner, fillers, a phone that rings, the
 // occasional word the recognizer got wrong.
 

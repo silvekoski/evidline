@@ -11,7 +11,6 @@ import {
 import { SearchIcon } from "lucide-react";
 import { HealthClass, Role, type Lens, type SensorRow } from "@tpm/schemas";
 import { ConfidenceBar } from "@/components/confidence-bar";
-import { StatusBadge } from "@/components/status-badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -31,9 +30,8 @@ const columns = [
   }),
   column.accessor("sourceName", {
     header: () => <span title="Values in this column are never sent to any model.">Source column</span>,
-    cell: ({ getValue }) => <span className="font-mono text-xs text-muted-foreground">{getValue()}</span>,
+    cell: ({ getValue }) => <span className="font-mono text-sm text-muted-foreground">{getValue()}</span>,
   }),
-  column.accessor("signalType", { header: "Signal type" }),
   column.accessor("role", { header: "Role", filterFn: "equals" }),
   column.accessor((row) => row.hypothesisName ?? "", {
     id: "hypothesisName",
@@ -41,13 +39,13 @@ const columns = [
     cell: ({ row }) => {
       const name = row.original.hypothesisName;
       return (
-        <span className="inline-flex min-w-0 flex-nowrap items-center gap-1.5">
+        <span className="inline-flex min-w-0 flex-nowrap items-center gap-2">
           {name ? (
-            <span className="min-w-0 max-w-48 truncate text-xs italic text-muted-foreground" title={name}>
+            <span className="min-w-0 max-w-96 truncate text-sm font-semibold text-foreground" title={name}>
               {name}
             </span>
           ) : (
-            <span className="text-xs text-muted-foreground">no hypothesis (model off)</span>
+            <span className="text-sm text-muted-foreground">no hypothesis (model off)</span>
           )}
           <NameCheckMarks checks={row.original.nameChecks} roleInferenceId={row.original.roleInferenceId} />
         </span>
@@ -68,10 +66,6 @@ const columns = [
     header: "Health",
     filterFn: "equals",
     cell: ({ getValue }) => <HealthBadge health={getValue()} />,
-  }),
-  column.accessor("status", {
-    header: "Status",
-    cell: ({ getValue }) => <StatusBadge kind={getValue()} />,
   }),
 ];
 
@@ -100,7 +94,7 @@ export function SensorTable({ sensors, current, lens }: { sensors: SensorRow[]; 
   const [globalFilter, setGlobalFilter] = useState("");
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const haystacks = useMemo(
-    () => new Map(sensors.map((s) => [s.alias, [s.alias, s.sourceName, s.signalType, s.role, s.hypothesisName ?? "", s.health].join(" ").toLowerCase()])),
+    () => new Map(sensors.map((s) => [s.alias, [s.alias, s.sourceName, s.role, s.hypothesisName ?? "", s.health].join(" ").toLowerCase()])),
     [sensors],
   );
 
@@ -185,7 +179,6 @@ export function SensorTable({ sensors, current, lens }: { sensors: SensorRow[]; 
       <DataTable
         table={table}
         label="Sensors"
-        dense
         empty={`No ${lens.sensor} matches the filters.`}
         rowProps={(row) => ({
           id: row.original.alias,

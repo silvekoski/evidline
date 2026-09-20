@@ -251,7 +251,7 @@ function healthIncidents(p: Prepared): Incident[] {
       sensors,
       window: w,
       method: cls,
-      stats: { n: w.n, sensors: sensors.length, statistic, threshold, ratio: ratio(statistic, threshold), maskedShare, maskedWindows: masked.length },
+      stats: { n: w.n, sensors: sensors.length, others: sensors.length - 1, statistic, threshold, ratio: ratio(statistic, threshold), maskedShare, maskedWindows: masked.length },
       verdict: `${sensors.length} sensor${sensors.length === 1 ? "" : "s"} failed the ${cls} check from sample ${w.from}. ${lead.value.sensor}: statistic ${sig(statistic)} against threshold ${sig(threshold)}.`,
       chart: { type: "line", window: w, series: sensors.slice(0, 5).map((alias, i) => series(alias, i === 0 ? "solid" : "thin", alias)), masks: masked },
     });
@@ -265,7 +265,7 @@ function healthIncidents(p: Prepared): Incident[] {
         n: w.n,
         cited: [ev, ...upstream],
         keys: ["sensors", "statistic", "threshold", "ratio", "maskedShare"],
-        result: `The health gate excluded ${sensors.length} sensor${sensors.length === 1 ? "" : "s"} (${cls}): ${sensors.slice(0, 6).join(", ")}${sensors.length > 6 ? ", ..." : ""}. ${lead.value.sensor}: statistic ${sig(statistic)} against threshold ${sig(threshold)}; masked share of the window ${sig(maskedShare)}.`,
+        result: `The health gate excluded ${sensors.length} sensor${sensors.length === 1 ? "" : "s"} (${cls}): ${sensors.slice(0, 6).join(", ")}${sensors.length > 6 ? ", and more" : ""}. ${lead.value.sensor}: statistic ${sig(statistic)} against threshold ${sig(threshold)}; masked share of the window ${sig(maskedShare)}.`,
       },
       drift: { name: "Drift", ...skipped },
       isolation: { name: "Isolation", ...skipped },
@@ -275,7 +275,7 @@ function healthIncidents(p: Prepared): Incident[] {
         name: "Verdict",
         n: w.n,
         cited: [ev, ...upstream],
-        keys: ["sensors", "statistic", "threshold"],
+        keys: ["sensors", "others", "statistic", "threshold"],
         result: `${faultLabel(faultClass)} on ${who} from sample ${w.from}. No process diagnosis uses ${sensors.length === 1 ? "this sensor" : "these sensors"}.`,
       },
     });

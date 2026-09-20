@@ -220,6 +220,27 @@ describe("separateFaults", () => {
     checkTrace(incident!, sink);
   });
 
+  it("cites the extra sensor count when a health failure spans more than one sensor", () => {
+    const grid = makeGrid(4);
+    const dead = (sensor: string): HealthValue => ({
+      sensor,
+      health: "dead",
+      masked: [window(1200, N)],
+      checks: [{ check: "dead", pass: false, statistic: 800, threshold: 40 }],
+    });
+    const { ctx, sink } = scenario(grid, {
+      health: () => ({ S01: dead("S01"), S02: dead("S02"), S03: dead("S03") }),
+    });
+    const incidents = separateFaults(ctx, sink);
+    expect(incidents).toHaveLength(1);
+    const [incident] = incidents;
+    expect(incident!.value.excluded).toEqual(["S01", "S02", "S03"]);
+    const verdict = incident!.value.trace.find((s) => s.test === "verdict")!;
+    expect(verdict.stats.others).toBe(2);
+    expect(verdict.result).toContain("and 2 more");
+    checkTrace(incident!, sink);
+  });
+
   it("calls a bias-like single driver sensor-drift-bias with a valid six-step trace", () => {
     const grid = makeGrid(4);
     const clean = grid.values[0]!.slice();

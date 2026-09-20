@@ -6,13 +6,13 @@ export type ScreenSlug = "sensors" | "quality" | "drift" | "diagnosis" | "log" |
 
 export const defaultRunId = "c84b5c33";
 
-export const screens: { slug: ScreenSlug; label: (lens: Lens) => string; icon: typeof ActivityIcon }[] = [
-  { slug: "sensors", label: (lens) => capitalize(lens.sensors), icon: ActivityIcon },
-  { slug: "quality", label: () => "Quality", icon: ListChecksIcon },
-  { slug: "drift", label: () => "Drift", icon: TrendingUpIcon },
-  { slug: "diagnosis", label: () => "Diagnosis", icon: StethoscopeIcon },
-  { slug: "log", label: () => "Log", icon: ScrollTextIcon },
-  { slug: "data-flow", label: () => "Data flow", icon: ShieldCheckIcon },
+export const screens: { slug: ScreenSlug; label: (lens: Lens) => string; icon: typeof ActivityIcon; group: "run" | "system" }[] = [
+  { slug: "sensors", label: (lens) => capitalize(lens.sensors), icon: ActivityIcon, group: "run" },
+  { slug: "quality", label: () => "Quality", icon: ListChecksIcon, group: "run" },
+  { slug: "drift", label: () => "Drift", icon: TrendingUpIcon, group: "run" },
+  { slug: "diagnosis", label: () => "Diagnosis", icon: StethoscopeIcon, group: "run" },
+  { slug: "log", label: () => "Log", icon: ScrollTextIcon, group: "system" },
+  { slug: "data-flow", label: () => "Data flow", icon: ShieldCheckIcon, group: "system" },
 ];
 
 export const screenForStage: Record<Stage, ScreenSlug> = {

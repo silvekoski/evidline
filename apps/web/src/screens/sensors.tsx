@@ -4,7 +4,7 @@ import { useLocation } from "react-router";
 import { ActivityIcon } from "lucide-react";
 import { toast } from "sonner";
 import { getNameCheckStatus, getSensors, keys, startNameChecks } from "@/api";
-import { shortModel } from "@/components/sensors/name-checks";
+import { shortModel } from "@/components/model-vote";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";

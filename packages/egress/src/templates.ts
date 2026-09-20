@@ -31,28 +31,41 @@ const list = (values: readonly string[]) => values.join(", ");
 
 const faultLabels = FaultClass.options.map((fc) => `${fc} = ${faultLabel(fc)}`).join(", ");
 
+const naming = [
+  "You get a JSON object: domain, metric, dt and sensor.",
+  "domain stream: the sensor is one measurement channel of a physical or technical process, for example a plant, a vehicle or a device.",
+  "Name a physical quantity or an equipment reading. metric is null.",
+  "domain records: the sensor is one statistic per time bucket of one column of a business table, for example orders, invoices, tickets or events.",
+  "metric names the statistic. count: rows per bucket. nullRate, formatViolationRate: share of rows with an empty or a malformed cell.",
+  "median, p95: quantile of a numeric column. roundShare, zeroDigitShare: share of round values in a numeric column.",
+  "share, otherShare: share of rows with one category value. distinct, duplicateRate: distinct values of an id column.",
+  "Name the column and the statistic in the words of the business, for example order quantity, median per bucket.",
+  "Do not name equipment or a physical quantity in the records domain.",
+  "The sensor summary has alias, n, signal type, missing rate, quantiles p1 to p99, MAD,",
+  "histogram shares, noise, acfTime, period, flat share, monotonic share, distinct values, hold,",
+  "the role from the engine with its confidence, and the peers it leads and follows with lag, rho and n.",
+];
+
+const namingSchema = [
+  "Response schema: name (string, at most 60 characters, what the sensor measures),",
+  "quantity (string, at most 40 characters, the kind of quantity or its usual unit),",
+  "confidence (number from 0 to 1), reason (string, at most 200 characters).",
+];
+
 const text: Record<Purpose, string> = {
   name_role: [
-    "You propose a physical quantity for one sensor of an industrial process.",
-    "You get a JSON summary of one sensor: alias, n, signal type, missing rate, quantiles p1 to p99, MAD,",
-    "histogram shares, noise, acfTime, period, flat share, monotonic share, distinct values, hold,",
-    "the role from the engine with its confidence, and the peers it leads and follows with lag, rho and n.",
+    "You propose what one sensor measures.",
+    ...naming,
     "The role and the relations are facts from the engine. Your answer is a hypothesis.",
     units,
-    "Response schema: name (string, at most 60 characters, a physical quantity or an equipment reading),",
-    "quantity (string, at most 40 characters, the kind of quantity or its usual unit),",
-    "confidence (number from 0 to 1), reason (string, at most 200 characters).",
+    ...namingSchema,
   ].join("\n"),
   check_name: [
-    "You give a second, independent opinion on the physical quantity of one sensor of an industrial process.",
-    "You get a JSON summary of one sensor: alias, n, signal type, missing rate, quantiles p1 to p99, MAD,",
-    "histogram shares, noise, acfTime, period, flat share, monotonic share, distinct values, hold,",
-    "the role from the engine with its confidence, and the peers it leads and follows with lag, rho and n.",
-    "You do not see the name that another model proposed. Reason from the statistics and the role only.",
+    "You give a second, independent opinion on what one sensor measures.",
+    ...naming,
+    "You do not see the name that another model proposed. Reason from the statistics, the metric and the role only.",
     units,
-    "Response schema: name (string, at most 60 characters, a physical quantity or an equipment reading),",
-    "quantity (string, at most 40 characters, the kind of quantity or its usual unit),",
-    "confidence (number from 0 to 1), reason (string, at most 200 characters).",
+    ...namingSchema,
   ].join("\n"),
   compile_rule: [
     "You compile one operator sentence into one monitoring rule.",
@@ -73,7 +86,10 @@ const text: Record<Purpose, string> = {
     "You rewrite the reasoning trace of one fault diagnosis as short prose for an operator.",
     "You get a JSON object: faultClass, n, onset, ranked sensors with contributions, excluded sensors,",
     "and trace steps. Each step has index, test, name, n, stats, result and evidenceIds.",
-    "Write one first sentence that states the fault label, then one sentence per trace step in order.",
+    "Write one first sentence that states the fault label and names the responsible sensor.",
+    "When ranked has entries, name the sensor with the largest contribution and its contribution share.",
+    "When ranked is empty, name the first sensor in excluded, and state how many more sensors are in excluded.",
+    "Then write one sentence per trace step in order.",
     "Each sentence cites the evidenceIds of its step in the evidenceIds field only. Never write an evidence id inside the text.",
     "The first sentence cites the evidenceIds of the verdict step.",
     "Use only numbers that appear in the stats of the cited step, with at most 3 significant digits.",

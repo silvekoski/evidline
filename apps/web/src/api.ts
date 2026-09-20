@@ -135,6 +135,7 @@ export const keys = {
   sources: (filter: string) => ["sources", filter] as const,
   source: (id: number) => ["sources", id] as const,
   sourceClaims: (id: number) => ["sources", id, "claims"] as const,
+  sourceBlobText: (id: number) => ["sources", id, "blob-text"] as const,
   corpusSearch: (query: string) => ["knowledge", "search", query] as const,
   columns: ["columns"] as const,
   columnKnowledge: (name: string) => ["columns", name, "knowledge"] as const,
@@ -176,6 +177,11 @@ export const listSources = (query: string) => request(SourceList, `/sources${que
 export const getSource = (id: number) => request(SourceDetail, `/sources/${id}`);
 export const getSourceClaims = (id: number) => request(ClaimList, `/sources/${id}/claims`);
 export const sourceBlobUrl = (id: number) => `${apiBase()}/sources/${id}/blob`;
+export async function getSourceBlobText(id: number): Promise<string> {
+  const res = await fetch(sourceBlobUrl(id));
+  if (!res.ok) throw new Error(await errorMessage(res));
+  return res.text();
+}
 export const sourcePageUrl = (id: number, page: number) => `${apiBase()}/sources/${id}/pages/${page}`;
 export const uploadSources = (list: File[]) => request(arrayOf(Source), "/sources/upload", files(list));
 export const reprocessSource = (id: number) => request(Source, `/sources/${id}/reprocess`, post());

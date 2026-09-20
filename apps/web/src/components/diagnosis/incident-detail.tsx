@@ -125,7 +125,7 @@ export function IncidentDetail({ incident, runId, highlight, label }: Props) {
         )}
         <DiagnosisProse prose={value.prose} />
         <TraceSteps trace={value.trace} />
-        {!gated && <CrossReview incident={incident} />}
+        <CrossReview incident={incident} />
         <ActionBar inference={incident} />
       </CardContent>
     </Card>

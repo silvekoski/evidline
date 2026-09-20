@@ -4,7 +4,7 @@ import type { AppContext } from "./context";
 import { appendLog } from "./log";
 import { chainOf } from "./operator";
 import { refreshCatalog } from "./catalog";
-import { sensorSummary } from "./payloads";
+import { namePayload } from "./payloads";
 
 const jobs = new Map<string, NameCheckJob>();
 export const nameCheckJob = (runId: string): NameCheckJob | null => jobs.get(runId) ?? null;
@@ -87,8 +87,7 @@ export async function runNameChecks(ctx: AppContext, runId: string, heads: RoleI
       Array.from({ length: Math.min(4, work.length) }, async () => {
         while (cursor < work.length) {
           const { head, model } = work[cursor++]!;
-          const payload = { purpose: "check_name" as const, dt: run.timeBase.dt, sensor: sensorSummary(ctx, runId, head.value.sensor) };
-          const result = await ctx.gateway.call<CheckNameResponse>("check_name", payload, { runId, inferenceId: head.id, operatorText: false }, model);
+          const result = await ctx.gateway.call<CheckNameResponse>("check_name", namePayload(ctx, run, head.value.sensor, "check_name"), { runId, inferenceId: head.id, operatorText: false }, model);
           appendLog(ctx.db, {
             type: "model-call",
             actor: "agent",

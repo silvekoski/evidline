@@ -1,5 +1,5 @@
 import { BotIcon } from "lucide-react";
-import { siAnthropic, siDeepseek, siGooglegemini, siKimi, siMetaai, siMinimax, siMistralai, siMoonshotai, siNvidia, siOllama, siPerplexity, siQwen, type SimpleIcon } from "simple-icons";
+import { siAnthropic, siDeepseek, siGooglegemini, siKimi, siMetaai, siMinimax, siMistralai, siMoonshotai, siNvidia, siOllama, siPerplexity, siQwen, siZdotai, type SimpleIcon } from "simple-icons";
 import { cn } from "cn";
 
 const ICONS_BY_ORG: Record<string, SimpleIcon> = {
@@ -15,6 +15,7 @@ const ICONS_BY_ORG: Record<string, SimpleIcon> = {
   nvidia: siNvidia,
   "minimax-ai": siMinimax,
   ollama: siOllama,
+  "zai-org": siZdotai,
 };
 
 function findIcon(model: string): SimpleIcon | null {

@@ -52,7 +52,6 @@ export function inferencesRoutes(ctx: AppContext) {
     .get("/:id/reviews", (c) => c.json(reviewReport(ctx, diagnosisOf(c.req.param("id")))))
     .post("/:id/review", (c) => {
       const head = diagnosisOf(c.req.param("id"));
-      if (head.value.ranked.length === 0) throw badRequest("no review for an incident that the health gate decided");
       const mode = getModelMode(db, ctx.gateway);
       if (mode !== "cloud") throw badRequest(mode === "off" ? "model off" : "reviewers need mode cloud");
       if (ctx.gateway.reviewers().length === 0) throw badRequest("no reviewer is set");

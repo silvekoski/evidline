@@ -8,15 +8,17 @@ import { getSource, keys, sourceBlobUrl } from "@/api";
 import { EmptyState } from "@/components/empty-state";
 import { sourceIcon } from "@/components/knowledge/badges";
 import { PageViewer } from "@/components/knowledge/page-viewer";
-import { normalize, pageOf, ReadingView, RowsView, TranscriptView, type Target } from "@/components/knowledge/segment-views";
+import { normalize, OriginalView, pageOf, ReadingView, RowsView, TranscriptView, type Target } from "@/components/knowledge/segment-views";
 import { SourceDetails } from "@/components/knowledge/source-details";
 import { SourceMenu, externalName } from "@/components/knowledge/source-menu";
 import { SourceStatusText, isBusy } from "@/components/knowledge/source-status";
 import { Button } from "@/components/ui/button";
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "@/components/ui/input-group";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 const detailsKey = "tpm.source.details";
+type View = "parsed" | "original";
 
 function matchesTarget(segment: Segment, params: URLSearchParams): boolean {
   const l = segment.locator;

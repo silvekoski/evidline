@@ -24,7 +24,7 @@ export const sensorSummary: SensorSummary = {
   follows: [],
 };
 
-export const nameRolePayload: EgressPayload = { purpose: "name_role", dt: 180000, sensor: sensorSummary };
+export const nameRolePayload: EgressPayload = { purpose: "name_role", dt: 180000, domain: "stream", metric: null, sensor: sensorSummary };
 
 export const compileRulePayload = (sentence: string, dt: number | null = 180000): EgressPayload => ({
   purpose: "compile_rule",

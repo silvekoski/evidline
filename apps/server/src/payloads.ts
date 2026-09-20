@@ -1,24 +1,28 @@
-import type { DiagnosisInference, EgressPayload, RoleInference, SensorSummary } from "@tpm/schemas";
+import { recordMetric, type DiagnosisInference, type EgressPayload, type RoleInference, type Run, type SensorSummary } from "@tpm/schemas";
 import type { AppContext } from "./context";
 
 function roles(ctx: AppContext, runId: string): Map<string, RoleInference> {
   return new Map(ctx.db.inferences.list(runId, "role").filter((i): i is RoleInference => i.stage === "role" && i.status !== "revised").map((i) => [i.value.sensor, i]));
 }
 
-export function sensorSummary(ctx: AppContext, runId: string, alias: string): SensorSummary {
-  const sensor = ctx.db.sensors.get(runId, alias);
+type NamePurpose = "name_role" | "check_name";
+
+export function namePayload<P extends NamePurpose>(ctx: AppContext, run: Run, alias: string, purpose: P): Extract<EgressPayload, { purpose: P }> {
+  const sensor = ctx.db.sensors.get(run.id, alias);
   if (!sensor) throw new Error(`Unknown sensor ${alias}`);
   const f = sensor.fingerprint;
-  const role = roles(ctx, runId).get(alias);
+  const role = roles(ctx, run.id).get(alias);
   const directed = sensor.relations.filter((r) => r.lag !== 0).map((r) => {
     const n = ctx.db.evidence.get(r.evidenceId)?.stats.n ?? sensor.peers.find((p) => p.alias === (r.a === alias ? r.b : r.a))?.n ?? 0;
     return { leads: (r.a === alias ? r.lag : -r.lag) > 0, peer: { alias: r.a === alias ? r.b : r.a, lag: Math.abs(r.lag), rho: r.rhoAtLag, n } };
   }).filter((r) => r.peer.n >= 100);
-  return { alias, n: f.n, signalType: f.signalType, missingRate: f.missingRate, quantiles: f.quantiles, mad: f.mad,
+  const summary: SensorSummary = { alias, n: f.n, signalType: f.signalType, missingRate: f.missingRate, quantiles: f.quantiles, mad: f.mad,
     histogramShares: f.histogram.shares.slice(0, 20), noise: f.noise, acfTime: f.acfTime, period: f.period,
     flatShare: f.flatShare, monotonicShare: f.monotonicShare, distinct: f.distinct, hold: f.hold,
     role: role?.value.role ?? "unknown", roleConfidence: role?.confidence ?? 0,
     leads: directed.filter((r) => r.leads).slice(0, 20).map((r) => r.peer), follows: directed.filter((r) => !r.leads).slice(0, 20).map((r) => r.peer) };
+  const metric = run.domain === "records" ? recordMetric(sensor.sourceName) : null;
+  return { purpose, dt: run.timeBase.dt, domain: run.domain, metric, sensor: summary } as Extract<EgressPayload, { purpose: P }>;
 }
 
 export function catalogFor(ctx: AppContext, runId: string, preferredAliases: string[]): Extract<EgressPayload, { purpose: "compile_rule" }>["catalog"] {

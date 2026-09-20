@@ -51,8 +51,17 @@ export const SensorSummary = z
   .strict();
 export type SensorSummary = z.infer<typeof SensorSummary>;
 
-export const NameRolePayload = z.object({ purpose: z.literal("name_role"), dt: num.nullable(), sensor: SensorSummary }).strict();
-export const CheckNamePayload = z.object({ purpose: z.literal("check_name"), dt: num.nullable(), sensor: SensorSummary }).strict();
+export const RecordMetric = z.enum(["count", "nullRate", "formatViolationRate", "median", "p95", "roundShare", "zeroDigitShare", "share", "otherShare", "distinct", "duplicateRate"]);
+export type RecordMetric = z.infer<typeof RecordMetric>;
+
+export function recordMetric(sourceName: string): RecordMetric | null {
+  const parsed = RecordMetric.safeParse(sourceName.replace(/\[.*$/, "").split(".").at(-1));
+  return parsed.success ? parsed.data : null;
+}
+
+const nameFields = { dt: num.nullable(), domain: Domain, metric: RecordMetric.nullable(), sensor: SensorSummary };
+export const NameRolePayload = z.object({ purpose: z.literal("name_role"), ...nameFields }).strict();
+export const CheckNamePayload = z.object({ purpose: z.literal("check_name"), ...nameFields }).strict();
 
 export const CatalogEntry = z.object({ alias: Alias, signalType: SignalType, role: Role }).strict();
 

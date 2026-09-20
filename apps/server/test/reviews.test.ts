@@ -125,15 +125,12 @@ describe("cross review routes", () => {
     ]);
   });
 
-  it("refuses a review outside mode cloud, without reviewers, and for an incident the health gate decided", async () => {
+  it("refuses a review outside mode cloud and without reviewers", async () => {
     f.ctx.db.settings.set("model-mode", "off");
     expect((await f.app.request(`/api/inferences/${diagnosis.id}/review`, { method: "POST" })).status).toBe(400);
     f.ctx.db.settings.set("model-mode", "local");
     expect(await (await f.app.request(`/api/inferences/${diagnosis.id}/review`, { method: "POST" })).json()).toEqual({ error: "reviewers need mode cloud" });
     f.ctx.db.settings.set("model-mode", "cloud");
-    const gated: DiagnosisInference = { ...diagnosis, id: `inf-${runId}-00010`, seq: 10, value: { ...diagnosis.value, ranked: [] } };
-    f.ctx.db.inferences.saveAll([gated]);
-    expect((await f.app.request(`/api/inferences/${gated.id}/review`, { method: "POST" })).status).toBe(400);
     const none = fixture({ resolveProvider: () => primary, resolveReviewers: () => [] });
     none.ctx.db.runs.save(run(runId));
     none.ctx.db.inferences.saveAll([diagnosis]);

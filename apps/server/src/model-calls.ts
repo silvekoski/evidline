@@ -4,7 +4,7 @@ import { refreshCatalog } from "./catalog";
 import type { AppContext } from "./context";
 import { appendLog } from "./log";
 import { createInference, type InferenceDraft } from "./persist";
-import { explanationPayload, sensorSummary } from "./payloads";
+import { explanationPayload, namePayload } from "./payloads";
 
 const inFlight = new Set<string>();
 
@@ -52,7 +52,7 @@ export async function runModelCalls(ctx: AppContext, runId: string): Promise<boo
     await Promise.all(Array.from({ length: Math.min(4, roles.length) }, async () => {
       while (cursor < roles.length) {
         const inference = roles[cursor++]!;
-        const result = await ctx.gateway.call<NameRoleResponse>("name_role", { purpose: "name_role", dt: run.timeBase.dt, sensor: sensorSummary(ctx, runId, inference.value.sensor) }, { runId, inferenceId: inference.id, operatorText: false });
+        const result = await ctx.gateway.call<NameRoleResponse>("name_role", namePayload(ctx, run, inference.value.sensor, "name_role"), { runId, inferenceId: inference.id, operatorText: false });
         appendLog(ctx.db, { type: "model-call", actor: "agent", runId, inferenceId: inference.id, evidenceIds: inference.evidenceIds, egressId: result.recordId, before: null, after: result.ok ? result.value : null, reason: result.ok ? null : result.reason });
         if (result.ok) supersede(ctx, inference, { ...inference.value, hypothesisName: result.value.name, hypothesisConfidence: result.value.confidence }, result.recordId, "Model role naming hypothesis", (status) => status === "proposed");
       }
