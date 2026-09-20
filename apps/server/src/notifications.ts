@@ -11,6 +11,7 @@ import {
 } from "@tpm/schemas";
 import type { AppContext } from "./context";
 import type { Db } from "./db";
+import { brandedEmail } from "./email-template";
 import { newNotificationId } from "./ids";
 
 type Notifier = Pick<AppContext, "db" | "slug" | "log">;
@@ -49,10 +50,10 @@ export async function sendEmail(alert: Alert): Promise<EmailResult> {
   }
 }
 
-function emailBody(ctx: Notifier, draft: NotificationDraft): string {
+function runLink(ctx: Notifier, draft: NotificationDraft): { label: string; url: string } | null {
   const base = process.env.APP_URL;
-  if (!base || draft.runId === null) return draft.message;
-  return `${draft.message}\n\nOpen: ${base.replace(/\/$/, "")}/w/${ctx.slug}/runs/${draft.runId}/${notificationScreen[draft.kind]}`;
+  if (!base || draft.runId === null) return null;
+  return { label: "Open the run", url: `${base.replace(/\/$/, "")}/w/${ctx.slug}/runs/${draft.runId}/${notificationScreen[draft.kind]}` };
 }
 
 export async function notify(ctx: Notifier, draft: NotificationDraft): Promise<Notification> {
@@ -60,7 +61,7 @@ export async function notify(ctx: Notifier, draft: NotificationDraft): Promise<N
   let notification: Notification = { ...draft, id: newNotificationId(), time: new Date().toISOString(), readAt: null, email: "off", emailError: null };
   ctx.db.notifications.save(notification);
   if (settings.emailConfigured && settings.email[draft.kind]) {
-    notification = { ...notification, ...(await sendEmail({ title: draft.title, message: emailBody(ctx, draft) })) };
+    notification = { ...notification, ...(await sendEmail(brandedEmail(draft.title, draft.message, runLink(ctx, draft)))) };
     ctx.db.notifications.save(notification);
     if (notification.email === "failed") ctx.log(`email for ${notification.id} failed: ${notification.emailError}`);
   }

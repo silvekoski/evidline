@@ -19,6 +19,16 @@ describe("resend alert", () => {
     expect(JSON.parse(calls[0]![1]!.body!)).toEqual({ from: "alerts@example.com", to: ["ops@example.com", "lead@example.com"], subject: "line-3: 1 sensor out of range", text: "T-101: health stuck" });
   });
 
+  it("adds the html body and each inline image as an attachment with a content id", async () => {
+    let body: Record<string, unknown> = {};
+    const transport: Transport = async (_url, init) => {
+      body = JSON.parse(init!.body!);
+      return { status: 200, headers: {}, text: "", bytes: async () => Buffer.alloc(0) };
+    };
+    await sendResendAlert(transport, config, { title: "t", message: "m", html: "<p>m</p>", images: [{ filename: "logo.png", contentId: "logo", content: Buffer.from("png") }] });
+    expect(body).toEqual({ from: "alerts@example.com", to: config.to, subject: "t", text: "m", html: "<p>m</p>", attachments: [{ filename: "logo.png", content_id: "logo", content: "cG5n" }] });
+  });
+
   it("reports a non-2xx response as an error", async () => {
     const transport: Transport = async () => ({ status: 403, headers: {}, text: "forbidden", bytes: async () => Buffer.alloc(0) });
     const result = await sendResendAlert(transport, config, { title: "t", message: "m" });

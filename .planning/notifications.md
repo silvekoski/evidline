@@ -12,7 +12,7 @@ A run makes a notification at three points in `apps/server/src/run-service.ts`:
 
 ## Email
 
-Resend sends the email. `packages/connectors/src/resend.ts` holds the HTTP call. The server reads `RESEND_API_KEY`, `ALERT_FROM`, and `ALERT_TO` (comma-separated). `APP_URL` is optional. When set, the email body ends with a link to the run screen.
+Resend sends the email. `apps/server/src/email-template.ts` builds an HTML body with the evidline logo as an inline image (content id `evidline-logo`, file `apps/server/assets/evidline-logo.png`) and a plain text fallback. `packages/connectors/src/resend.ts` holds the HTTP call. The server reads `RESEND_API_KEY`, `ALERT_FROM`, and `ALERT_TO` (comma-separated). `APP_URL` is optional. When set, the email body ends with a link to the run screen.
 
 The per-kind toggles live in the `settings` table under the key `notifications`. Defaults: sensor alert on, run finished off, run failed on.
 

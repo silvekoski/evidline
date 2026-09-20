@@ -79,12 +79,17 @@ describe("notify", () => {
     const stored = await notify(f.ctx, draft);
     expect(stored.email).toBe("sent");
     expect(fetchMock).toHaveBeenCalledWith("https://api.resend.com/emails", expect.objectContaining({ method: "POST", headers: expect.objectContaining({ Authorization: "Bearer re_123" }) }));
-    expect(JSON.parse(fetchMock.mock.calls[0]![1].body)).toEqual({
+    const body = JSON.parse(fetchMock.mock.calls[0]![1].body);
+    expect(body).toMatchObject({
       from: "alerts@example.com",
       to: ["ops@example.com", "lead@example.com"],
       subject: "line-3.csv: 1 sensor out of range",
-      text: "T-101: health stuck\n\nOpen: https://plant.example/w/norrin/runs/0123abcd/quality",
+      text: "T-101: health stuck\n\nOpen the run: https://plant.example/w/norrin/runs/0123abcd/quality",
+      attachments: [{ filename: "evidline-logo.png", content_id: "evidline-logo", content: expect.stringMatching(/^iVBOR/) }],
     });
+    expect(body.html).toContain('<img src="cid:evidline-logo"');
+    expect(body.html).toContain('href="https://plant.example/w/norrin/runs/0123abcd/quality"');
+    expect(body.html).toContain("T-101: health stuck");
   });
 
   it("records a failed email and logs a line", async () => {
