@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <a href="https://evidline.silvekoski.com">Live demo</a>
+  <a href="https://65.108.32.178.compute.verda.run">Live demo</a>
 </p>
 
 # Evidline
