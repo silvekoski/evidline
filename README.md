@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="apps/server/assets/evidline-logo.png" alt="Evidline" width="360">
+  <img src="apps/server/assets/evidline-banner.jpg" alt="Evidline: understand any sensor stream in minutes, with the customer's own words as proof.">
 </p>
 
 # Evidline
