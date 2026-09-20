@@ -68,3 +68,10 @@ Date: 2026-09-19. Source: the PRD "Customer Knowledge Capture". This file record
 - OCR: a page with under 20 characters of text layer renders to PNG at scale 2 and goes to a vision model through the text channel (`ocr` purpose). Live check on 2026-09-20: `Qwen/Qwen3-VL-32B-Instruct` on Featherless read a test page near-verbatim in 6.3 s. `Qwen/Qwen3-VL-8B-Instruct` and the 2.5-VL family are also there. The public model catalog answers 404, so the list came from probes.
 - Featherless base URL is `https://api.featherless.ai/v1`. The `/openai/v1` prefix answers 404 on every route.
 - Not done: the replay test and the golden set (need project material), `.msg`, IMAP, live runs of the connectors (need an Entra app, a Slack app, and a mailbox).
+
+## Demo corpus (2026-09-20)
+
+- `scripts/build-demo-corpus.ts` writes 36 files. The customer people write in tags (`PI-1011`), equipment names, and plain words. The model column names appear only in the tag list, in the export notes written for Norrin, and in Norrin's own mails, as they would in real life.
+- Transcripts split into short Teams cues, with fillers, a late joiner, a phone that rings, and words the recognizer got wrong (`ex meas seven`, `P I ten eleven`). Mails carry signatures, disclaimers, quoted threads, an HTML body, an auto-reply, an invite, and a one-liner. The set holds a superseded revision with old limits, a purchase order, an HSE talk, and a holiday list as noise.
+- The loop check report is a scanned PDF: one JPEG page drawn with `@napi-rs/canvas`, skewed and speckled. It goes through OCR.
+- Replay on 2026-09-20 with the TE catalog: 507 claims, 57 linked before the tag list import, 321 after. The alias import now finds the CSV column that names the catalog by itself and relinks every claim. Golden set: 16 of 20 in the top 3.

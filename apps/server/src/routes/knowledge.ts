@@ -30,7 +30,7 @@ export async function uploadFiles(ctx: AppContext, body: Record<string, string |
   return out;
 }
 
-const AliasImportBody = z.object({ csv: z.string().min(1), tagColumn: z.string().default("tag"), phraseColumns: z.array(z.string()).default(["description", "name", "alias"]) });
+const AliasImportBody = z.object({ csv: z.string().min(1), tagColumn: z.string().optional(), phraseColumns: z.array(z.string()).default(["tag", "description", "name", "alias", "kuvaus", "tunnus"]) });
 const ManualLinkBody = z.object({ columnId: z.number().int() });
 const ErasureBody = z.object({ person: z.string().trim().min(2).max(120) });
 
@@ -150,9 +150,10 @@ export function knowledgeRoutes(ctx: AppContext) {
       const { csv, tagColumn, phraseColumns } = await parseBody(c, AliasImportBody);
       const { rows } = parseCsv(csv);
       const header = (rows[0] ?? []).map((h) => h.trim().toLowerCase());
-      const tagAt = header.indexOf(tagColumn.toLowerCase());
-      if (tagAt < 0) throw badRequest(`the CSV has no column ${tagColumn}`);
-      const phraseAt = phraseColumns.map((p) => header.indexOf(p.toLowerCase())).filter((i) => i >= 0);
+      const hits = header.map((_, i) => rows.slice(1).filter((row) => corpus.columns.byName(row[i]?.trim() ?? "") !== null).length);
+      const tagAt = tagColumn ? header.indexOf(tagColumn.toLowerCase()) : hits.indexOf(Math.max(...hits));
+      if (tagAt < 0 || hits[tagAt] === 0) throw badRequest(tagColumn ? `the CSV column ${tagColumn} names no catalog column` : "no CSV column holds the catalog column names");
+      const phraseAt = phraseColumns.map((p) => header.indexOf(p.toLowerCase())).filter((i) => i >= 0 && i !== tagAt);
       let added = 0;
       let unknown = 0;
       corpus.transaction(() => {
@@ -171,6 +172,7 @@ export function knowledgeRoutes(ctx: AppContext) {
           }
         }
       });
+      if (added > 0) for (const claim of corpus.claims.list()) ctx.jobs.enqueue("link", { claimId: claim.id }, { dedupe: `link-${claim.id}` });
       return c.json({ added, unknown });
     })
     .post("/erasure", async (c) => {

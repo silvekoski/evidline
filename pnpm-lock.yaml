@@ -24,6 +24,9 @@ importers:
       '@eslint/js':
         specifier: ^9.39.0
         version: 9.39.5
+      '@napi-rs/canvas':
+        specifier: ^1.0.9
+        version: 1.0.9
       '@types/node':
         specifier: ^26.6.2
         version: 26.6.2

@@ -139,6 +139,18 @@ describe("claims", () => {
     expect(summary.failed).toEqual([expect.objectContaining({ type: "link", lastError: "boom" })]);
   });
 
+  it("imports a tag list and finds the column that names the catalog by itself", async () => {
+    const csv = "tag;model_name;description;unit\nPI-1011;xmeas_7;Reactor R-101 pressure;kPa g\nPV-2041;xmv_6;Purge valve;%\nFV-3009;PM2_DR3_STM_VLV_POS;Dryer 3 steam valve;%\n";
+    const res = await f.app.request("/api/aliases/import", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ csv }) });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ added: 4, unknown: 1 });
+    const column = f.ctx.corpus.columns.byName("xmeas_7")!;
+    expect(f.ctx.corpus.aliases.ofColumn(column.id)).toEqual(["PI-1011", "Reactor R-101 pressure"]);
+    expect(f.ctx.registry.jobs.list(f.ctx.slug).filter((j) => j.type === "link" && j.status === "queued").length).toBe(f.ctx.corpus.claims.count());
+    const bad = await f.app.request("/api/aliases/import", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ csv: "a,b\nx,y\n" }) });
+    expect(bad.status).toBe(400);
+  });
+
   it("turns a typed answer into a note source with a stated claim linked to the column", async () => {
     const column = f.ctx.corpus.columns.byName("xmeas_7")!;
     const res = await f.app.request(`/api/columns/${column.id}/answer`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ speaker: "Anna Data", text: "xmeas_7 is the reactor pressure in kPa gauge, logged every 3 minutes." }) });
