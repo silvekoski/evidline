@@ -62,6 +62,8 @@ import {
   type OverrideValue,
 } from "@tpm/schemas";
 
+export const sessionKey = "tpm.session";
+
 export const workspaceSlug = (pathname: string = window.location.pathname): string | null => /^\/w\/([a-z0-9][a-z0-9-]*)(?:\/|$)/.exec(pathname)?.[1] ?? null;
 
 export const apiBase = (): string => {

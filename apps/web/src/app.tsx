@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { MutationCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createBrowserRouter, RouterProvider } from "react-router";
 import { toast } from "sonner";
-import { workspaceSlug } from "@/api";
+import { sessionKey, workspaceSlug } from "@/api";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppLayout } from "@/layout/app-layout";
@@ -95,6 +95,10 @@ export function App() {
   };
 
   const rootClient = useMemo(makeQueryClient, []);
+  if (!isLoginRoute && !publicToken && !localStorage.getItem(sessionKey)) {
+    window.location.replace("/login");
+    return null;
+  }
   return (
     <>
       {isLoginRoute ? (

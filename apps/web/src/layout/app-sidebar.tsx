@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { NavLink, useLocation, useNavigate } from "react-router";
 import { BookOpenIcon, CircleHelpIcon, FileTextIcon, FilesIcon, ListChecksIcon, LogOutIcon, PlayIcon, PlugIcon, UserIcon } from "lucide-react";
-import { getSensors, keys, listRuns } from "@/api";
+import { getSensors, keys, listRuns, sessionKey } from "@/api";
 import { useActiveRunId } from "@/hooks/use-active-run-id";
 import { useLens } from "@/hooks/use-lens";
 import { useProfilePhoto } from "@/hooks/use-profile-photo";
@@ -221,7 +221,7 @@ export function AppSidebar() {
                   </NavLink>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onSelect={() => window.location.assign("/login")}>
+                <DropdownMenuItem onSelect={() => { localStorage.removeItem(sessionKey); window.location.assign("/login"); }}>
                   <LogOutIcon aria-hidden="true" />
                   Log out
                 </DropdownMenuItem>

@@ -1,6 +1,7 @@
 import type { FormEvent } from "react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { sessionKey } from "@/api";
 import { EvidlineLogo } from "@/components/evidline-logo";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,6 +19,7 @@ export function LoginScreen() {
 
   const handleLogin = (event: FormEvent) => {
     event.preventDefault();
+    localStorage.setItem(sessionKey, "1");
     window.location.assign("/");
   };
 
