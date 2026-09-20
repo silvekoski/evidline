@@ -9,17 +9,40 @@ import { namePayload } from "./payloads";
 const jobs = new Map<string, NameCheckJob>();
 export const nameCheckJob = (runId: string): NameCheckJob | null => jobs.get(runId) ?? null;
 
-const stop = new Set(["the", "of", "a", "an", "in", "for", "and", "or", "to", "sensor", "signal", "reading", "measurement", "value", "indicator", "process", "level", "rate"]);
-const tokens = (name: string): Set<string> => new Set(name.toLowerCase().normalize("NFKC").match(/[\p{L}\p{N}]+/gu)?.filter((t) => !stop.has(t)).map((t) => t.replace(/s$/, "")) ?? []);
+const stop = new Set(["the", "of", "a", "an", "in", "for", "and", "or", "to", "with", "sensor", "signal", "reading", "measurement", "variable", "value", "indicator", "process", "level", "rate", "channel", "check"]);
+
+const quantities: Record<string, string[]> = {
+  temperature: ["temp"],
+  pressure: ["press"],
+  flow: ["flowrate", "feed", "throughput"],
+  speed: ["velocity", "rpm"],
+  position: ["opening", "travel", "stroke"],
+  valve: ["actuator", "damper"],
+  setpoint: ["reference", "target", "setting", "sp"],
+  counter: ["count", "cycle", "step", "batch", "index", "sequence", "timer", "clock"],
+  state: ["status", "mode", "flag", "discrete", "identifier", "id", "boolean"],
+  voltage: ["volt"],
+  current: ["amperage", "amp"],
+  power: ["watt"],
+  frequency: ["hz"],
+  concentration: ["composition", "purity"],
+  humidity: ["moisture"],
+  vibration: ["acceleration"],
+  torque: [],
+  density: [],
+  ph: [],
+};
+const concept = new Map<string, string>(Object.entries(quantities).flatMap(([q, aliases]) => [q, ...aliases].map((word) => [word, q] as const)));
+const singular = (t: string): string => t.replace(/s$/, "");
+const tokens = (name: string): Set<string> => new Set(name.toLowerCase().normalize("NFKC").match(/[\p{L}\p{N}]+/gu)?.filter((t) => !stop.has(t)).map((t) => concept.get(t) ?? concept.get(singular(t)) ?? singular(t)) ?? []);
 
 export function namesAgree(a: string | null, b: string | null): boolean | null {
   if (a === null || b === null) return null;
   const ta = tokens(a);
   const tb = tokens(b);
   if (ta.size === 0 || tb.size === 0) return a.trim().toLowerCase() === b.trim().toLowerCase();
-  let shared = 0;
-  for (const t of ta) if (tb.has(t)) shared++;
-  return shared / Math.min(ta.size, tb.size) >= 0.5;
+  const shared = [...ta].filter((t) => tb.has(t));
+  return shared.some((t) => t in quantities) || shared.length / Math.min(ta.size, tb.size) >= 0.5;
 }
 
 const replyOf = <T>(record: EgressRecord, schema: { safeParse: (x: unknown) => { data?: T } }): T | null =>

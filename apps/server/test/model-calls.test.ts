@@ -131,4 +131,13 @@ describe("name agreement", () => {
     expect(namesAgree("Process temperature", "Production Cycle Counter")).toBe(false);
     expect(namesAgree(null, "x")).toBeNull();
   });
+
+  it("treats one shared physical quantity as agreement", () => {
+    expect(namesAgree("Production Line Speed Setting", "Setpoint or Reference Value")).toBe(true);
+    expect(namesAgree("Ambient temperature setpoint", "Temp")).toBe(true);
+    expect(namesAgree("Discrete equipment state identifier", "Discrete state indicator")).toBe(true);
+    expect(namesAgree("Process Cycle Counter", "Batch step count")).toBe(true);
+    expect(namesAgree("Process feed rate setpoint", "Process temperature")).toBe(false);
+    expect(namesAgree("Valve Position Feedback Redundancy Check", "Tank level")).toBe(false);
+  });
 });
