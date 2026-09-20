@@ -1,6 +1,7 @@
 import { Hono } from "hono";
-import { ModelModeBody } from "@tpm/schemas";
+import { ModelModeBody, NotificationSettingsBody } from "@tpm/schemas";
 import type { AppContext } from "../context";
+import { getNotificationSettings, sendEmail, setNotificationSettings } from "../notifications";
 import { parseBody } from "../request";
 import { getModelSettings, setModelMode } from "../settings";
 
@@ -10,5 +11,8 @@ export function settingsRoutes(ctx: AppContext) {
     .put("/model", async (c) => {
       const { mode } = await parseBody(c, ModelModeBody);
       return c.json(setModelMode(ctx.db, ctx.gateway, mode));
-    });
+    })
+    .get("/notifications", (c) => c.json(getNotificationSettings(ctx.db)))
+    .put("/notifications", async (c) => c.json(setNotificationSettings(ctx.db, await parseBody(c, NotificationSettingsBody))))
+    .post("/notifications/test", async (c) => c.json(await sendEmail({ title: `${ctx.slug}: test notification`, message: "Email notifications work for this workspace." })));
 }

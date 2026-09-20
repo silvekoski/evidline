@@ -15,6 +15,7 @@ import { DiagnosisScreen } from "@/screens/diagnosis";
 import { DriftScreen } from "@/screens/drift";
 import { LoginScreen } from "@/screens/login";
 import { LogScreen } from "@/screens/log";
+import { NotificationsScreen } from "@/screens/notifications";
 import { OpenQuestionsScreen } from "@/screens/open-questions";
 import { ProfileScreen } from "@/screens/profile";
 import { PublicUploadScreen } from "@/screens/public-upload";
@@ -52,6 +53,7 @@ const routes = [
       { path: "spec", element: <SpecScreen /> },
       { path: "connectors", element: <ConnectorsScreen /> },
       { path: "profile", element: <ProfileScreen /> },
+      { path: "notifications", element: <NotificationsScreen /> },
     ],
   },
 ];

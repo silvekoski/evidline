@@ -6,6 +6,7 @@ import { filesRoutes } from "./files";
 import { inferencesRoutes } from "./inferences";
 import { knowledgeRoutes } from "./knowledge";
 import { logRoutes } from "./log";
+import { notificationRoutes } from "./notifications";
 import { rulesRoutes } from "./rules";
 import { runsRoutes } from "./runs";
 import { settingsRoutes } from "./settings";
@@ -18,6 +19,7 @@ export function apiRoutes(ctx: AppContext) {
     .route("/inferences", inferencesRoutes(ctx))
     .route("/rules", rulesRoutes(ctx))
     .route("/log", logRoutes(ctx))
+    .route("/notifications", notificationRoutes(ctx))
     .route("/egress", egressRoutes(ctx))
     .route("/settings", settingsRoutes(ctx))
     .route("/", knowledgeRoutes(ctx));

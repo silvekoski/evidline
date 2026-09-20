@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import type { Source } from "@tpm/adapters";
 import { Purpose, stageNames, type Overrides, type Run, type StageName, type StageProgress } from "@tpm/schemas";
-import { sendRunAlert } from "./alerts";
+import { notify, runFailed, runFinished, sensorAlert } from "./notifications";
 import type { AppContext } from "./context";
 import { newRunId } from "./ids";
 import { appendLog } from "./log";
@@ -62,7 +62,7 @@ export function startRun(ctx: AppContext, input: RunInput): { run: Run; done: Pr
 }
 
 async function execute(ctx: AppContext, initial: Run, input: RunInput): Promise<Run> {
-  const { db, hub, log: logLine } = ctx;
+  const { db, hub } = ctx;
   let run = initial;
   const save = (patch: Partial<Run>): void => {
     run = { ...run, ...patch };
@@ -86,7 +86,8 @@ async function execute(ctx: AppContext, initial: Run, input: RunInput): Promise<
     const output = await runPipelineJob(job, (event) => stage(event.name, { status: event.status, ms: event.ms, counts: event.counts }));
     const persisted = persistRun(db, run, output);
     run = persisted.run;
-    void sendRunAlert(run, persisted.inferences, logLine);
+    const alert = sensorAlert(run, persisted.inferences);
+    if (alert) void notify(ctx, alert);
     refreshCatalog(ctx, run.id);
     stage("Model calls", { status: "running" });
     const started = Date.now();
@@ -94,14 +95,17 @@ async function execute(ctx: AppContext, initial: Run, input: RunInput): Promise<
     const records = db.egress.list(run.id);
     stage("Model calls", { status: "done", ms: Date.now() - started, counts: { calls: records.length, sent: records.filter((r) => r.status === "sent").length } });
     const finishedAt = new Date().toISOString();
-    log("run-finished", { status: "done", ms: Date.parse(finishedAt) - Date.parse(run.createdAt), sensors: run.sensorCount, gridSize: run.gridSize });
+    const ms = Date.parse(finishedAt) - Date.parse(run.createdAt);
+    log("run-finished", { status: "done", ms, sensors: run.sensorCount, gridSize: run.gridSize });
     save({ status: "done", finishedAt });
+    void notify(ctx, runFinished(run, ms));
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     const running = run.stages.find((s) => s.status === "running");
     if (running) stage(running.name as StageName, { status: "failed" });
     log("run-finished", { status: "failed" }, message);
     save({ status: "failed", error: message, finishedAt: new Date().toISOString() });
+    void notify(ctx, runFailed(run, message));
     hub.publish(run.id, { type: "error", message });
   }
   hub.publish(run.id, { type: "done", runId: run.id });

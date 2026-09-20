@@ -3,7 +3,7 @@ import { dirname } from "node:path";
 import Database from "better-sqlite3";
 import * as sqliteVec from "sqlite-vec";
 import { bucketMeans, type Grid, type Peer } from "@tpm/core";
-import type { EgressRecord, Evidence, Fingerprint, Inference, Purpose, RedundancyGroup, Relation, Rule, Run, Stage, ThreadEntry } from "@tpm/schemas";
+import type { EgressRecord, Evidence, Fingerprint, Inference, Notification, Purpose, RedundancyGroup, Relation, Rule, Run, Stage, ThreadEntry } from "@tpm/schemas";
 import { dbPath } from "./paths";
 
 export type SensorRecord = {
@@ -210,6 +210,14 @@ export function openDb(path: string = process.env.DB_PATH ?? dbPath) {
     [["runId"], ["inferenceId"]],
   );
   const settings = defineTable<SettingRow>(db, prepare, "settings", ["key"], { key: "text", value: "text" });
+  const notifications = defineTable<Notification>(
+    db,
+    prepare,
+    "notifications",
+    ["id"],
+    { id: "text", time: "text", kind: "text", title: "text", message: "text", runId: "text", readAt: "text", email: "text", emailError: "text" },
+    [["readAt"]],
+  );
 
   return {
     raw: db,
@@ -332,6 +340,13 @@ export function openDb(path: string = process.env.DB_PATH ?? dbPath) {
     settings: {
       get: (key: string): string | null => settings.one('WHERE "key" = ?', key)?.value ?? null,
       set: (key: string, value: string): void => settings.upsert({ key, value }),
+    },
+    notifications: {
+      save: notifications.upsert,
+      get: (id: string): Notification | null => notifications.one("WHERE id = ?", id),
+      list: (limit = 200): Notification[] => notifications.many("ORDER BY time DESC, rowid DESC LIMIT ?", limit),
+      markRead: (id: string, readAt: string): boolean => prepare("UPDATE notifications SET read_at = ? WHERE id = ? AND read_at IS NULL").run(readAt, id).changes > 0,
+      markAllRead: (readAt: string): number => prepare("UPDATE notifications SET read_at = ? WHERE read_at IS NULL").run(readAt).changes,
     },
   };
 }

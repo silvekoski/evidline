@@ -5,6 +5,7 @@ import { Kbd } from "@/components/ui/kbd";
 import { Separator } from "@/components/ui/separator";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { EvidenceSheet } from "@/components/evidence-sheet";
+import { NotificationBell } from "@/components/notifications/notification-bell";
 import { AppBreadcrumb } from "./app-breadcrumb";
 import { AppSidebar } from "./app-sidebar";
 import { ColorPaletteSwitch } from "./color-palette-switch";
@@ -31,6 +32,7 @@ export function AppLayout() {
             <span>Jump to</span>
             <Kbd>{isMac ? "⌘" : "Ctrl"} K</Kbd>
           </Button>
+          <NotificationBell />
           <Button variant="ghost" size="icon-sm" aria-label="Take the product tour" onClick={tour.restart}>
             <CircleHelpIcon aria-hidden="true" />
           </Button>

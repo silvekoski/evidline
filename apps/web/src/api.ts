@@ -40,6 +40,11 @@ import {
   LogEntry,
   LogVerification,
   ModelSettings,
+  Notification,
+  NotificationList,
+  NotificationSettings,
+  NotificationTestResult,
+  type NotificationSettingsBody,
   LaneReport,
   QualityReport,
   ReviewReport,
@@ -123,6 +128,8 @@ export const keys = {
   egressTemplates: ["egress", "templates"] as const,
   egressRecord: (id: string) => ["egress", "record", id] as const,
   modelSettings: ["settings", "model"] as const,
+  notifications: ["notifications"] as const,
+  notificationSettings: ["settings", "notifications"] as const,
   workspaces: ["workspaces"] as const,
   corpusStats: ["knowledge", "stats"] as const,
   sources: (filter: string) => ["sources", filter] as const,
@@ -238,9 +245,15 @@ export const getEgress = (runId?: string) => request(arrayOf(EgressRecord), `/eg
 export const getEgressTotals = (runId?: string) => request(EgressTotals, `/egress/totals${runQuery(runId)}`);
 export const getEgressTemplates = () => request(TemplateInfo, "/egress/templates");
 export const getEgressRecord = (id: string) => request(EgressRecord, `/egress/${id}`);
+const put = (body: unknown): RequestInit => ({ method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
 export const getModelSettings = () => request(ModelSettings, "/settings/model");
-export const setModelMode = (mode: ModelMode) =>
-  request(ModelSettings, "/settings/model", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ mode }) });
+export const setModelMode = (mode: ModelMode) => request(ModelSettings, "/settings/model", put({ mode }));
+export const listNotifications = () => request(NotificationList, "/notifications");
+export const markNotificationRead = (id: string) => request(Notification, `/notifications/${id}/read`, post());
+export const markAllNotificationsRead = () => request({ parse: (x) => x as { read: number } }, "/notifications/read-all", post());
+export const getNotificationSettings = () => request(NotificationSettings, "/settings/notifications");
+export const setNotificationSettings = (body: NotificationSettingsBody) => request(NotificationSettings, "/settings/notifications", put(body));
+export const sendTestNotification = () => request(NotificationTestResult, "/settings/notifications/test", post());
 
 export function subscribeRunEvents(runId: string, onEvent: (event: RunEvent) => void): () => void {
   const source = new EventSource(`${apiBase()}/runs/${runId}/events`);

@@ -9,3 +9,4 @@ const random = (prefix: string) => (): string => `${prefix}-${randomBytes(6).toS
 export const newThreadId = random("th");
 export const newEgressId = random("eg");
 export const newRuleId = random("rule");
+export const newNotificationId = random("ntf");
