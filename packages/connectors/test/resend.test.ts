@@ -12,7 +12,7 @@ describe("resend alert", () => {
       return { status: 200, headers: {}, text: '{"id":"abc"}', bytes: async () => Buffer.alloc(0) };
     };
     const result = await sendResendAlert(transport, config, { title: "line-3: 1 sensor out of range", message: "T-101: health stuck" });
-    expect(result).toEqual({ ok: true });
+    expect(result).toEqual({ ok: true, id: "abc" });
     expect(calls).toHaveLength(1);
     expect(calls[0]![0]).toBe("https://api.resend.com/emails");
     expect(calls[0]![1]).toMatchObject({ method: "POST", headers: { Authorization: "Bearer re_123", "Content-Type": "application/json" } });

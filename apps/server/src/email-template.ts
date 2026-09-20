@@ -7,7 +7,11 @@ const logo: InlineImage = { filename: "evidline-logo.png", contentId: "evidline-
 
 const escape = (text: string): string => text.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
 
-export function brandedEmail(title: string, message: string, link: { label: string; url: string } | null): Alert {
+export type EmailDebug = Record<string, string>;
+
+export function brandedEmail(title: string, message: string, link: { label: string; url: string } | null, debug: EmailDebug): Alert {
+  const debugText = Object.entries(debug).map(([key, value]) => `${key}: ${value}`).join("\n");
+  const debugHtml = Object.entries(debug).map(([key, value]) => `${escape(key)}: ${escape(value)}`).join("<br>");
   const lines = message.split("\n").map(escape).join("<br>");
   const button = link
     ? `<p style="margin:24px 0 0"><a href="${escape(link.url)}" style="display:inline-block;padding:10px 18px;border-radius:6px;background:#f5a524;color:#1a1a1a;font-weight:600;text-decoration:none">${escape(link.label)}</a></p>`
@@ -21,6 +25,8 @@ export function brandedEmail(title: string, message: string, link: { label: stri
 <tr><td style="padding-top:12px;font-size:14px;line-height:1.5;font-family:ui-monospace,SFMono-Regular,Menlo,monospace">${lines}</td></tr>
 <tr><td>${button}</td></tr>
 <tr><td style="padding-top:32px;font-size:12px;color:#6b6b6b">evidline sent this notification. Change which events send an email in the notification center.</td></tr>
+<tr><td style="padding-top:16px;font-size:11px;line-height:1.5;color:#8a8a8a;font-family:ui-monospace,SFMono-Regular,Menlo,monospace">${debugHtml}</td></tr>
 </table></td></tr></table></body></html>`;
-  return { title, message: link ? `${message}\n\n${link.label}: ${link.url}` : message, html, images: [logo] };
+  const text = [message, ...(link ? [`${link.label}: ${link.url}`] : []), debugText].join("\n\n");
+  return { title, message: text, html, images: [logo] };
 }

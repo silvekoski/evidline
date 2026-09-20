@@ -215,9 +215,10 @@ export function openDb(path: string = process.env.DB_PATH ?? dbPath) {
     prepare,
     "notifications",
     ["id"],
-    { id: "text", time: "text", kind: "text", title: "text", message: "text", runId: "text", readAt: "text", email: "text", emailError: "text" },
+    { id: "text", time: "text", kind: "text", title: "text", message: "text", runId: "text", readAt: "text", email: "text", emailId: "text", emailError: "text" },
     [["readAt"]],
   );
+  if (!prepare("SELECT 1 FROM pragma_table_info('notifications') WHERE name = 'email_id'").get()) db.exec("ALTER TABLE notifications ADD COLUMN email_id TEXT");
 
   return {
     raw: db,

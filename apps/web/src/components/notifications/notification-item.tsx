@@ -41,6 +41,7 @@ export function NotificationItem({ notification, compact = false, onOpen }: { no
           <span className={cn("text-xs", notification.email === "failed" ? "text-destructive" : "text-muted-foreground")}>
             {emailText[notification.email]}
             {notification.emailError && `: ${notification.emailError}`}
+            {!compact && notification.emailId && <span className="font-mono"> (resend {notification.emailId})</span>}
           </span>
         </ItemContent>
       </button>

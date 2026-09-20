@@ -16,6 +16,7 @@ export const Notification = z.object({
   runId: z.string().nullable(),
   readAt: z.string().nullable(),
   email: EmailStatus,
+  emailId: z.string().nullable(),
   emailError: z.string().nullable(),
 });
 export type Notification = z.infer<typeof Notification>;
@@ -31,7 +32,7 @@ export type NotificationSettings = z.infer<typeof NotificationSettings>;
 export const NotificationSettingsBody = z.object({ email: z.partialRecord(NotificationKind, z.boolean()) });
 export type NotificationSettingsBody = z.infer<typeof NotificationSettingsBody>;
 
-export const NotificationTestResult = z.object({ email: EmailStatus, emailError: z.string().nullable() });
+export const NotificationTestResult = z.object({ email: EmailStatus, emailId: z.string().nullable(), emailError: z.string().nullable() });
 export type NotificationTestResult = z.infer<typeof NotificationTestResult>;
 
 export const notificationScreen: Record<NotificationKind, "quality" | "sensors" | "log"> = { "sensor-alert": "quality", "run-finished": "sensors", "run-failed": "log" };

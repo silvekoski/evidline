@@ -1,3 +1,4 @@
+import { hostname } from "node:os";
 import { fetchTransport, sendResendAlert, type Alert } from "@tpm/connectors";
 import {
   NotificationSettingsBody,
@@ -11,12 +12,12 @@ import {
 } from "@tpm/schemas";
 import type { AppContext } from "./context";
 import type { Db } from "./db";
-import { brandedEmail } from "./email-template";
+import { brandedEmail, type EmailDebug } from "./email-template";
 import { newNotificationId } from "./ids";
 
 type Notifier = Pick<AppContext, "db" | "slug" | "log">;
 export type NotificationDraft = Pick<Notification, "kind" | "title" | "message" | "runId">;
-export type EmailResult = { email: EmailStatus; emailError: string | null };
+export type EmailResult = { email: EmailStatus; emailId: string | null; emailError: string | null };
 
 const settingsKey = "notifications";
 const defaultEmail: Record<NotificationKind, boolean> = { "sensor-alert": true, "run-finished": false, "run-failed": true };
@@ -39,16 +40,31 @@ export function setNotificationSettings(db: Db, body: NotificationSettingsBody):
   return getNotificationSettings(db);
 }
 
-export async function sendEmail(alert: Alert): Promise<EmailResult> {
+export async function sendEmail(alert: Alert, ref: string, log: (line: string) => void): Promise<EmailResult> {
   const config = emailConfig();
-  if (!config) return { email: "off", emailError: "RESEND_API_KEY, ALERT_FROM or ALERT_TO is not set" };
+  if (!config) return { email: "off", emailId: null, emailError: "RESEND_API_KEY, ALERT_FROM or ALERT_TO is not set" };
+  const started = performance.now();
+  const done = (result: EmailResult): EmailResult => {
+    const ms = Math.round(performance.now() - started);
+    const detail = result.email === "sent" ? `resend=${result.emailId ?? "?"}` : `error=${JSON.stringify(result.emailError)}`;
+    log(`email ${result.email} ref=${ref} from=${config.from} to=${config.to.join(",")} subject=${JSON.stringify(alert.title)} bytes=${alert.html?.length ?? alert.message.length} ${detail} ${ms} ms`);
+    return result;
+  };
   try {
     const result = await sendResendAlert(fetchTransport, config, alert);
-    return result.ok ? { email: "sent", emailError: null } : { email: "failed", emailError: result.error };
+    return done(result.ok ? { email: "sent", emailId: result.id, emailError: null } : { email: "failed", emailId: null, emailError: result.error });
   } catch (e) {
-    return { email: "failed", emailError: e instanceof Error ? e.message : String(e) };
+    return done({ email: "failed", emailId: null, emailError: e instanceof Error ? e.message : String(e) });
   }
 }
+
+export const emailDebug = (ctx: Pick<AppContext, "slug">, fields: EmailDebug): EmailDebug => ({
+  ...fields,
+  workspace: ctx.slug,
+  host: hostname(),
+  server: process.env.APP_URL ?? "APP_URL not set",
+  "sent at": new Date().toISOString(),
+});
 
 function runLink(ctx: Notifier, draft: NotificationDraft): { label: string; url: string } | null {
   const base = process.env.APP_URL;
@@ -58,12 +74,14 @@ function runLink(ctx: Notifier, draft: NotificationDraft): { label: string; url:
 
 export async function notify(ctx: Notifier, draft: NotificationDraft): Promise<Notification> {
   const settings = getNotificationSettings(ctx.db);
-  let notification: Notification = { ...draft, id: newNotificationId(), time: new Date().toISOString(), readAt: null, email: "off", emailError: null };
+  let notification: Notification = { ...draft, id: newNotificationId(), time: new Date().toISOString(), readAt: null, email: "off", emailId: null, emailError: null };
   ctx.db.notifications.save(notification);
   if (settings.emailConfigured && settings.email[draft.kind]) {
-    notification = { ...notification, ...(await sendEmail(brandedEmail(draft.title, draft.message, runLink(ctx, draft)))) };
+    const debug = emailDebug(ctx, { notification: notification.id, kind: draft.kind, run: draft.runId ?? "none" });
+    notification = { ...notification, ...(await sendEmail(brandedEmail(draft.title, draft.message, runLink(ctx, draft), debug), notification.id, ctx.log)) };
     ctx.db.notifications.save(notification);
-    if (notification.email === "failed") ctx.log(`email for ${notification.id} failed: ${notification.emailError}`);
+  } else {
+    ctx.log(`email off ref=${notification.id} kind=${draft.kind} configured=${settings.emailConfigured} enabled=${settings.email[draft.kind]}`);
   }
   return notification;
 }

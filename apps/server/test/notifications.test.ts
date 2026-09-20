@@ -68,7 +68,7 @@ describe("notify", () => {
     vi.stubGlobal("fetch", fetchMock);
     const stored = await notify(f.ctx, draft);
     expect(fetchMock).not.toHaveBeenCalled();
-    expect(stored).toMatchObject({ ...draft, readAt: null, email: "off", emailError: null });
+    expect(stored).toMatchObject({ ...draft, readAt: null, email: "off", emailId: null, emailError: null });
     expect(f.ctx.db.notifications.list()).toEqual([stored]);
     expect(getNotificationSettings(f.ctx.db)).toEqual({ email: { "sensor-alert": true, "run-finished": false, "run-failed": true }, emailConfigured: false, recipients: [] });
   });
@@ -77,27 +77,30 @@ describe("notify", () => {
     const fetchMock = vi.fn().mockResolvedValue(fakeFetchResponse(200, '{"id":"abc"}'));
     vi.stubGlobal("fetch", fetchMock);
     const stored = await notify(f.ctx, draft);
-    expect(stored.email).toBe("sent");
+    expect(stored).toMatchObject({ email: "sent", emailId: "abc", emailError: null });
     expect(fetchMock).toHaveBeenCalledWith("https://api.resend.com/emails", expect.objectContaining({ method: "POST", headers: expect.objectContaining({ Authorization: "Bearer re_123" }) }));
     const body = JSON.parse(fetchMock.mock.calls[0]![1].body);
     expect(body).toMatchObject({
       from: "alerts@example.com",
       to: ["ops@example.com", "lead@example.com"],
       subject: "line-3.csv: 1 sensor out of range",
-      text: "T-101: health stuck\n\nOpen the run: https://plant.example/w/norrin/runs/0123abcd/quality",
+      text: expect.stringMatching(/^T-101: health stuck\n\nOpen the run: https:\/\/plant\.example\/w\/norrin\/runs\/0123abcd\/quality\n\n/),
       attachments: [{ filename: "evidline-logo.png", content_id: "evidline-logo", content: expect.stringMatching(/^iVBOR/) }],
     });
     expect(body.html).toContain('<img src="cid:evidline-logo"');
     expect(body.html).toContain('href="https://plant.example/w/norrin/runs/0123abcd/quality"');
     expect(body.html).toContain("T-101: health stuck");
+    expect(body.text).toContain(`notification: ${stored.id}\nkind: sensor-alert\nrun: 0123abcd\nworkspace: norrin\nhost: `);
+    expect(body.html).toContain(`notification: ${stored.id}<br>kind: sensor-alert<br>run: 0123abcd<br>workspace: norrin`);
   });
 
   it("records a failed email and logs a line", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(fakeFetchResponse(403, "forbidden")));
     const lines: string[] = [];
     const stored = await notify({ ...f.ctx, log: (line) => lines.push(line) }, draft);
-    expect(stored).toMatchObject({ email: "failed", emailError: "403 forbidden" });
-    expect(lines).toEqual([`email for ${stored.id} failed: 403 forbidden`]);
+    expect(stored).toMatchObject({ email: "failed", emailId: null, emailError: "403 forbidden" });
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatch(new RegExp(`^email failed ref=${stored.id} from=alerts@example.com to=ops@example.com,lead@example.com subject="line-3.csv: 1 sensor out of range" bytes=\\d+ error="403 forbidden" \\d+ ms$`));
   });
 
   it("skips the email for a kind that is off in the settings", async () => {
@@ -105,8 +108,10 @@ describe("notify", () => {
     vi.stubGlobal("fetch", fetchMock);
     const res = await f.app.request("/api/settings/notifications", json({ email: { "sensor-alert": false } }));
     expect(await res.json()).toMatchObject({ email: { "sensor-alert": false, "run-finished": false, "run-failed": true }, emailConfigured: true, recipients: ["ops@example.com", "lead@example.com"] });
-    expect((await notify(f.ctx, draft)).email).toBe("off");
+    const lines: string[] = [];
+    expect((await notify({ ...f.ctx, log: (line) => lines.push(line) }, draft)).email).toBe("off");
     expect(fetchMock).not.toHaveBeenCalled();
+    expect(lines[0]).toMatch(/^email off ref=ntf-\w+ kind=sensor-alert configured=true enabled=false$/);
   });
 });
 
@@ -133,7 +138,7 @@ describe("notification routes", () => {
 
   it("reports a missing email setup from the test route", async () => {
     const res = await f.app.request("/api/settings/notifications/test", { method: "POST" });
-    expect(await res.json()).toEqual({ email: "off", emailError: "RESEND_API_KEY, ALERT_FROM or ALERT_TO is not set" });
+    expect(await res.json()).toEqual({ email: "off", emailId: null, emailError: "RESEND_API_KEY, ALERT_FROM or ALERT_TO is not set" });
   });
 
   it("rejects an unknown kind in the settings body", async () => {
