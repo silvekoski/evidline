@@ -1,6 +1,4 @@
-import { jsonText } from "@tpm/egress";
-import { CheckNameResponse } from "@tpm/schemas";
-import { namesAgree } from "./name-checks";
+import { nameVote, type NameVote } from "./name-checks";
 import type {
   BaselineInference,
   CalibrationInference,
@@ -55,28 +53,19 @@ function notesByAlias(db: Db, run: Run): Map<string, string[]> {
   return byAlias;
 }
 
-type RowContext = { roles: Map<string, RoleInference>; health: Map<string, HealthInference>; drifts: Map<string, DriftInference>; notes: Map<string, string[]>; checks: (role: RoleInference) => SensorRow["nameChecks"] };
+type RowContext = { roles: Map<string, RoleInference>; health: Map<string, HealthInference>; drifts: Map<string, DriftInference>; notes: Map<string, string[]>; vote: (role: RoleInference) => NameVote };
 
 function rowContext(db: Db, run: Run): RowContext {
   const list = currentInferences(db, run.id);
   const bySensor = <I extends Inference>(items: I[]): Map<string, I> => new Map(items.map((i) => [i.sensor ?? "", i]));
-  const checks = (role: RoleInference): SensorRow["nameChecks"] => {
-    const byModel = new Map<string, { model: string; name: string | null; agrees: boolean | null }>();
-    for (const record of db.egress.byInference(role.id, "check_name")) {
-      const model = record.provider?.model ?? "";
-      if (byModel.has(model)) continue;
-      const reply = record.status === "sent" && record.response !== null ? CheckNameResponse.safeParse(JSON.parse(jsonText(record.response))).data ?? null : null;
-      byModel.set(model, { model, name: reply?.name ?? null, agrees: namesAgree(reply?.name ?? null, role.value.hypothesisName) });
-    }
-    return [...byModel.values()].sort((a, b) => a.model.localeCompare(b.model));
-  };
-  return { roles: bySensor(ofStage(list, "role")), health: bySensor(ofStage(list, "health")), drifts: bySensor(ofStage(list, "drift")), notes: notesByAlias(db, run), checks };
+  return { roles: bySensor(ofStage(list, "role")), health: bySensor(ofStage(list, "health")), drifts: bySensor(ofStage(list, "drift")), notes: notesByAlias(db, run), vote: (role) => nameVote(db, role) };
 }
 
 function sensorRow(sensor: SensorRecord, c: RowContext): SensorRow {
   const role = c.roles.get(sensor.alias);
   const health = c.health.get(sensor.alias);
   if (!role || !health) throw notFound(`inferences of ${sensor.alias}`);
+  const vote = c.vote(role);
   return {
     alias: sensor.alias,
     sourceName: sensor.sourceName,
@@ -84,14 +73,14 @@ function sensorRow(sensor: SensorRecord, c: RowContext): SensorRow {
     signalType: sensor.fingerprint.signalType,
     role: role.value.role,
     roleConfidence: role.confidence,
-    hypothesisName: role.value.hypothesisName,
+    hypothesisName: vote.name ?? role.value.hypothesisName,
     health: health.value.health,
     status: role.status,
     roleInferenceId: role.id,
     healthInferenceId: health.id,
     driftInferenceId: c.drifts.get(sensor.alias)?.id ?? null,
     notes: c.notes.get(sensor.alias) ?? [],
-    nameChecks: c.checks(role),
+    nameChecks: [...(vote.primary ? [vote.primary] : []), ...vote.checks].map(({ model, name, agrees }) => ({ model, name, agrees })),
   };
 }
 

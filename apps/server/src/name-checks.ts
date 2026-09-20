@@ -1,6 +1,7 @@
 import { jsonText } from "@tpm/egress";
 import { CheckNameResponse, NameRoleResponse, type EgressRecord, type NameCheck, type NameCheckJob, type NameCheckReport, type PrimaryName, type RoleInference } from "@tpm/schemas";
 import type { AppContext } from "./context";
+import type { Db } from "./db";
 import { appendLog } from "./log";
 import { chainOf } from "./operator";
 import { refreshCatalog } from "./catalog";
@@ -48,7 +49,17 @@ export function namesAgree(a: string | null, b: string | null): boolean | null {
 const replyOf = <T>(record: EgressRecord, schema: { safeParse: (x: unknown) => { data?: T } }): T | null =>
   record.status === "sent" && record.response !== null ? (schema.safeParse(JSON.parse(jsonText(record.response))).data ?? null) : null;
 
-function checkOf(record: EgressRecord, hypothesis: string | null): NameCheck {
+export function consensus(names: (string | null)[]): string | null {
+  let best: { name: string; votes: number } | null = null;
+  for (const name of names) {
+    if (name === null) continue;
+    const votes = names.filter((other) => namesAgree(name, other) === true).length;
+    if (best === null || votes > best.votes) best = { name, votes };
+  }
+  return best?.name ?? null;
+}
+
+function checkOf(record: EgressRecord): Omit<NameCheck, "agrees"> {
   const reply = replyOf(record, CheckNameResponse);
   const error =
     record.status === "blocked" ? (record.guards.find((g) => !g.pass)?.detail ?? "blocked")
@@ -65,15 +76,14 @@ function checkOf(record: EgressRecord, hypothesis: string | null): NameCheck {
     quantity: reply?.quantity ?? null,
     confidence: reply?.confidence ?? null,
     reason: reply?.reason ?? null,
-    agrees: namesAgree(reply?.name ?? null, hypothesis),
     error,
   };
 }
 
-export function primaryName(ctx: AppContext, head: RoleInference): PrimaryName | null {
-  let primary: PrimaryName | null = null;
-  for (const inference of chainOf(ctx.db, head)) {
-    for (const record of ctx.db.egress.byInference(inference.id, "name_role")) {
+function primaryName(db: Db, head: RoleInference): Omit<PrimaryName, "agrees"> | null {
+  let primary: Omit<PrimaryName, "agrees"> | null = null;
+  for (const inference of chainOf(db, head)) {
+    for (const record of db.egress.byInference(inference.id, "name_role")) {
       const reply = replyOf(record, NameRoleResponse);
       if (reply === null || (primary !== null && primary.time >= record.time)) continue;
       primary = { egressId: record.id, time: record.time, model: record.provider?.model ?? "", host: record.provider?.host ?? "", name: reply.name, quantity: reply.quantity, confidence: reply.confidence, reason: reply.reason };
@@ -82,18 +92,27 @@ export function primaryName(ctx: AppContext, head: RoleInference): PrimaryName |
   return primary;
 }
 
-export function nameChecks(ctx: AppContext, head: RoleInference): NameCheck[] {
-  const byModel = new Map<string, NameCheck>();
-  for (const inference of chainOf(ctx.db, head)) {
-    for (const record of ctx.db.egress.byInference(inference.id, "check_name")) {
-      const check = checkOf(record, head.value.hypothesisName);
+function nameChecks(db: Db, head: RoleInference): Omit<NameCheck, "agrees">[] {
+  const byModel = new Map<string, Omit<NameCheck, "agrees">>();
+  for (const inference of chainOf(db, head)) {
+    for (const record of db.egress.byInference(inference.id, "check_name")) {
+      const check = checkOf(record);
       if (!byModel.has(check.model) || byModel.get(check.model)!.time < check.time) byModel.set(check.model, check);
     }
   }
   return [...byModel.values()].sort((a, b) => a.model.localeCompare(b.model));
 }
 
-export const nameCheckReport = (ctx: AppContext, head: RoleInference): NameCheckReport => ({ pending: jobs.get(head.runId) ?? null, primary: primaryName(ctx, head), checks: nameChecks(ctx, head) });
+export type NameVote = Omit<NameCheckReport, "pending">;
+
+export function nameVote(db: Db, head: RoleInference): NameVote {
+  const primary = primaryName(db, head);
+  const checks = nameChecks(db, head);
+  const name = consensus([primary?.name ?? head.value.hypothesisName, ...checks.map((c) => c.name)]);
+  return { name, primary: primary && { ...primary, agrees: namesAgree(primary.name, name) }, checks: checks.map((c) => ({ ...c, agrees: namesAgree(c.name, name) })) };
+}
+
+export const nameCheckReport = (ctx: AppContext, head: RoleInference): NameCheckReport => ({ pending: jobs.get(head.runId) ?? null, ...nameVote(ctx.db, head) });
 
 export async function runNameChecks(ctx: AppContext, runId: string, heads: RoleInference[], opts: { again?: boolean } = {}): Promise<boolean> {
   if (jobs.has(runId)) return false;
@@ -119,7 +138,7 @@ export async function runNameChecks(ctx: AppContext, runId: string, heads: RoleI
             evidenceIds: head.evidenceIds,
             egressId: result.recordId,
             before: null,
-            after: result.ok ? { purpose: "check_name", model, name: result.value.name, confidence: result.value.confidence, agrees: namesAgree(result.value.name, head.value.hypothesisName) } : null,
+            after: result.ok ? { purpose: "check_name", model, name: result.value.name, confidence: result.value.confidence } : null,
             reason: result.ok ? null : `${model}: ${result.reason}`,
           });
           const job = jobs.get(runId);

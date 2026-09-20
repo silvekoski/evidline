@@ -1,22 +1,25 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { PlugIcon, RefreshCwIcon, Trash2Icon } from "lucide-react";
-import { ConnectorKind, type Connector } from "@tpm/schemas";
+import type { Connector, ConnectorKind } from "@tpm/schemas";
 import { assignUnassigned, createConnector, deleteConnector, keys, listConnectors, listTextEgress, listUnassigned, listWorkspaces, syncConnector } from "@/api";
 import { SourceKindBadge } from "@/components/knowledge/badges";
 import { WorkspaceSettings } from "@/components/knowledge/workspace-settings";
 import { connectorGaps } from "@/api";
 import { ConfirmAction } from "@/components/confirm-action";
 import { EmptyState } from "@/components/empty-state";
-import { ConnectorFields, connectorFields, defaultValues, isComplete, toConfig, type ConnectorValues } from "@/components/knowledge/connector-form";
+import { ConnectorFields, connectorKinds, defaultValues, isComplete, toConfig, type ConnectorValues } from "@/components/knowledge/connector-form";
 import { JobSummary } from "@/components/knowledge/job-summary";
 import { PageHeader } from "@/components/page-header";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { RadioGroup } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { RadioGroup as RadioGroupPrimitive } from "radix-ui";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatTime } from "@/lib/format";
 
@@ -25,17 +28,27 @@ function NewConnector({ onCreated }: { onCreated: () => void }) {
   const [kind, setKind] = useState<ConnectorKind>("teams");
   const [name, setName] = useState("");
   const [values, setValues] = useState<ConnectorValues>(() => defaultValues("teams"));
-  const [secret, setSecret] = useState("");
   const create = useMutation({
-    mutationFn: () => createConnector({ kind, name, workspace: null, config: toConfig(kind, values), secret: secret || null }),
+    mutationFn: () => createConnector({ kind, name: name.trim(), workspace: null, config: toConfig(kind, values), secret: values.secret?.trim() || null }),
     onSuccess: () => {
       setOpen(false);
       onCreated();
     },
   });
-  const spec = connectorFields[kind];
+  const spec = connectorKinds[kind];
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (next) {
+          setKind("teams");
+          setName("");
+          setValues(defaultValues("teams"));
+          create.reset();
+        }
+      }}
+    >
       <DialogTrigger asChild>
         <Button size="sm">
           <PlugIcon aria-hidden="true" /> Add connector
@@ -51,45 +64,47 @@ function NewConnector({ onCreated }: { onCreated: () => void }) {
         >
           <DialogHeader>
             <DialogTitle>Add connector</DialogTitle>
-            <DialogDescription>{spec.hint}</DialogDescription>
+            <DialogDescription>Pick a source. The connector captures each new item with no manual step.</DialogDescription>
           </DialogHeader>
-          <div className="grid gap-1.5">
-            <Label htmlFor="c-kind">Kind</Label>
-            <Select
-              value={kind}
-              onValueChange={(v) => {
-                setKind(v as ConnectorKind);
-                setValues(defaultValues(v as ConnectorKind));
-              }}
-            >
-              <SelectTrigger id="c-kind">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {ConnectorKind.options.map((k) => (
-                  <SelectItem key={k} value={k}>
-                    {k}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <RadioGroup
+            value={kind}
+            aria-label="Source"
+            className="grid-cols-2"
+            onValueChange={(v) => {
+              setKind(v as ConnectorKind);
+              setValues(defaultValues(v as ConnectorKind));
+            }}
+          >
+            {(Object.entries(connectorKinds) as [ConnectorKind, (typeof connectorKinds)[ConnectorKind]][]).map(([k, { label, icon: Icon, description }]) => {
+              return (
+                <RadioGroupPrimitive.Item
+                  key={k}
+                  value={k}
+                  className="flex items-start gap-2.5 rounded-md border border-input p-3 text-left outline-none transition-colors motion-reduce:transition-none hover:bg-muted/50 focus-visible:ring-3 focus-visible:ring-ring/50 data-[state=checked]:border-primary data-[state=checked]:bg-primary/5"
+                >
+                  <Icon aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                  <span className="flex flex-col gap-0.5">
+                    <span className="text-sm font-medium leading-none">{label}</span>
+                    <span className="text-xs text-muted-foreground">{description}</span>
+                  </span>
+                </RadioGroupPrimitive.Item>
+              );
+            })}
+          </RadioGroup>
           <div className="grid gap-1.5">
             <Label htmlFor="c-name">Name</Label>
-            <Input id="c-name" value={name} required onChange={(e) => setName(e.target.value)} />
+            <Input id="c-name" value={name} required placeholder={spec.namePlaceholder} maxLength={80} onChange={(e) => setName(e.target.value)} />
           </div>
-          <ConnectorFields kind={kind} values={values} onChange={setValues} />
-          {spec.secret && (
-            <div className="grid gap-1.5">
-              <Label htmlFor="c-secret">Secret ({spec.secret})</Label>
-              <Input id="c-secret" type="password" value={secret} autoComplete="off" onChange={(e) => setSecret(e.target.value)} />
-              <p className="text-xs text-muted-foreground">Stored with AES-256-GCM. The browser never gets it back.</p>
-            </div>
+          <ConnectorFields key={kind} kind={kind} values={values} onChange={setValues} />
+          {create.isError && (
+            <Alert variant="destructive">
+              <AlertTitle>The connector was not added</AlertTitle>
+              <AlertDescription>{create.error.message}</AlertDescription>
+            </Alert>
           )}
-          {create.isError && <p className="text-sm" role="alert">{create.error.message}</p>}
           <DialogFooter>
             <Button type="submit" disabled={create.isPending || name.trim() === "" || !isComplete(kind, values)}>
-              Add
+              {create.isPending ? "Adding…" : `Add ${spec.label}`}
             </Button>
           </DialogFooter>
         </form>
@@ -130,7 +145,7 @@ function ConnectorCard({ connector, onChange }: { connector: Connector; onChange
       <CardHeader>
         <CardTitle>{connector.name}</CardTitle>
         <CardDescription>
-          {connector.kind}, {connector.status}
+          {connectorKinds[connector.kind].label}, {connector.status}
           {connector.workspace ? `, workspace ${connector.workspace}` : ", all workspaces"}
         </CardDescription>
       </CardHeader>

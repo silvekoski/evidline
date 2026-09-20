@@ -28,6 +28,48 @@ const markdown = (spec: DataSpec): string => {
   ].join("\n");
 };
 
+type MissingColumn = { column: string; base: string; stat: string | null; sliced: boolean };
+
+const columnPattern = /^([A-Za-z][\w]*)(?:\.([A-Za-z0-9]+))?(\[.+\])?$/;
+
+const parseColumn = (column: string): MissingColumn => {
+  const m = column.match(columnPattern);
+  return m ? { column, base: m[1]!, stat: m[2] ?? null, sliced: m[3] !== undefined } : { column, base: column, stat: null, sliced: false };
+};
+
+const naturalCompare = (a: string, b: string): number => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" });
+
+const groupMissingColumns = (columns: string[]): { plain: MissingColumn[]; groups: [string, MissingColumn[]][] } => {
+  const byBase = new Map<string, MissingColumn[]>();
+  for (const column of columns) {
+    const parsed = parseColumn(column);
+    byBase.set(parsed.base, [...(byBase.get(parsed.base) ?? []), parsed]);
+  }
+  const plain: MissingColumn[] = [];
+  const groups: [string, MissingColumn[]][] = [];
+  for (const [base, items] of byBase) {
+    if (items.length === 1 && items[0]!.stat === null && !items[0]!.sliced) plain.push(items[0]!);
+    else groups.push([base, items]);
+  }
+  plain.sort((a, b) => naturalCompare(a.column, b.column));
+  groups.sort(([a], [b]) => naturalCompare(a, b));
+  return { plain, groups };
+};
+
+function MissingColumnBadge({ item, pending, label }: { item: MissingColumn; pending: number; label: string }) {
+  return (
+    <Badge variant={pending > 0 ? "secondary" : "outline"} className="gap-1 font-mono" title={item.column}>
+      {pending > 0 && <MessageCircleQuestionIcon aria-hidden="true" className="size-3" />}
+      {label}
+      {pending > 0 && (
+        <span className="sr-only">
+          , {pending} claim{pending === 1 ? "" : "s"} to review
+        </span>
+      )}
+    </Badge>
+  );
+}
+
 const download = (name: string, type: string, text: string): void => {
   const url = URL.createObjectURL(new Blob([text], { type }));
   const a = document.createElement("a");
@@ -114,25 +156,67 @@ export function SpecScreen() {
             </section>
           ))}
           {spec.data.columnsWithoutClaims.length > 0 && (
-            <section aria-labelledby="spec-missing">
-              <h2 id="spec-missing" className="mb-2 text-sm font-medium">
+            <section aria-labelledby="spec-missing" className="flex flex-col gap-4">
+              <h2 id="spec-missing" className="text-sm font-medium">
                 Columns without a confirmed claim ({spec.data.columnsWithoutClaims.length})
               </h2>
-              <ul className="flex flex-wrap gap-1.5" aria-label="Columns without a confirmed claim">
-                {spec.data.columnsWithoutClaims.map((column) => {
-                  const pending = pendingByColumn.get(column) ?? 0;
-                  return (
-                    <li key={column}>
-                      <Badge variant={pending > 0 ? "secondary" : "outline"} className="gap-1 font-mono">
-                        {pending > 0 && <MessageCircleQuestionIcon aria-hidden="true" className="size-3" />}
-                        {column}
-                        {pending > 0 && <span className="sr-only">, {pending} claim{pending === 1 ? "" : "s"} to review</span>}
-                      </Badge>
-                    </li>
-                  );
-                })}
-              </ul>
-              <Button asChild size="xs" variant="outline" className="mt-2">
+              {(() => {
+                const { plain, groups } = groupMissingColumns(spec.data.columnsWithoutClaims);
+                return (
+                  <>
+                    {groups.length > 0 && (
+                      <ul className="flex flex-col gap-2">
+                        {groups.map(([base, items]) => {
+                          const bare = items.find((p) => p.stat === null && !p.sliced) ?? null;
+                          const stats = items.filter((p) => p.stat !== null && !p.sliced);
+                          const sliced = items.filter((p) => p.sliced);
+                          const barePending = bare ? (pendingByColumn.get(bare.column) ?? 0) : 0;
+                          return (
+                            <li key={base} className="rounded-md border p-2.5">
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <span className="mr-1 inline-flex items-center gap-1 font-mono text-xs font-medium" title={bare ? "No confirmed claim about this column itself" : undefined}>
+                                  {barePending > 0 && <MessageCircleQuestionIcon aria-hidden="true" className="size-3 text-muted-foreground" />}
+                                  {base}
+                                </span>
+                                {stats.map((p) => (
+                                  <MissingColumnBadge key={p.column} item={p} pending={pendingByColumn.get(p.column) ?? 0} label={p.stat!} />
+                                ))}
+                              </div>
+                              {sliced.length > 0 && (
+                                <details className="mt-2">
+                                  <summary className="cursor-pointer text-xs text-muted-foreground underline-offset-4 hover:underline">
+                                    {sliced.length} sliced by value
+                                  </summary>
+                                  <ul className="mt-2 flex flex-wrap gap-1.5">
+                                    {sliced.map((p) => (
+                                      <li key={p.column}>
+                                        <MissingColumnBadge item={p} pending={pendingByColumn.get(p.column) ?? 0} label={p.column.slice(base.length)} />
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </details>
+                              )}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                    {plain.length > 0 && (
+                      <div className="flex flex-col gap-1.5">
+                        <p className="text-xs text-muted-foreground">{plain.length} column{plain.length === 1 ? "" : "s"} with no statistic yet</p>
+                        <ul className="flex flex-wrap gap-1.5" aria-label="Columns with no statistic">
+                          {plain.map((p) => (
+                            <li key={p.column}>
+                              <MissingColumnBadge item={p} pending={pendingByColumn.get(p.column) ?? 0} label={p.column} />
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
+              <Button asChild size="xs" variant="outline" className="self-start">
                 <Link to="/open-questions">Answer the open questions</Link>
               </Button>
             </section>

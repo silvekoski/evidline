@@ -266,9 +266,9 @@ export const NameCheck = z.object({
   error: z.string().nullable(),
 });
 export type NameCheck = z.infer<typeof NameCheck>;
-export const PrimaryName = NameCheck.omit({ agrees: true, error: true });
+export const PrimaryName = NameCheck.omit({ error: true });
 export type PrimaryName = z.infer<typeof PrimaryName>;
 export const NameCheckJob = z.object({ runId: z.string(), done: z.number().int(), total: z.number().int(), model: z.string() });
 export type NameCheckJob = z.infer<typeof NameCheckJob>;
-export const NameCheckReport = z.object({ pending: NameCheckJob.nullable(), primary: PrimaryName.nullable(), checks: z.array(NameCheck) });
+export const NameCheckReport = z.object({ pending: NameCheckJob.nullable(), name: z.string().nullable(), primary: PrimaryName.nullable(), checks: z.array(NameCheck) });
 export type NameCheckReport = z.infer<typeof NameCheckReport>;

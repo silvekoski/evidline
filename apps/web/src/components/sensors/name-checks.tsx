@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { LoaderIcon } from "lucide-react";
 import { cn } from "cn";
 import type { SensorRow } from "@tpm/schemas";
 import { getModelSettings, getNameChecks, keys, requestNameCheck } from "@/api";
 import { shortModel, supportOf, VoteHeader, VoteRow, VoteTally, type VoteChip } from "@/components/model-vote";
+import { Progress } from "@/components/ui/progress";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useActiveRunId } from "@/hooks/use-active-run-id";
 import { ModelLogo } from "./model-logo";
@@ -14,7 +16,7 @@ export function NameCheckMarks({ checks, roleInferenceId }: { checks: SensorRow[
   const open = useOpenSensor();
   if (checks.length === 0) return null;
   const agree = checks.filter((c) => c.agrees === true).length;
-  const label = `AI cross-check, ${agree} of ${checks.length} models agree: ${checks.map((c) => `${shortModel(c.model)} ${c.agrees === true ? "agrees" : c.agrees === false ? "differs" : "no answer"}${c.name ? ` (${c.name})` : ""}`).join(", ")}. Open to see the full cross-check.`;
+  const label = `AI vote, ${agree} of ${checks.length} models gave this name: ${checks.map((c) => `${shortModel(c.model)} ${c.agrees === true ? "agrees" : c.agrees === false ? "differs" : "no answer"}${c.name ? ` (${c.name})` : ""}`).join(", ")}. Open to see the full vote.`;
   return (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -76,16 +78,17 @@ export function NameCheckPanel({ inferenceId, hypothesis, hypothesisConfidence }
   const primary = report.data?.primary ?? null;
   const pending = report.data?.pending ?? null;
   const waiting = pending ? (settings.data?.reviewers.map((r) => r.model) ?? []).filter((m) => !checks.some((c) => c.model === m)) : [];
-  const answered = checks.filter((c) => c.name !== null).length;
-  const agree = checks.filter((c) => c.agrees === true).length;
+  const voters = [...(primary ? [primary] : []), ...checks];
+  const answered = voters.filter((c) => c.name !== null).length;
+  const agree = voters.filter((c) => c.agrees === true).length;
   const hasReason = primary?.reason !== null || checks.some((c) => c.reason);
   const support = supportOf(agree, answered);
   return (
     <section aria-labelledby={`checks-${inferenceId}`} className="flex flex-col gap-2">
       <VoteHeader
         id={`checks-${inferenceId}`}
-        question="Do other models agree with the name?"
-        hint="Blind vote. Each reviewer gets the same statistics and names the sensor on its own. No reviewer sees the primary name."
+        question="Which name do the models agree on?"
+        hint="Blind vote. Each reviewer gets the same statistics and names the sensor on its own. No reviewer sees the primary name. The name that most models share wins."
         hasReason={hasReason}
         why={why}
         onWhy={() => setWhy((v) => !v)}
@@ -94,14 +97,23 @@ export function NameCheckPanel({ inferenceId, hypothesis, hypothesisConfidence }
         onAsk={() => run.mutate()}
       />
       {run.isError && <p className="text-xs">{run.error.message}</p>}
-      {checks.length > 0 && <VoteTally agree={agree} total={checks.length} sentence={`${agree === 1 ? "reviewer gave" : "reviewers gave"} the same name. ${support}${support === "Strong support." ? "" : " Treat the name as a guess."}`} />}
+      {pending && (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground" role="status">
+          <LoaderIcon aria-hidden="true" className="size-3.5 shrink-0 motion-safe:animate-spin" />
+          <Progress value={(pending.done / pending.total) * 100} className="h-1.5 flex-1" aria-label="Reviewers answered" />
+          <span className="shrink-0 tabular-nums">
+            {pending.done}/{pending.total}
+          </span>
+        </div>
+      )}
+      {checks.length > 0 && <VoteTally agree={agree} total={voters.length} sentence={`${agree === 1 ? "model names" : "models name"} ${report.data?.name ?? "nothing"}. ${support}${support === "Strong support." ? "" : " Treat the name as a guess."}`} />}
       <ul className="flex flex-col" aria-label="Names by model">
         {(primary || hypothesis) && (
           <VoteRow
             model={primary?.model ?? ""}
-            answer={answerOf(hypothesis, primary?.quantity ?? null, "no hypothesis (model off)")}
+            answer={answerOf(primary?.name ?? hypothesis, primary?.quantity ?? null, "no hypothesis (model off)")}
             confidence={primary?.confidence ?? hypothesisConfidence}
-            chip={{ text: "Primary", variant: "outline" }}
+            chip={primary?.agrees === false ? { text: "Outvoted", variant: "secondary" } : { text: "Primary", variant: "outline" }}
             runId={runId}
             egressId={primary?.egressId ?? null}
             time={primary?.time ?? null}
@@ -112,9 +124,28 @@ export function NameCheckPanel({ inferenceId, hypothesis, hypothesisConfidence }
         {checks.map((c) => (
           <VoteRow key={c.model} model={c.model} answer={answerOf(c.name, c.quantity, c.error ?? "no answer")} confidence={c.confidence} chip={chipOf(c.agrees)} runId={runId} egressId={c.egressId} time={c.time} reason={c.reason} why={why} />
         ))}
-        {waiting.map((model) => (
-          <VoteRow key={model} model={model} answer={<span className="text-muted-foreground">waiting for the answer</span>} confidence={null} chip={{ text: "Waiting", variant: "secondary" }} runId={runId} egressId={null} time={null} reason={null} why={why} />
-        ))}
+        {waiting.map((model) => {
+          const active = pending?.model === model;
+          return (
+            <VoteRow
+              key={model}
+              model={model}
+              answer={
+                <span className={cn("inline-flex items-center gap-1.5", active ? "text-foreground" : "text-muted-foreground")}>
+                  {active && <LoaderIcon aria-hidden="true" className="size-3.5 motion-safe:animate-spin" />}
+                  {active ? "answering now" : "queued"}
+                </span>
+              }
+              confidence={null}
+              chip={{ text: active ? "Answering" : "Queued", variant: "secondary" }}
+              runId={runId}
+              egressId={null}
+              time={null}
+              reason={null}
+              why={why}
+            />
+          );
+        })}
         {checks.length === 0 && waiting.length === 0 && <li className="py-2 text-xs text-muted-foreground">No vote yet. Ask other models for an independent name from each reviewer.</li>}
       </ul>
     </section>

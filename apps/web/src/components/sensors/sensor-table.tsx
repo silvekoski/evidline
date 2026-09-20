@@ -8,7 +8,7 @@ import {
   type ColumnFiltersState,
   type SortingState,
 } from "@tanstack/react-table";
-import { SearchIcon } from "lucide-react";
+import { SearchIcon, SparklesIcon } from "lucide-react";
 import { HealthClass, Role, type Lens, type SensorRow } from "@tpm/schemas";
 import { ConfidenceBar } from "@/components/confidence-bar";
 import { Input } from "@/components/ui/input";
@@ -35,7 +35,12 @@ const columns = [
   column.accessor("role", { header: "Role", filterFn: "equals" }),
   column.accessor((row) => row.hypothesisName ?? "", {
     id: "hypothesisName",
-    header: "Hypothesis",
+    header: () => (
+      <span className="inline-flex items-center gap-1.5" title="The name that most models gave the sensor. A guess by AI, not a fact.">
+        <SparklesIcon aria-hidden="true" className="size-3.5" />
+        AI hypothesis
+      </span>
+    ),
     cell: ({ row }) => {
       const name = row.original.hypothesisName;
       return (
