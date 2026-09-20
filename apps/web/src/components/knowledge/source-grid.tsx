@@ -11,6 +11,62 @@ import { SourceStatusText, needsAttention } from "./source-status";
 const csvRow = (text: string) => text.split(";").map((cell) => cell.split(":").slice(1).join(":").trim());
 const csvHead = (text: string) => text.split(";").map((cell) => cell.split(":")[0]!.trim());
 
+// The excerpt can cut a table row short before its closing "|". Match the leading "|" only.
+const isTableLine = (line: string) => /^\s*\|/.test(line);
+const isSeparatorLine = (line: string) => /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)+\|?\s*$/.test(line);
+const isListLine = (line: string) => /^\s*[-*+]\s+\S/.test(line);
+const tableCells = (line: string) =>
+  line
+    .trim()
+    .replace(/^\|/, "")
+    .replace(/\|$/, "")
+    .split("|")
+    .map((cell) => cell.trim());
+
+function TextRow({ text, clamp, bold }: { text: string; clamp: boolean; bold: boolean }) {
+  const lines = text.split("\n");
+  if (lines.length > 1 && lines.every(isTableLine)) {
+    const [head, ...body] = lines.filter((line) => !isSeparatorLine(line)).map(tableCells);
+    if (!head) return null;
+    return (
+      <table className="w-full border-collapse">
+        <thead>
+          <tr>
+            {head.map((cell, i) => (
+              <th key={i} className="border-b border-neutral-300 pr-1.5 pb-0.5 text-left font-medium whitespace-nowrap">
+                {cell}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {body.map((cells, i) => (
+            <tr key={i}>
+              {cells.map((cell, j) => (
+                <td key={j} className="max-w-16 truncate border-b border-neutral-100 pr-1.5 py-0.5">
+                  {cell}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    );
+  }
+  if (lines.length > 1 && lines.every(isListLine)) {
+    return (
+      <ul className="list-disc pl-3">
+        {lines.map((line, i) => (
+          <li key={i} className="truncate">
+            {line.replace(/^\s*[-*+]\s+/, "")}
+          </li>
+        ))}
+      </ul>
+    );
+  }
+  return <p className={cn("whitespace-pre-line", clamp && "line-clamp-3", bold && "text-[8px] font-medium")}>{text}</p>;
+}
+
 function Paper({ children, className }: { children: ReactNode; className?: string }) {
   return (
     <div aria-hidden="true" className={cn("absolute inset-x-3 top-3 bottom-0 overflow-hidden rounded-t-sm bg-white px-2.5 pt-2.5 text-[7px] leading-[10px] text-neutral-800 shadow-sm", className)}>
@@ -70,9 +126,7 @@ function Excerpt({ source }: { source: Source }) {
     <Paper>
       <div className="flex flex-col gap-1">
         {rows.map((r, i) => (
-          <p key={i} className={cn(rows.length > 1 && "line-clamp-3", i === 0 && "text-[8px] font-medium")}>
-            {r.text}
-          </p>
+          <TextRow key={i} text={r.text} clamp={rows.length > 1} bold={i === 0} />
         ))}
       </div>
     </Paper>

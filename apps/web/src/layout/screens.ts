@@ -4,6 +4,8 @@ import { capitalize } from "@/lib/format";
 
 export type ScreenSlug = "sensors" | "quality" | "drift" | "diagnosis" | "log" | "data-flow";
 
+export const defaultRunId = "c84b5c33";
+
 export const screens: { slug: ScreenSlug; label: (lens: Lens) => string; icon: typeof ActivityIcon }[] = [
   { slug: "sensors", label: (lens) => capitalize(lens.sensors), icon: ActivityIcon },
   { slug: "quality", label: () => "Quality", icon: ListChecksIcon },

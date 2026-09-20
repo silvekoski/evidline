@@ -5,6 +5,7 @@ import { cn } from "cn";
 import type { Claim, ClaimLink } from "@tpm/schemas";
 import { setClaimStatus, setLinkConfirmed } from "@/api";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { formatTime } from "@/lib/format";
 import { ClaimStatusBadge, ProvenanceBadge, SourceKindBadge } from "./badges";
 import { locatorLabel, sourceHref } from "./locator";
@@ -16,7 +17,14 @@ function LinkChip({ link, onChange }: { link: ClaimLink; onChange: () => void })
     <li className={cn("inline-flex h-6 items-center gap-1 rounded-md border pl-2 text-xs", state === "confirmed" && "border-foreground", state === "rejected" && "border-dashed text-muted-foreground")}>
       {state === "confirmed" && <CheckIcon aria-hidden="true" className="size-3" />}
       <span className={cn("font-mono", state === "rejected" && "line-through")}>{link.column}</span>
-      <span className="font-mono text-muted-foreground">{link.score.toFixed(2)}</span>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="font-mono text-muted-foreground" aria-label={`Match score for the link to ${link.column}: ${link.score.toFixed(2)}`}>
+            {link.score.toFixed(2)}
+          </span>
+        </TooltipTrigger>
+        <TooltipContent>Match score between this claim and {link.column}, not a sensor value</TooltipContent>
+      </Tooltip>
       <span className="sr-only">, {state}</span>
       {state === "candidate" && (
         <Button size="icon-xs" variant="ghost" aria-label={`Confirm the link to ${link.column}`} onClick={() => confirm.mutate(true)} disabled={confirm.isPending}>

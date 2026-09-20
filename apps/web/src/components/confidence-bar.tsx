@@ -1,11 +1,11 @@
 import { cn } from "cn";
 
-export function ConfidenceBar({ value, className }: { value: number; className?: string }) {
+export function ConfidenceBar({ value, label = "confidence", className }: { value: number; label?: string; className?: string }) {
   const filled = Math.round(Math.min(1, Math.max(0, value)) * 5);
   return (
     <span
       role="meter"
-      aria-label="confidence"
+      aria-label={label}
       aria-valuemin={0}
       aria-valuemax={1}
       aria-valuenow={value}

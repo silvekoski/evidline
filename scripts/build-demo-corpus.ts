@@ -1,6 +1,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { createCanvas } from "@napi-rs/canvas";
+import JSZip from "jszip";
 
 // A fictional customer corpus for the knowledge layer. The customer people write the way
 // plant people write: tag numbers, equipment names, plain words, typos, small talk. The
@@ -1063,6 +1064,107 @@ write(
     "- Near miss in January: a contractor van reversed into the fence at gate 1. No injury. Reversing without a spotter is not allowed on site.",
     "",
     "Questions to the HSE coordinator. Next talk in March: hot work permits before the summer shutdown.",
+    "",
+  ].join("\n"),
+);
+
+write(
+  "2026-03-19 RE Purge valve positioner installed.eml",
+  eml({
+    id: "5b7e2a-01",
+    from: mikko,
+    to: `Anna Lehtinen <${anna[1]}>`,
+    cc: `${jarkko[0]} <${jarkko[1]}>, ${corpus}`,
+    subject: "Purge valve positioner installed",
+    date: "Thu, 19 Mar 2026 15:03:44 +0200",
+    body: [
+      "Hi Anna,",
+      "",
+      "Quick note: the new positioner from PO-26-0142 went into PV-2041 today, MOC-2026-014 signed off at 14:20. Stroke test passed. The weekly stem lubrication workaround is gone from the wash checklist.",
+      "",
+      "You should not see the Tuesday compressor power bump from the old sticking valve any more from today onward. Tell us if it comes back.",
+      "",
+      "Terveisin,",
+      "Mikko",
+      "",
+      "Mikko Virtanen | Käyttöinsinööri / Process engineer | Saimaa Kemia Oy, Vuoksenrannan tehdas",
+      ...disclaimer,
+    ],
+  }),
+);
+
+write(
+  "MOC-2026-014 purge valve positioner replacement.docx",
+  await docx([
+    { heading: "Management of change MOC-2026-014", text: "Saimaa Kemia Oy, Vuoksenrannan tehdas. Reactor line R-101. Raised by M. Virtanen. Approved by J. Rantanen and T. Koskinen. Date 2026-03-18." },
+    {
+      heading: "Change",
+      text: "Replace the positioner on the purge valve PV-2041 with the smart positioner from purchase order PO-26-0142, Nordic Valve Service Oy, model NVS-8400. The old pneumatic positioner sticks after every wash of the purge line and needs the weekly stem lubrication from the February safety bulletin.",
+    },
+    { heading: "Reason", text: "The positioner arrived from the supplier in week 12 as re-quoted. Staying on the old positioner risks a pressure trip on a wash day if the stem lubrication step is missed." },
+    { heading: "Risk assessment", text: "The valve is isolated and set to manual before the swap. The shift operator watches reactor pressure PI-1011 during the two hour work window. No process risk if the work permit sequence is followed." },
+    {
+      heading: "Implementation",
+      text: "Nordic Valve Service Oy on site 2026-03-19, day shift. Instrument department, P. Salo, assists. The positioner is commissioned and stroke tested before handover. The weekly stem lubrication step comes off the wash checklist once commissioning is signed off.",
+    },
+    { heading: "Sign-off", text: "Commissioned 2026-03-19 at 14:20. Stroke test passed, 0 to 100 percent in 8 seconds. J. Rantanen accepts the change. Copy to the data team at Norrin for their records." },
+  ]),
+);
+
+write(
+  "Operator training R-101 module 4 alarm response.pptx",
+  await pptx([
+    ["OPERATOR TRAINING, R-101, MODULE 4: ALARM RESPONSE", "Trainer notes, H. Aaltonen, 2026-03. Internal."],
+    ["Slide 1. Alarm priorities.", "High: reactor pressure PI-1011 above 2895 kPa, reactor level LI-1012 outside 20 to 80 percent.", "Low: analyzer hold longer than 30 minutes, cooling valve FV-1010 above 90 percent."],
+    ["Slide 2. High reactor pressure PI-1011.", "Check the purge valve PV-2041 position first.", "Since the positioner change on 19 March a stuck valve is not expected.", "If the valve responds, the alarm should clear within two minutes."],
+    ["Slide 3. The P-302 trip sequence, in order.", "1. FI-3017 goes to zero.", "2. LI-3012 climbs fast.", "3. Close FV-3009 to 20 percent.", "4. Restart the pump.", "5. Return the steam valve to auto."],
+    ["Slide 4. Cooling coil fouling, FV-1010.", "The valve opens further each week for the same reactor temperature.", "Book the coil cleaning near 90 percent, before it reaches the high alarm.", "After a cleaning, expect TI-1021 to drop about 8 degrees C."],
+    ["Slide 5. Quiz.", "Eight questions, answers on the intranet."],
+  ]),
+);
+
+write(
+  "2026-04-23 Saimaa Kemia April sync.vtt",
+  vtt([
+    ["00:00:02", "Anna Lehtinen", "Hi all. Two things today, the cooling coil cleaning and the purge valve. Mikko, how did the cleaning go?"],
+    ["00:00:11", "Mikko Virtanen", "Went as planned, twentieth and twenty first of April. FV-1010 dropped from about eighty eight to forty percent right after the restart, and TI-1021 came down about eight degrees. Exactly what we told you last time."],
+    ["00:00:29", "Anna Lehtinen", "Good, that matches. And the purge valve, any sign of the old sticking since the positioner change?"],
+    ["00:00:36", "Mikko Virtanen", "None. Zero bumps on the compressor power since the nineteenth of March. The MOC closed it out properly."],
+    ["00:00:45", "Jarkko Rantanen", "On the analyzer side, the reactor feed chromatograph got its new column on the sixth as planned. There is a small level shift on the feed composition, about half a mole percent, like Sari said it would be. Not a process change."],
+    ["00:01:03", "Sari Nieminen", "Confirmed, the shift is in the calibration record. Nothing else from the lab this month."],
+    ["00:01:10", "Anna Lehtinen", "Great, a quiet month for once. Thanks everyone, talk next time."],
+    ["00:01:15", "Jarkko Rantanen", "Kiitos, moikka."],
+  ]),
+);
+
+write(
+  "2026-04-30 Production report April 2026.md",
+  [
+    "# Production report, reactor line R-101, April 2026",
+    "",
+    "Prepared by Timo Heikkinen, production planning. Distribution: plant management, Norrin project.",
+    "",
+    "## Summary",
+    "",
+    "Production of G and H was 98.4 percent of plan. One planned event cost production time: the cooling coil cleaning on 20 to 21 April, 36 hours at reduced rate. No unplanned stoppages.",
+    "",
+    "## Quality",
+    "",
+    "Product component D from AI-4037 stayed below 0.6 mol percent all month. The April average was 0.39 mol percent, the best of the year so far.",
+    "",
+    "## Events with an effect on the trends",
+    "",
+    "- 2026-04-06: reactor feed chromatograph AI-1023 got a new column. Feed composition shifted about 0.5 mol percent, a calibration effect, not a process change.",
+    "- 2026-04-20 08:00 to 2026-04-21 20:00: cooling coil cleaning. FV-1010 dropped from about 88 to 40 percent, TI-1021 dropped about 8 degrees C after the restart.",
+    "- No purge valve sticking this month. PV-2041 has had zero events since the positioner replacement on 19 March (MOC-2026-014).",
+    "",
+    "## Personnel",
+    "",
+    "Summer holiday schedule for the automation team is confirmed: Jarkko week 9 already covered, Mikko weeks 27 to 28, Sari weeks 29 to 30.",
+    "",
+    "## Outlook",
+    "",
+    "No major maintenance planned for May. Next scheduled event is the annual instrument calibration round in November.",
     "",
   ].join("\n"),
 );

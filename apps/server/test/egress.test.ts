@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { EgressRecord, EgressTotals, Purpose, TemplateInfo } from "@tpm/schemas";
+import { EgressRecord, EgressTotals, TemplateCatalog, TemplateName } from "@tpm/schemas";
 import { egressRecord, fixture, run, type Fixture } from "./fixture";
 
 describe("egress routes", () => {
@@ -45,8 +45,9 @@ describe("egress routes", () => {
   });
 
   it("serves every template with a hash", async () => {
-    const info = TemplateInfo.parse(await (await f.app.request("/api/egress/templates")).json());
-    expect(Object.keys(info).sort()).toEqual([...Purpose.options].sort());
+    const info = TemplateCatalog.parse(await (await f.app.request("/api/egress/templates")).json());
+    expect(Object.keys(info).sort()).toEqual([...TemplateName.options].sort());
     expect(info.name_role.hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(info.extract.hash).toMatch(/^[0-9a-f]{64}$/);
   });
 });

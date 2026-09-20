@@ -1,4 +1,5 @@
-import { type FormEvent, useState } from "react";
+import { type ChangeEvent, type FormEvent, useRef, useState } from "react";
+import { Link } from "react-router";
 import { toast } from "sonner";
 import { UserAvatar } from "@/components/user-avatar";
 import { Button } from "@/components/ui/button";
@@ -9,17 +10,45 @@ import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { demoUser } from "@/lib/demo-user";
+import { useProfilePhoto } from "@/hooks/use-profile-photo";
+import { maxProfilePhotoBytes, setProfilePhoto } from "@/lib/profile-photo";
 
 export function ProfileScreen() {
   const [name, setName] = useState(demoUser.name);
   const [email, setEmail] = useState(demoUser.email);
   const [role, setRole] = useState(demoUser.role);
   const [bio, setBio] = useState(demoUser.bio);
-  const [emailNotifications, setEmailNotifications] = useState(true);
   const [productUpdates, setProductUpdates] = useState(false);
+  const photoUrl = useProfilePhoto();
+  const photoInputRef = useRef<HTMLInputElement>(null);
 
-  const handlePhotoChange = () => {
-    toast.error("Photo uploads are not available in the demo environment.");
+  const handleChangePhoto = () => {
+    photoInputRef.current?.click();
+  };
+
+  const handlePhotoSelected = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("Choose an image file.");
+      return;
+    }
+    if (file.size > maxProfilePhotoBytes) {
+      toast.error("Choose an image under 2 MB.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      setProfilePhoto(reader.result as string);
+      toast.success("Photo updated.");
+    };
+    reader.onerror = () => toast.error("The file did not load.");
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemovePhoto = () => {
+    setProfilePhoto(null);
   };
 
   const handleSave = (event: FormEvent) => {
@@ -37,12 +66,21 @@ export function ProfileScreen() {
         <CardContent>
           <form className="flex flex-col gap-5" onSubmit={handleSave}>
             <div className="flex items-center gap-3">
-              <UserAvatar name={name} className="size-14 text-lg" />
+              <UserAvatar name={name} photoUrl={photoUrl} className="size-14 text-lg" />
               <div className="flex gap-2">
-                <Button type="button" variant="outline" size="sm" onClick={handlePhotoChange}>
+                <input
+                  ref={photoInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  tabIndex={-1}
+                  aria-hidden="true"
+                  onChange={handlePhotoSelected}
+                />
+                <Button type="button" variant="outline" size="sm" onClick={handleChangePhoto}>
                   Change photo
                 </Button>
-                <Button type="button" variant="ghost" size="sm" onClick={handlePhotoChange}>
+                <Button type="button" variant="ghost" size="sm" onClick={handleRemovePhoto} disabled={!photoUrl}>
                   Remove
                 </Button>
               </div>
@@ -65,11 +103,13 @@ export function ProfileScreen() {
             </div>
             <Separator />
             <div className="flex items-center justify-between gap-4">
-              <Label htmlFor="profile-email-notifications" className="flex flex-col items-start gap-0.5 font-normal">
+              <span className="flex flex-col items-start gap-0.5 text-sm">
                 Email notifications
-                <span className="text-xs font-normal text-muted-foreground">Get an email for each run that finishes.</span>
-              </Label>
-              <Switch id="profile-email-notifications" checked={emailNotifications} onCheckedChange={setEmailNotifications} />
+                <span className="text-xs text-muted-foreground">Select which run events send an email.</span>
+              </span>
+              <Button asChild type="button" variant="outline" size="sm">
+                <Link to="/notifications">Manage</Link>
+              </Button>
             </div>
             <div className="flex items-center justify-between gap-4">
               <Label htmlFor="profile-product-updates" className="flex flex-col items-start gap-0.5 font-normal">

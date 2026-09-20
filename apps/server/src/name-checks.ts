@@ -1,5 +1,5 @@
 import { jsonText } from "@tpm/egress";
-import { CheckNameResponse, type EgressRecord, type NameCheck, type NameCheckJob, type NameCheckReport, type RoleInference } from "@tpm/schemas";
+import { CheckNameResponse, NameRoleResponse, type EgressRecord, type NameCheck, type NameCheckJob, type NameCheckReport, type PrimaryName, type RoleInference } from "@tpm/schemas";
 import type { AppContext } from "./context";
 import { appendLog } from "./log";
 import { chainOf } from "./operator";
@@ -22,8 +22,11 @@ export function namesAgree(a: string | null, b: string | null): boolean | null {
   return shared / Math.min(ta.size, tb.size) >= 0.5;
 }
 
+const replyOf = <T>(record: EgressRecord, schema: { safeParse: (x: unknown) => { data?: T } }): T | null =>
+  record.status === "sent" && record.response !== null ? (schema.safeParse(JSON.parse(jsonText(record.response))).data ?? null) : null;
+
 function checkOf(record: EgressRecord, hypothesis: string | null): NameCheck {
-  const reply = record.status === "sent" && record.response !== null ? CheckNameResponse.safeParse(JSON.parse(jsonText(record.response))).data ?? null : null;
+  const reply = replyOf(record, CheckNameResponse);
   const error =
     record.status === "blocked" ? (record.guards.find((g) => !g.pass)?.detail ?? "blocked")
     : record.status === "off" ? "model off"
@@ -38,9 +41,22 @@ function checkOf(record: EgressRecord, hypothesis: string | null): NameCheck {
     name: reply?.name ?? null,
     quantity: reply?.quantity ?? null,
     confidence: reply?.confidence ?? null,
+    reason: reply?.reason ?? null,
     agrees: namesAgree(reply?.name ?? null, hypothesis),
     error,
   };
+}
+
+export function primaryName(ctx: AppContext, head: RoleInference): PrimaryName | null {
+  let primary: PrimaryName | null = null;
+  for (const inference of chainOf(ctx.db, head)) {
+    for (const record of ctx.db.egress.byInference(inference.id, "name_role")) {
+      const reply = replyOf(record, NameRoleResponse);
+      if (reply === null || (primary !== null && primary.time >= record.time)) continue;
+      primary = { egressId: record.id, time: record.time, model: record.provider?.model ?? "", host: record.provider?.host ?? "", name: reply.name, quantity: reply.quantity, confidence: reply.confidence, reason: reply.reason };
+    }
+  }
+  return primary;
 }
 
 export function nameChecks(ctx: AppContext, head: RoleInference): NameCheck[] {
@@ -54,7 +70,7 @@ export function nameChecks(ctx: AppContext, head: RoleInference): NameCheck[] {
   return [...byModel.values()].sort((a, b) => a.model.localeCompare(b.model));
 }
 
-export const nameCheckReport = (ctx: AppContext, head: RoleInference): NameCheckReport => ({ pending: jobs.get(head.runId) ?? null, checks: nameChecks(ctx, head) });
+export const nameCheckReport = (ctx: AppContext, head: RoleInference): NameCheckReport => ({ pending: jobs.get(head.runId) ?? null, primary: primaryName(ctx, head), checks: nameChecks(ctx, head) });
 
 export async function runNameChecks(ctx: AppContext, runId: string, heads: RoleInference[], opts: { again?: boolean } = {}): Promise<boolean> {
   if (jobs.has(runId)) return false;

@@ -8,7 +8,6 @@ import { ConfidenceBar } from "@/components/confidence-bar";
 import { EvidenceChip } from "@/components/evidence-chip";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Hypothesis } from "./hypothesis";
 import { NameCheckPanel } from "./name-checks";
 
 export function RolesTab({ detail }: { detail: SensorDetail }) {
@@ -18,6 +17,7 @@ export function RolesTab({ detail }: { detail: SensorDetail }) {
   const hypothesisConfidence = inference.data?.stage === "role" ? inference.data.value.hypothesisConfidence : null;
   return (
     <div className="flex flex-col gap-5">
+      <NameCheckPanel inferenceId={detail.roleInferenceId} hypothesis={detail.hypothesisName} hypothesisConfidence={hypothesisConfidence} />
       <section aria-labelledby="role-inference" className="flex flex-col gap-2">
         <h3 id="role-inference" className="text-xs font-medium text-muted-foreground">
           Role inference <span className="font-mono">{detail.roleInferenceId}</span>
@@ -71,17 +71,6 @@ export function RolesTab({ detail }: { detail: SensorDetail }) {
             : "No score."}
         </p>
       </section>
-      <section aria-labelledby="role-hypothesis" className="flex flex-col gap-2">
-        <h3 id="role-hypothesis" className="text-xs font-medium text-muted-foreground">
-          Physical name
-        </h3>
-        <div className="flex flex-wrap items-center gap-3">
-          <Hypothesis name={detail.hypothesisName} />
-          {hypothesisConfidence !== null && <ConfidenceBar value={hypothesisConfidence} />}
-        </div>
-        <p className="text-xs text-muted-foreground">The model proposes the name from the fingerprint summary. No later stage reads it, so a wrong name cannot cause a wrong diagnosis.</p>
-      </section>
-      <NameCheckPanel inferenceId={detail.roleInferenceId} hypothesis={detail.hypothesisName} />
     </div>
   );
 }

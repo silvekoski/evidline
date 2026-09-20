@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import type { ModelMode, ModelSettings } from "@tpm/schemas";
+import type { ModelMode, ModelSettings, ProviderInfo } from "@tpm/schemas";
 import { keys, setModelMode } from "@/api";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -14,6 +14,24 @@ const envHint: Record<OnMode, string> = {
   cloud: "TPM_AZURE_ENDPOINT, TPM_AZURE_KEY and TPM_AZURE_DEPLOYMENT",
   local: "TPM_OLLAMA_HOST and TPM_OLLAMA_MODEL",
 };
+
+function ProviderTable({ label, info }: { label: string; info: ProviderInfo }) {
+  return (
+    <div className="flex flex-col gap-1">
+      <p className="font-medium">{label}</p>
+      <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5">
+        <dt className="text-muted-foreground">Provider</dt>
+        <dd>{info.name}</dd>
+        <dt className="text-muted-foreground">Model</dt>
+        <dd className="font-mono">{info.model}</dd>
+        <dt className="text-muted-foreground">Region</dt>
+        <dd>{info.region ?? "none"}</dd>
+        <dt className="text-muted-foreground">Host</dt>
+        <dd className="font-mono break-all">{info.host}</dd>
+      </dl>
+    </div>
+  );
+}
 
 export function ModelModeCard({ settings, plant }: { settings: ModelSettings; plant: string }) {
   const queryClient = useQueryClient();
@@ -67,30 +85,15 @@ export function ModelModeCard({ settings, plant }: { settings: ModelSettings; pl
             The {mode} mode has no provider. Set {envHint[mode]} in the server environment. Until then, each call writes an error record and the text template gives the answer.
           </p>
         ) : (
-          <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-xs">
-            <dt className="text-muted-foreground">Provider</dt>
-            <dd>{provider.name}</dd>
-            <dt className="text-muted-foreground">Model</dt>
-            <dd className="font-mono">{provider.model}</dd>
-            <dt className="text-muted-foreground">Region</dt>
-            <dd>{provider.region ?? "none"}</dd>
-            <dt className="text-muted-foreground">Host</dt>
-            <dd className="font-mono break-all">{provider.host}</dd>
-          </dl>
-        )}
-        {mode === "cloud" && (
-          <p className="text-xs text-muted-foreground">
-            Reviewers:{" "}
-            {settings.reviewers.length === 0 ? (
-              "none. Set TPM_REVIEW_KEY in the server environment for a cross review."
-            ) : (
-              <>
-                {settings.reviewers.length} {settings.reviewers.length === 1 ? "model" : "models"} on{" "}
-                <span className="font-mono">{[...new Set(settings.reviewers.map((r) => r.host))].join(", ")}</span>:{" "}
-                <span className="font-mono">{settings.reviewers.map((r) => r.model).join(", ")}</span>
-              </>
-            )}
-          </p>
+          <div className="flex flex-col gap-3 text-xs">
+            <ProviderTable label="Model" info={provider} />
+            {mode === "cloud" &&
+              (settings.reviewers.length === 0 ? (
+                <p className="text-muted-foreground">Reviewers: none. Set TPM_REVIEW_KEY in the server environment for a cross review.</p>
+              ) : (
+                settings.reviewers.map((r, i) => <ProviderTable key={`${r.host}/${r.model}`} label={`Reviewer ${i + 1}`} info={r} />)
+              ))}
+          </div>
         )}
       </CardContent>
     </Card>

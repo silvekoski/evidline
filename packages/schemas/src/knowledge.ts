@@ -65,6 +65,7 @@ export const Source = z.object({
   chunks: z.number().int(),
   embeddedChunks: z.number().int(),
   claims: z.number().int(),
+  excerpt: z.array(z.object({ speaker: z.string().nullable(), text: z.string() })),
   createdAt: z.string(),
 });
 export type Source = z.infer<typeof Source>;

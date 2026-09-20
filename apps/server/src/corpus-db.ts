@@ -140,7 +140,7 @@ const migrations = [
   `ALTER TABLE catalog_column ADD COLUMN checks INTEGER NOT NULL DEFAULT 0; ALTER TABLE catalog_column ADD COLUMN agreeing INTEGER NOT NULL DEFAULT 0;`,
 ];
 
-export type SourceDraft = Omit<Source, "id" | "workspace" | "pages" | "ocrPages" | "segments" | "chunks" | "embeddedChunks" | "claims" | "createdAt"> & { parentSourceId: number | null };
+export type SourceDraft = Omit<Source, "id" | "workspace" | "pages" | "ocrPages" | "segments" | "chunks" | "embeddedChunks" | "claims" | "excerpt" | "createdAt"> & { parentSourceId: number | null };
 export type SegmentDraftRow = { text: string; speaker: string | null; locator: Locator; block: number };
 export type ChunkDraftRow = { sourceId: number | null; kind: ChunkKind; text: string; locator: Locator; tokens: number; segmentFrom: number | null; segmentTo: number | null; columnId?: number | null; claimId?: number | null };
 export type ClaimDraft = { chunkId: number; sourceId: number; statement: string; quote: string; speaker: string | null; occurredAt: string | null; provenance: Provenance; status: ClaimStatus; locator: Locator; namedColumn: string | null };
@@ -176,7 +176,7 @@ export function openCorpus(db: Database.Database, workspace: WorkspaceSlug) {
   const run = (sql: string, ...params: unknown[]) => prepare(sql).run(...params);
   const transaction = <T>(fn: () => T): T => db.transaction(fn)();
 
-  const sourceSql = `SELECT s.*, (SELECT COUNT(*) FROM segment WHERE source_id = s.id) AS segments, (SELECT COUNT(*) FROM chunk WHERE source_id = s.id) AS chunks, (SELECT COUNT(*) FROM chunk WHERE source_id = s.id AND embedded = 1) AS embedded_chunks, (SELECT COUNT(*) FROM claim WHERE source_id = s.id) AS claims FROM source s`;
+  const sourceSql = `SELECT s.*, (SELECT COUNT(*) FROM segment WHERE source_id = s.id) AS segments, (SELECT COUNT(*) FROM chunk WHERE source_id = s.id) AS chunks, (SELECT COUNT(*) FROM chunk WHERE source_id = s.id AND embedded = 1) AS embedded_chunks, (SELECT COUNT(*) FROM claim WHERE source_id = s.id) AS claims, (SELECT json_group_array(json_object('speaker', speaker, 'text', substr(text, 1, 240))) FROM (SELECT speaker, text FROM segment WHERE source_id = s.id ORDER BY seq LIMIT 6)) AS excerpt FROM source s`;
   const sourceOf = (r: Row): Source => ({
     id: r.id as number,
     workspace,
@@ -199,6 +199,7 @@ export function openCorpus(db: Database.Database, workspace: WorkspaceSlug) {
     chunks: r.chunks as number,
     embeddedChunks: r.embedded_chunks as number,
     claims: r.claims as number,
+    excerpt: JSON.parse(r.excerpt as string) as Source["excerpt"],
     createdAt: r.created_at as string,
   });
   const segmentOf = (r: Row): Segment => ({ id: r.id as number, sourceId: r.source_id as number, seq: r.seq as number, text: r.text as string, speaker: r.speaker as string | null, locator: Locator.parse(JSON.parse(r.locator as string)) });

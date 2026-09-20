@@ -8,7 +8,6 @@ import { EvidenceSheet } from "@/components/evidence-sheet";
 import { NotificationBell } from "@/components/notifications/notification-bell";
 import { AppBreadcrumb } from "./app-breadcrumb";
 import { AppSidebar } from "./app-sidebar";
-import { ColorPaletteSwitch } from "./color-palette-switch";
 import { CommandPalette, useCommandPalette } from "./command-palette";
 import { ProductTour, useProductTour } from "./product-tour";
 import { useWorkspace } from "./workspace-context";
@@ -23,7 +22,7 @@ export function AppLayout() {
     <SidebarProvider>
       <AppSidebar />
       <SidebarInset>
-        <header className="sticky top-0 z-10 flex h-12 shrink-0 items-center gap-2 border-b bg-background px-4">
+        <header className="sticky top-0 z-10 flex h-12 shrink-0 items-center gap-3 border-b bg-background px-4">
           <SidebarTrigger />
           <Separator orientation="vertical" className="h-4" />
           <AppBreadcrumb />
@@ -36,7 +35,6 @@ export function AppLayout() {
           <Button variant="ghost" size="icon-sm" aria-label="Take the product tour" onClick={tour.restart}>
             <CircleHelpIcon aria-hidden="true" />
           </Button>
-          <ColorPaletteSwitch />
         </header>
         <div className="flex flex-1 flex-col p-4">
           <Outlet />

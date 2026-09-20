@@ -79,19 +79,19 @@ function SensorBody({ run, report, row, initialTab, lens }: { run: Run | undefin
       </SheetHeader>
       <Tabs defaultValue={initialTab} className="px-4 pb-4">
         <TabsList aria-label={`${row.alias} details`}>
-          <TabsTrigger value="fingerprint">Fingerprint</TabsTrigger>
           <TabsTrigger value="roles">Roles</TabsTrigger>
+          <TabsTrigger value="fingerprint">Fingerprint</TabsTrigger>
           <TabsTrigger value="relations">Relations</TabsTrigger>
           <TabsTrigger value="knowledge">Knowledge</TabsTrigger>
           <TabsTrigger value="notes">Notes</TabsTrigger>
         </TabsList>
         {detail.data ? (
           <>
-            <TabsContent value="fingerprint">
-              <FingerprintTab alias={row.alias} fingerprint={detail.data.fingerprint} label={label} dt={dt} />
-            </TabsContent>
             <TabsContent value="roles">
               <RolesTab detail={detail.data} />
+            </TabsContent>
+            <TabsContent value="fingerprint">
+              <FingerprintTab alias={row.alias} fingerprint={detail.data.fingerprint} label={label} dt={dt} />
             </TabsContent>
             <TabsContent value="relations">
               <RelationsTab detail={detail.data} report={report} lens={lens} dt={dt} />

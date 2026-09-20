@@ -4,6 +4,7 @@ import { Link } from "react-router";
 import { EqualIcon, EqualNotIcon, FilesIcon } from "lucide-react";
 import { Domain, Purpose, stageNames, type Run } from "@tpm/schemas";
 import { keys, listRuns } from "@/api";
+import { defaultRunId } from "@/layout/screens";
 import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,7 +19,7 @@ type Filter = "all" | Domain;
 export function RunsScreen() {
   const runs = useQuery({ queryKey: keys.runs, queryFn: listRuns });
   const [filter, setFilter] = useState<Filter>("all");
-  const [selected, setSelected] = useState<string[]>([]);
+  const [selected, setSelected] = useState<string[]>([defaultRunId]);
 
   const toggle = (id: string, checked: boolean) =>
     setSelected((ids) => (checked ? [...ids.filter((x) => x !== id), id].slice(-2) : ids.filter((x) => x !== id)));

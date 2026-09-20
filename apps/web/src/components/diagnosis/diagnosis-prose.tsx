@@ -1,4 +1,4 @@
-import { ChartLineIcon, CheckIcon, FileTextIcon, SparklesIcon, XIcon } from "lucide-react";
+import { BotIcon, ChartLineIcon, CheckIcon, FileTextIcon, XIcon } from "lucide-react";
 import type { DiagnosisValue } from "@tpm/schemas";
 import { openEvidence } from "@/hooks/use-evidence-sheet";
 
@@ -7,7 +7,7 @@ export function DiagnosisProse({ prose }: { prose: DiagnosisValue["prose"] }) {
     return <p className="text-sm text-muted-foreground">No prose yet. The reasoning steps carry the diagnosis.</p>;
   }
   const { source, validation } = prose;
-  const SourceIcon = source === "model" ? SparklesIcon : FileTextIcon;
+  const SourceIcon = source === "model" ? BotIcon : FileTextIcon;
   const ValidIcon = validation.pass ? CheckIcon : XIcon;
   const errors = validation.errors.length;
   return (

@@ -1,9 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { NavLink, useLocation, useNavigate } from "react-router";
 import { BookOpenIcon, CircleHelpIcon, FileTextIcon, FilesIcon, ListChecksIcon, LogOutIcon, PlayIcon, PlugIcon, UserIcon } from "lucide-react";
-import { keys, listRuns } from "@/api";
+import { getSensors, keys, listRuns } from "@/api";
 import { useActiveRunId } from "@/hooks/use-active-run-id";
 import { useLens } from "@/hooks/use-lens";
+import { useProfilePhoto } from "@/hooks/use-profile-photo";
 import { UserAvatar } from "@/components/user-avatar";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -17,13 +18,16 @@ import {
   SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
+  SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarMenuSkeleton,
   SidebarRail,
 } from "@/components/ui/sidebar";
 import { demoUser } from "@/lib/demo-user";
-import { screens, type ScreenSlug } from "./screens";
+import { defaultRunId, screens, type ScreenSlug } from "./screens";
+import { EvidlineLogo } from "@/components/evidline-logo";
+import { EvidlineMark } from "@/components/evidline-mark";
 import { WorkspaceSwitcher } from "./workspace-switcher";
 
 const knowledgeScreens = [
@@ -42,19 +46,21 @@ export function currentScreen(pathname: string): ScreenSlug | null {
 export function AppSidebar() {
   const runId = useActiveRunId();
   const lens = useLens();
+  const photoUrl = useProfilePhoto();
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const runs = useQuery({ queryKey: keys.runs, queryFn: listRuns });
   const screen = currentScreen(pathname) ?? "sensors";
+  const selectedRunId = runId ?? (runs.data?.some((r) => r.id === defaultRunId) ? defaultRunId : "");
+  const sensors = useQuery({ queryKey: keys.sensors(selectedRunId), queryFn: () => getSensors(selectedRunId), enabled: selectedRunId !== "" });
+  const nameDisagreements = sensors.data?.sensors.filter((s) => s.nameChecks.some((c) => c.agrees === false)).length ?? 0;
 
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader>
-        <div className="flex h-8 items-center gap-2 px-2 font-medium group-data-[collapsible=icon]:justify-center">
-          <span className="font-mono text-xs" aria-hidden="true">
-            TPM
-          </span>
-          <span className="truncate group-data-[collapsible=icon]:hidden">Process Monitor</span>
+        <div className="flex h-14 items-center px-2 group-data-[collapsible=icon]:justify-center">
+          <EvidlineLogo replayKey={pathname} className="h-10 group-data-[collapsible=icon]:hidden" />
+          <EvidlineMark replayKey={pathname} className="hidden size-6 group-data-[collapsible=icon]:inline-block" />
         </div>
         <WorkspaceSwitcher />
         <div className="flex flex-col gap-1 group-data-[collapsible=icon]:hidden">
@@ -64,7 +70,7 @@ export function AppSidebar() {
           {runs.isPending ? (
             <SidebarMenuSkeleton />
           ) : (
-            <Select value={runId ?? ""} onValueChange={(id) => navigate(`/runs/${id}/${screen}`)}>
+            <Select value={selectedRunId} onValueChange={(id) => navigate(`/runs/${id}/${screen}`)}>
               <SelectTrigger id="run-selector" size="sm" className="w-full">
                 <SelectValue placeholder="Select a run" />
               </SelectTrigger>
@@ -104,14 +110,14 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
         <SidebarGroup>
-          <SidebarGroupLabel>{runId ? `Run ${runId}` : "Select a run"}</SidebarGroupLabel>
+          <SidebarGroupLabel>{selectedRunId ? `Run ${selectedRunId}` : "Select a run"}</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {screens.map(({ slug, label, icon: Icon }) => (
                 <SidebarMenuItem key={slug}>
-                  {runId ? (
-                    <SidebarMenuButton asChild isActive={pathname === `/runs/${runId}/${slug}`} tooltip={label(lens)}>
-                      <NavLink to={`/runs/${runId}/${slug}`}>
+                  {selectedRunId ? (
+                    <SidebarMenuButton asChild isActive={pathname === `/runs/${selectedRunId}/${slug}`} tooltip={label(lens)}>
+                      <NavLink to={`/runs/${selectedRunId}/${slug}`}>
                         <Icon aria-hidden="true" />
                         <span>{label(lens)}</span>
                       </NavLink>
@@ -122,6 +128,11 @@ export function AppSidebar() {
                       <span>{label(lens)}</span>
                     </SidebarMenuButton>
                   )}
+                  {slug === "sensors" && nameDisagreements > 0 ? (
+                    <SidebarMenuBadge aria-label={`${nameDisagreements} sensor${nameDisagreements === 1 ? "" : "s"} disagree on name`}>
+                      {nameDisagreements}
+                    </SidebarMenuBadge>
+                  ) : null}
                 </SidebarMenuItem>
               ))}
             </SidebarMenu>
@@ -151,7 +162,7 @@ export function AppSidebar() {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <SidebarMenuButton size="lg" tooltip={demoUser.name}>
-                  <UserAvatar name={demoUser.name} />
+                  <UserAvatar name={demoUser.name} photoUrl={photoUrl} />
                   <span className="flex flex-col items-start truncate group-data-[collapsible=icon]:hidden">
                     <span className="truncate text-sm">{demoUser.name}</span>
                     <span className="truncate text-xs text-muted-foreground">{demoUser.email}</span>

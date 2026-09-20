@@ -28,7 +28,8 @@ export function KnowledgeTab({ sourceName }: { sourceName: string }) {
         ) : (
           <>
             <span>Hypothesis: {column.hypothesis ?? <span className="text-muted-foreground">none</span>}</span>
-            <ConfidenceBar value={column.confidence} />
+            <span className="text-xs text-muted-foreground">Column match confidence</span>
+            <ConfidenceBar value={column.confidence} label="column match confidence" />
           </>
         )}
         <span className="text-muted-foreground">

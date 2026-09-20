@@ -1,0 +1,16 @@
+import { loadSource } from "@tpm/adapters";
+import { createMemorySink, runPipeline, window } from "@tpm/core";
+const path = process.argv[2] ?? "te_process.csv";
+const mode = process.argv[3] ?? "as-is";
+const t = performance.now();
+const source = await loadSource(path);
+const grid = mode === "continuous" ? { ...source.grid, episodes: [window(0, source.grid.n)] } : source.grid;
+console.log(`loaded in ${((performance.now() - t) / 1000).toFixed(1)} s`, JSON.stringify({ mode, n: grid.n, sensors: grid.aliases.length, episodes: grid.episodes.length, bucket: source.stats.bucket }));
+const sink = createMemorySink("grid0001");
+const result = runPipeline(grid, sink, { onStage: (name, ms, counts) => console.log(`stage ${name}: ${ms} ms`, JSON.stringify(counts)) });
+console.log(`total ${((performance.now() - t) / 1000).toFixed(1)} s`);
+console.log("baseline", JSON.stringify(result.baseline.value.window), result.baseline.claim);
+console.log("health failed", JSON.stringify(result.health.filter((h) => h.value.health !== "healthy").map((h) => [h.value.sensor, h.value.health])));
+console.log("roles", JSON.stringify(result.roles.filter((r) => r.value.role !== "unknown").map((r) => [r.value.sensor, r.value.role, r.confidence])));
+console.log("drifting", JSON.stringify(result.drifts.filter((d) => d.value.drifting).map((d) => [d.value.sensor, d.value.responsible, d.value.onset, d.value.inRange])));
+for (const i of result.incidents) console.log("incident", i.value.faultClass, JSON.stringify(i.value.window), "onset", i.value.onset, "ranked", JSON.stringify(i.value.ranked.slice(0, 6).map((r) => [r.sensor, r.contribution])), "excluded", i.value.excluded.length, "\n  claim:", i.claim.slice(0, 600));

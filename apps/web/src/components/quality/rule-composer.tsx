@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router";
-import { CheckIcon, CircleAlertIcon, PlayIcon, PlusIcon, WandSparklesIcon } from "lucide-react";
+import { CheckIcon, CircleAlertIcon, PlayIcon, PlusIcon } from "lucide-react";
 import type { Rule } from "@tpm/schemas";
 import { compileRule, keys } from "@/api";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -78,7 +78,6 @@ export function RuleComposer({ runId, gridSize }: { runId: string; gridSize: num
             />
             <div>
               <Button type="submit" disabled={compile.isPending || sentence.trim().length === 0}>
-                <WandSparklesIcon aria-hidden="true" />
                 Compile
               </Button>
             </div>

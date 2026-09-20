@@ -1,5 +1,6 @@
 import { Hono } from "hono";
-import type { EgressTotals } from "@tpm/schemas";
+import type { EgressTotals, TemplateCatalog } from "@tpm/schemas";
+import { extractTemplate } from "@tpm/egress";
 import type { AppContext } from "../context";
 import type { Db } from "../db";
 import { notFound, runIdQuery } from "../request";
@@ -25,7 +26,7 @@ export function egressRoutes(ctx: AppContext) {
   return new Hono()
     .get("/", (c) => c.json(ctx.db.egress.list(runIdQuery(c))))
     .get("/totals", (c) => c.json(egressTotals(ctx.db, runIdQuery(c))))
-    .get("/templates", (c) => c.json(ctx.gateway.templates()))
+    .get("/templates", (c) => c.json({ ...ctx.gateway.templates(), extract: { text: extractTemplate, hash: ctx.textGateway.templateHash } } satisfies TemplateCatalog))
     .get("/:id", (c) => {
       const record = ctx.db.egress.get(c.req.param("id"));
       if (!record) throw notFound("egress record");

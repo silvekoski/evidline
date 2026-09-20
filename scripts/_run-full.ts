@@ -1,0 +1,17 @@
+import { loadSource } from "@tpm/adapters";
+import { createMemorySink, runPipeline } from "@tpm/core";
+const path = process.argv[2] ?? "te_process.csv";
+const t = performance.now();
+const source = await loadSource(path, { onProgress: (rows) => { if (rows % (1 << 20) === 0) console.log(`${rows} rows, ${((performance.now() - t) / 1000).toFixed(0)} s`); } });
+console.log(`loaded in ${((performance.now() - t) / 1000).toFixed(1)} s`, JSON.stringify({ n: source.grid.n, sensors: source.grid.aliases.length, stats: source.stats }));
+const sink = createMemorySink("full0001");
+const result = runPipeline(source.grid, sink, { onStage: (name, ms, counts) => console.log(`stage ${name}: ${ms} ms`, JSON.stringify(counts), `rss ${(process.memoryUsage().rss / 1e6).toFixed(0)} MB`) });
+console.log(`total ${((performance.now() - t) / 1000).toFixed(1)} s`);
+console.log("baseline", JSON.stringify(result.baseline.value.window), result.baseline.claim);
+console.log("health failed", JSON.stringify(result.health.filter((h) => h.value.health !== "healthy").map((h) => [h.value.sensor, h.value.health])));
+console.log("drifting", JSON.stringify(result.drifts.filter((d) => d.value.drifting).map((d) => [d.value.sensor, d.value.responsible, d.value.onset])));
+console.log("incidents", JSON.stringify(result.incidents.map((i) => ({ ...i, evidenceIds: undefined })), null, 1).slice(0, 4000));
+console.log("evidence", sink.evidence.length, "derived", sink.derived.size);
+let bytes = 0;
+for (const d of sink.derived.values()) for (const v of Object.values(d)) bytes += v.byteLength;
+console.log("derived bytes", bytes);

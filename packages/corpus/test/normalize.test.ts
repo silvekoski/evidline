@@ -66,6 +66,20 @@ describe("documents", () => {
     expect(loc.kind === "file" && markdown.slice(loc.charStart, loc.charEnd)).toBe("xmeas_7 is the reactor pressure. The unit is kPa gauge.");
   });
 
+  it("keeps the row breaks of a markdown table instead of flattening it into one line", async () => {
+    const table = "| Letters | Meaning |\n| --- | --- |\n| FI | Flow indication |\n| PI | Pressure indication |\n";
+    const n = await normalizeFile(file("legend.md", table));
+    expect(n.segments).toHaveLength(1);
+    expect(n.segments[0]!.text).toBe("| Letters | Meaning |\n| --- | --- |\n| FI | Flow indication |\n| PI | Pressure indication |");
+  });
+
+  it("keeps the line breaks of a markdown list instead of flattening it into one line", async () => {
+    const list = "- Reactor pressure trips at 2800 kPa.\n- Purge valve opens above 2800 kPa.\n";
+    const n = await normalizeFile(file("notes.md", list));
+    expect(n.segments).toHaveLength(1);
+    expect(n.segments[0]!.text).toBe("- Reactor pressure trips at 2800 kPa.\n- Purge valve opens above 2800 kPa.");
+  });
+
   it("reads pptx slides with slide numbers", async () => {
     const n = await normalizeFile(file("deck.pptx", await pptx([["Title", "Dryer 3 overview"], ["The valve sticks after a wash."]])));
     expect(n.segments.map((s) => [s.text, s.locator.kind === "file" ? s.locator.page : null])).toEqual([["Title", 1], ["Dryer 3 overview", 1], ["The valve sticks after a wash.", 2]]);

@@ -12,7 +12,6 @@ import {
   FileWarningIcon,
   PenIcon,
   RefreshCwIcon,
-  SparklesIcon,
   TriangleIcon,
   TrendingUpIcon,
 } from "lucide-react";
@@ -22,7 +21,7 @@ import { Badge } from "@/components/ui/badge";
 
 export type StatusKind = "healthy" | "drift" | FaultFamily | "hypothesis" | InferenceStatus | EgressRecord["status"];
 
-const styles: Record<StatusKind, { icon: typeof CheckIcon; word: string; variant: ComponentProps<typeof Badge>["variant"]; className?: string }> = {
+const styles: Record<StatusKind, { icon: typeof CheckIcon | null; word: string; variant: ComponentProps<typeof Badge>["variant"]; className?: string }> = {
   sent: { icon: SendIcon, word: "sent", variant: "outline" },
   blocked: { icon: BanIcon, word: "blocked", variant: "default" },
   off: { icon: PowerOffIcon, word: "off", variant: "outline", className: "text-muted-foreground" },
@@ -32,7 +31,7 @@ const styles: Record<StatusKind, { icon: typeof CheckIcon; word: string; variant
   sensor: { icon: CircleOffIcon, word: "Sensor fault", variant: "default" },
   process: { icon: TriangleIcon, word: "Process fault", variant: "default" },
   data: { icon: FileWarningIcon, word: "Data fault", variant: "default" },
-  hypothesis: { icon: SparklesIcon, word: "hypothesis", variant: "ghost", className: "italic px-0" },
+  hypothesis: { icon: null, word: "hypothesis", variant: "ghost", className: "italic px-0" },
   proposed: { icon: CircleDashedIcon, word: "proposed", variant: "ghost", className: "text-muted-foreground px-0" },
   accepted: { icon: CheckIcon, word: "accepted", variant: "ghost", className: "px-0" },
   questioned: { icon: CircleHelpIcon, word: "questioned", variant: "ghost", className: "px-0" },
@@ -48,7 +47,7 @@ export function StatusBadge({ kind, label, className }: { kind: StatusKind; labe
   const { icon: Icon, word, variant, className: kindClass } = styles[kind];
   return (
     <Badge variant={variant} className={cn("font-normal", kindClass, className)}>
-      <Icon aria-hidden="true" />
+      {Icon && <Icon aria-hidden="true" />}
       {kind === "hypothesis" && label ? `${label}, ${word}` : (label ?? word)}
     </Badge>
   );

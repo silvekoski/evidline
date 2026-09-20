@@ -54,6 +54,7 @@ type RenderProps<T> = {
   rowProps?: (row: Row<T>) => ComponentProps<"tr"> & { "data-state"?: string };
   empty?: ReactNode;
   pagination?: boolean;
+  dense?: boolean;
 };
 
 type ManagedProps<T> = RenderProps<T> & {
@@ -90,7 +91,7 @@ function ManagedTable<T>({ columns, data, getRowId, initialSorting = [], expande
   return <TableView {...props} table={table} />;
 }
 
-function TableView<T>({ table, label, renderExpanded, rowProps, empty = "No rows.", pagination }: RenderProps<T> & { table: TableInstance<T> }) {
+function TableView<T>({ table, label, renderExpanded, rowProps, empty = "No rows.", pagination, dense }: RenderProps<T> & { table: TableInstance<T> }) {
   const rows = table.getRowModel().rows;
   const span = table.getVisibleLeafColumns().length;
   const { pageIndex, pageSize } = table.getState().pagination;
@@ -113,10 +114,15 @@ function TableView<T>({ table, label, renderExpanded, rowProps, empty = "No rows
                     key={header.id}
                     scope="col"
                     aria-sort={sorted === "asc" ? "ascending" : sorted === "desc" ? "descending" : header.column.getCanSort() ? "none" : undefined}
-                    className={cn("h-8", meta?.numeric && "text-right", meta?.className)}
+                    className={cn(dense ? "h-7 px-1.5" : "h-8", meta?.numeric && "text-right", meta?.className)}
                   >
                     {header.column.getCanSort() ? (
-                      <Button variant="ghost" size="xs" className={cn("-mx-2 h-7 font-medium", meta?.numeric && "flex-row-reverse")} onClick={header.column.getToggleSortingHandler()}>
+                      <Button
+                        variant="ghost"
+                        size="xs"
+                        className={cn(dense ? "-mx-1.5 h-6" : "-mx-2 h-7", "font-medium", meta?.numeric && "flex-row-reverse")}
+                        onClick={header.column.getToggleSortingHandler()}
+                      >
                         {content}
                         {sorted === "asc" ? (
                           <ArrowUpIcon aria-hidden="true" />
@@ -149,7 +155,7 @@ function TableView<T>({ table, label, renderExpanded, rowProps, empty = "No rows
                   {row.getVisibleCells().map((cell) => {
                     const meta = metaOf(cell.column);
                     return (
-                      <TableCell key={cell.id} className={cn("py-1", meta?.numeric && "text-right font-mono tabular-nums", meta?.className)}>
+                      <TableCell key={cell.id} className={cn(dense ? "px-1.5 py-0.5" : "py-1", meta?.numeric && "text-right font-mono tabular-nums", meta?.className)}>
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
                       </TableCell>
                     );

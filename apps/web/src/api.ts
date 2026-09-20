@@ -56,7 +56,7 @@ import {
   SearchResult,
   SensorDetail,
   SensorReport,
-  TemplateInfo,
+  TemplateCatalog,
   ThreadEntry,
   type ModelMode,
   type OverrideValue,
@@ -243,7 +243,7 @@ export const verifyLog = () => request(LogVerification, "/log/verify");
 export const logExportUrl = (format: "json" | "csv") => `${apiBase()}/log/export?format=${format}`;
 export const getEgress = (runId?: string) => request(arrayOf(EgressRecord), `/egress${runQuery(runId)}`);
 export const getEgressTotals = (runId?: string) => request(EgressTotals, `/egress/totals${runQuery(runId)}`);
-export const getEgressTemplates = () => request(TemplateInfo, "/egress/templates");
+export const getEgressTemplates = () => request(TemplateCatalog, "/egress/templates");
 export const getEgressRecord = (id: string) => request(EgressRecord, `/egress/${id}`);
 const put = (body: unknown): RequestInit => ({ method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
 export const getModelSettings = () => request(ModelSettings, "/settings/model");

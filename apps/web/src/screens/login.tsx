@@ -1,6 +1,7 @@
 import type { FormEvent } from "react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { EvidlineLogo } from "@/components/evidline-logo";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -23,7 +24,8 @@ export function LoginScreen() {
   return (
     <main className="flex min-h-svh flex-col items-center justify-center gap-3 p-6">
       <Card className="w-full max-w-sm">
-        <CardHeader>
+        <CardHeader className="justify-items-center text-center">
+          <EvidlineLogo className="mb-2 h-12" />
           <CardTitle>Log in</CardTitle>
           <CardDescription>Use the demo account below.</CardDescription>
         </CardHeader>

@@ -213,8 +213,14 @@ export const EgressTotals = z.object({
 });
 export type EgressTotals = z.infer<typeof EgressTotals>;
 
-export const TemplateInfo = z.record(Purpose, z.object({ text: z.string(), hash: z.string() }));
+const Template = z.object({ text: z.string(), hash: z.string() });
+export const TemplateInfo = z.record(Purpose, Template);
 export type TemplateInfo = z.infer<typeof TemplateInfo>;
+
+export const TemplateName = z.enum([...Purpose.options, "extract"]);
+export type TemplateName = z.infer<typeof TemplateName>;
+export const TemplateCatalog = z.record(TemplateName, Template);
+export type TemplateCatalog = z.infer<typeof TemplateCatalog>;
 
 export const ReviewMatch = z.enum(["class", "family", "none"]);
 export type ReviewMatch = z.infer<typeof ReviewMatch>;
@@ -246,11 +252,14 @@ export const NameCheck = z.object({
   name: z.string().nullable(),
   quantity: z.string().nullable(),
   confidence: z.number().nullable(),
+  reason: z.string().nullable(),
   agrees: z.boolean().nullable(),
   error: z.string().nullable(),
 });
 export type NameCheck = z.infer<typeof NameCheck>;
+export const PrimaryName = NameCheck.omit({ agrees: true, error: true });
+export type PrimaryName = z.infer<typeof PrimaryName>;
 export const NameCheckJob = z.object({ runId: z.string(), done: z.number().int(), total: z.number().int(), model: z.string() });
 export type NameCheckJob = z.infer<typeof NameCheckJob>;
-export const NameCheckReport = z.object({ pending: NameCheckJob.nullable(), checks: z.array(NameCheck) });
+export const NameCheckReport = z.object({ pending: NameCheckJob.nullable(), primary: PrimaryName.nullable(), checks: z.array(NameCheck) });
 export type NameCheckReport = z.infer<typeof NameCheckReport>;

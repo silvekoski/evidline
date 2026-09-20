@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router";
-import { CopyIcon, DownloadIcon, FileTextIcon } from "lucide-react";
+import { CopyIcon, DownloadIcon, FileTextIcon, MessageCircleQuestionIcon } from "lucide-react";
 import { toast } from "sonner";
 import type { DataSpec } from "@tpm/schemas";
 import { buildSpec, keys, listClaims } from "@/api";
@@ -43,6 +43,8 @@ export function SpecScreen() {
   const claimById = new Map((claims.data ?? []).map((c) => [c.id, c]));
   const byColumn = new Map<string, DataSpec["sentences"]>();
   for (const s of spec.data?.sentences ?? []) byColumn.set(s.column, [...(byColumn.get(s.column) ?? []), s]);
+  const pendingByColumn = new Map<string, number>();
+  for (const c of claims.data ?? []) for (const column of new Set(c.links.map((l) => l.column))) pendingByColumn.set(column, (pendingByColumn.get(column) ?? 0) + 1);
 
   return (
     <>
@@ -116,7 +118,20 @@ export function SpecScreen() {
               <h2 id="spec-missing" className="mb-2 text-sm font-medium">
                 Columns without a confirmed claim ({spec.data.columnsWithoutClaims.length})
               </h2>
-              <p className="font-mono text-xs text-muted-foreground">{spec.data.columnsWithoutClaims.join(", ")}</p>
+              <ul className="flex flex-wrap gap-1.5" aria-label="Columns without a confirmed claim">
+                {spec.data.columnsWithoutClaims.map((column) => {
+                  const pending = pendingByColumn.get(column) ?? 0;
+                  return (
+                    <li key={column}>
+                      <Badge variant={pending > 0 ? "secondary" : "outline"} className="gap-1 font-mono">
+                        {pending > 0 && <MessageCircleQuestionIcon aria-hidden="true" className="size-3" />}
+                        {column}
+                        {pending > 0 && <span className="sr-only">, {pending} claim{pending === 1 ? "" : "s"} to review</span>}
+                      </Badge>
+                    </li>
+                  );
+                })}
+              </ul>
               <Button asChild size="xs" variant="outline" className="mt-2">
                 <Link to="/open-questions">Answer the open questions</Link>
               </Button>

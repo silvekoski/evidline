@@ -1,7 +1,7 @@
 import { useScrollTarget } from "@/hooks/use-scroll-target";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "react-router";
-import { ActivityIcon, SparklesIcon } from "lucide-react";
+import { ActivityIcon } from "lucide-react";
 import { toast } from "sonner";
 import { getNameCheckStatus, getSensors, keys, startNameChecks } from "@/api";
 import { shortModel } from "@/components/sensors/name-checks";
@@ -64,7 +64,7 @@ export function SensorsScreen() {
               {pending ? `Cross-check ${pending.done} of ${pending.total}, now ${shortModel(pending.model)}` : `Reviewers: ${checkStatus.data.models.map(shortModel).join(", ")}`}
             </span>
             <Button size="sm" variant="outline" onClick={() => checkAll.mutate()} disabled={checkAll.isPending || pending !== null}>
-              <SparklesIcon aria-hidden="true" /> Cross-check names
+              Cross-check names
             </Button>
           </span>
         )}
@@ -87,7 +87,7 @@ export function SensorsScreen() {
             run={run.data}
             report={report.data}
             row={selected}
-            initialTab={id === selected?.roleInferenceId ? "roles" : tab === "knowledge" ? "knowledge" : "fingerprint"}
+            initialTab={tab === "knowledge" ? "knowledge" : "roles"}
             lens={lens}
             onClose={() => open(null)}
           />

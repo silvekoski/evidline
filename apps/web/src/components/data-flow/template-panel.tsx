@@ -1,5 +1,5 @@
 import { EqualIcon, EqualNotIcon } from "lucide-react";
-import { Purpose, type TemplateInfo } from "@tpm/schemas";
+import { TemplateName, type Purpose, type TemplateCatalog } from "@tpm/schemas";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { shortHash } from "@/lib/format";
@@ -19,24 +19,24 @@ export function HashMatch({ hash, runHash }: { hash: string; runHash: string | u
   );
 }
 
-export function TemplatePanel({ templates, runHashes }: { templates: TemplateInfo; runHashes: Partial<Record<Purpose, string>> | undefined }) {
+export function TemplatePanel({ templates, runHashes }: { templates: TemplateCatalog; runHashes: Partial<Record<Purpose, string>> | undefined }) {
   return (
     <Card size="sm">
       <CardHeader>
         <CardTitle>Prompt templates</CardTitle>
-        <CardDescription>Five constant templates with no dataset text. The panel compares each hash with the hash that the active run recorded.</CardDescription>
+        <CardDescription>Every constant template, with no dataset text. The panel compares each run template with the hash that the active run recorded.</CardDescription>
       </CardHeader>
       <CardContent>
         <Accordion type="multiple">
-          {Purpose.options.map((purpose) => {
-            const template = templates[purpose];
+          {TemplateName.options.map((name) => {
+            const template = templates[name];
             return (
-              <AccordionItem key={purpose} value={purpose}>
+              <AccordionItem key={name} value={name}>
                 <AccordionTrigger className="items-center">
                   <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                    <span className="font-mono">{purpose}</span>
+                    <span className="font-mono">{name}</span>
                     <span className="font-mono text-xs text-muted-foreground">{shortHash(template.hash)}</span>
-                    <HashMatch hash={template.hash} runHash={runHashes?.[purpose]} />
+                    {name === "extract" ? <span className="text-xs text-muted-foreground">knowledge, not tied to a run</span> : <HashMatch hash={template.hash} runHash={runHashes?.[name]} />}
                   </span>
                 </AccordionTrigger>
                 <AccordionContent className="flex flex-col gap-2">

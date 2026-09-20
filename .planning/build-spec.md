@@ -158,7 +158,7 @@ export function roundPayload(value: unknown): unknown;
 - Shared parts from PRD section 8: `EvidenceChip` (Badge + HoverCard, opens the `EvidenceSheet`), `EvidenceSheet` (one Sheet, chart plus method, window, stats table), `ActionBar` (Accept, Question, Override on every inference), `StatusBadge` (shapes and words, no color), `ConfidenceBar` (5 segments plus mono number), `FaultBadge`. Charts through `components/ui/chart.tsx` only.
 - Lens: `useLens()` returns the words for the run domain.
 - Accessibility: every control works with a keyboard, every icon-only button has `aria-label`, every chart has a text summary next to it.
-- Color palettes: `src/palettes.css` holds one `:root[data-palette="<id>"]` block per palette, the dark variants of tweakcn presets, color keys only. `lib/color-palette.ts` lists the ids and stores the choice in `localStorage` under `tpm.color-palette`. `main.tsx` sets `data-palette` before render. The header switch (`layout/color-palette-switch.tsx`) is a radio menu. Mono is the base and the default.
+- Colors: `index.css` holds the dark variant of the tweakcn Amber minimal preset, colors only. Fonts, radius and shadows are local.
 - Theme preview: the dev server page holds the tweakcn live-preview script (`tweakcnPreview` in `vite.config.ts`). It acts only inside the tweakcn.com editor iframe. A production build never holds it.
 
 ## scripts

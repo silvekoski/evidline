@@ -17,7 +17,6 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DataTable } from "@/components/data-table";
 import { HealthBadge } from "./health-badge";
-import { Hypothesis } from "./hypothesis";
 import { NameCheckMarks } from "./name-checks";
 import { KnowledgeCell } from "./knowledge-cell";
 import { useOpenSensor } from "./use-open-sensor";
@@ -31,7 +30,7 @@ const columns = [
     meta: { className: "font-mono" },
   }),
   column.accessor("sourceName", {
-    header: "Source column, never sent",
+    header: () => <span title="Values in this column are never sent to any model.">Source column</span>,
     cell: ({ getValue }) => <span className="font-mono text-xs text-muted-foreground">{getValue()}</span>,
   }),
   column.accessor("signalType", { header: "Signal type" }),
@@ -39,12 +38,21 @@ const columns = [
   column.accessor((row) => row.hypothesisName ?? "", {
     id: "hypothesisName",
     header: "Hypothesis",
-    cell: ({ row }) => (
-      <span className="inline-flex flex-wrap items-center gap-2">
-        <Hypothesis name={row.original.hypothesisName} />
-        <NameCheckMarks checks={row.original.nameChecks} roleInferenceId={row.original.roleInferenceId} />
-      </span>
-    ),
+    cell: ({ row }) => {
+      const name = row.original.hypothesisName;
+      return (
+        <span className="inline-flex min-w-0 flex-nowrap items-center gap-1.5">
+          {name ? (
+            <span className="min-w-0 max-w-48 truncate text-xs italic text-muted-foreground" title={name}>
+              {name}
+            </span>
+          ) : (
+            <span className="text-xs text-muted-foreground">no hypothesis (model off)</span>
+          )}
+          <NameCheckMarks checks={row.original.nameChecks} roleInferenceId={row.original.roleInferenceId} />
+        </span>
+      );
+    },
   }),
   column.display({
     id: "knowledge",
@@ -177,6 +185,7 @@ export function SensorTable({ sensors, current, lens }: { sensors: SensorRow[]; 
       <DataTable
         table={table}
         label="Sensors"
+        dense
         empty={`No ${lens.sensor} matches the filters.`}
         rowProps={(row) => ({
           id: row.original.alias,
