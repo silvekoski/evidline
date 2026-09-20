@@ -6,6 +6,7 @@ import { useActiveRunId } from "@/hooks/use-active-run-id";
 import { useLens } from "@/hooks/use-lens";
 import { useProfilePhoto } from "@/hooks/use-profile-photo";
 import { UserAvatar } from "@/components/user-avatar";
+import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -165,7 +166,12 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
         <SidebarGroup>
-          <SidebarGroupLabel>System</SidebarGroupLabel>
+          <SidebarGroupLabel className="justify-between group-data-[collapsible=icon]:justify-center">
+            System
+            <Badge variant="outline" className="text-[10px] text-muted-foreground group-data-[collapsible=icon]:hidden">
+              Advanced
+            </Badge>
+          </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {screens

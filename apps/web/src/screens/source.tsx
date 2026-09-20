@@ -4,7 +4,7 @@ import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import { ArrowLeftIcon, ChevronDownIcon, ChevronUpIcon, ExternalLinkIcon, PanelRightIcon, SearchIcon, XIcon } from "lucide-react";
 import { cn } from "cn";
 import type { Segment } from "@tpm/schemas";
-import { getSource, keys, sourceBlobUrl } from "@/api";
+import { getSource, keys } from "@/api";
 import { EmptyState } from "@/components/empty-state";
 import { sourceIcon } from "@/components/knowledge/badges";
 import { PageViewer } from "@/components/knowledge/page-viewer";
@@ -40,6 +40,7 @@ export function SourceScreen() {
   const detail = useQuery({ queryKey: keys.source(id), queryFn: () => getSource(id), refetchInterval: (q) => (q.state.data && isBusy(q.state.data.source.status) ? 2000 : false) });
   const [find, setFind] = useState("");
   const [matchIndex, setMatchIndex] = useState(0);
+  const [view, setView] = useState<View>("parsed");
   const [details, setDetails] = useState(() => localStorage.getItem(detailsKey) !== "closed");
   useEffect(() => localStorage.setItem(detailsKey, details ? "open" : "closed"), [details]);
 
@@ -81,7 +82,9 @@ export function SourceScreen() {
   const transcript = source.kind === "teams_call" || source.kind === "voice_note" || (segments.length > 0 && segments.every((s) => s.locator.kind === "teams_call"));
   const rows = !paged && segments.length > 0 && segments.every((s) => s.locator.kind === "file" && s.locator.row !== null);
   const body =
-    shown.length === 0 ? (
+    view === "original" ? (
+      <OriginalView source={source} />
+    ) : shown.length === 0 ? (
       <div className="p-6">
         <EmptyState title="No text yet" description={isBusy(source.status) ? "The pipeline processes this source." : paged ? "This page has no text segments." : "The source has no text segments."} />
       </div>
@@ -107,7 +110,7 @@ export function SourceScreen() {
           {source.title}
         </h1>
         <SourceStatusText status={source.status} className="text-xs" />
-        {segments.length > 0 && (
+        {view === "parsed" && segments.length > 0 && (
           <InputGroup className="w-full sm:w-72">
             <InputGroupAddon>
               <SearchIcon aria-hidden="true" />
@@ -151,11 +154,10 @@ export function SourceScreen() {
           </InputGroup>
         )}
         {source.blobPath && !paged && (
-          <Button asChild variant="outline" size="sm">
-            <a href={sourceBlobUrl(source.id)} target="_blank" rel="noreferrer">
-              <ExternalLinkIcon aria-hidden="true" /> Original
-            </a>
-          </Button>
+          <ToggleGroup type="single" variant="outline" size="sm" spacing={0} value={view} onValueChange={(v) => v && setView(v as View)} aria-label="View">
+            <ToggleGroupItem value="parsed">Parsed</ToggleGroupItem>
+            <ToggleGroupItem value="original">Original</ToggleGroupItem>
+          </ToggleGroup>
         )}
         {source.externalUrl && (
           <Button asChild variant="outline" size="sm">
