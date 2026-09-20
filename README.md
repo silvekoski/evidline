@@ -2,6 +2,10 @@
   <img src="apps/server/assets/evidline-banner.jpg" alt="Evidline: understand any sensor stream in minutes, with the customer's own words as proof.">
 </p>
 
+<p align="center">
+  <a href="https://evidline.silvekoski.com">Live demo</a>
+</p>
+
 # Evidline
 
 Figuratively speaking, Evidline reads an undocumented sensor stream and makes sense of it. It maps each of the hundreds of columns to what it measures, identifies drifting sensors, tells the difference between a sensor fault and a process fault, and shows relevant past sensor behavior to an engineer. Every inference shows its evidence, and the raw data never leaves the plant.
